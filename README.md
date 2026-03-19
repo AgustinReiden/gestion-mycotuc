@@ -1,36 +1,81 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Mycotuc Gestion
 
-## Getting Started
+App interna para gestionar ventas, gastos, inventario, produccion y contactos del emprendimiento Mycotuc.
 
-First, run the development server:
+## Stack
+
+- `Next.js` + `TypeScript` + `Tailwind CSS`
+- `Supabase Auth` + `Postgres`
+- Formularios con `React Hook Form` + `Zod`
+- Despliegue containerizado para `Coolify`
+
+## Que incluye este MVP
+
+- Login por `email/password` con Supabase Auth
+- Dashboard con KPIs, alertas y resumen por canal/categoria
+- Ventas multi-item con estado de cobro
+- Gastos manuales y compras de insumos ligadas a stock
+- Inventario de productos e insumos con ajustes manuales
+- Produccion por lotes simples
+- Agenda de clientes y proveedores
+- Reportes por periodo
+
+## Variables de entorno
+
+Copia `.env.example` a `.env.local` y completa:
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+NEXT_PUBLIC_SUPABASE_URL=
+NEXT_PUBLIC_SUPABASE_ANON_KEY=
+NEXT_PUBLIC_APP_URL=http://localhost:3000
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+`SUPABASE_SERVICE_ROLE_KEY` no es necesario para esta version, pero quedo documentado para futuras tareas backend-only.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Base de datos en Supabase
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+1. Crea un proyecto en Supabase.
+2. En `SQL Editor`, ejecuta todas las migraciones de `supabase/migrations` en orden por nombre.
+3. Si ya tenias usuarios creados en `Authentication`, asegúrate de ejecutar tambien las migraciones de sincronizacion de perfiles para hacer el backfill.
+4. Si quieres cargar datos de ejemplo, ejecuta `supabase/seed/seed.sql`.
+5. En `Authentication > Users`, crea manualmente los usuarios del equipo o usa los existentes.
 
-## Learn More
+Archivos SQL del proyecto:
 
-To learn more about Next.js, take a look at the following resources:
+- `supabase/migrations/20260318130000_initial_schema.sql`
+- `supabase/migrations/20260318152000_auth_profile_sync.sql`
+- `supabase/migrations/20260318164000_profile_self_heal_and_policy.sql`
+- `supabase/migrations/20260318180000_inventory_history_and_batch_guards.sql`
+- `supabase/seed/seed.sql`
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Desarrollo local
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+```bash
+npm.cmd install
+npm.cmd run dev
+```
 
-## Deploy on Vercel
+La app quedara disponible en `http://localhost:3000`.
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## Despliegue en Coolify
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+1. Crea un nuevo servicio desde el repo Git.
+2. Usa el `Dockerfile` incluido en la raiz.
+3. Configura las variables `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY` y `NEXT_PUBLIC_APP_URL`.
+4. Despliega el servicio.
+
+El proyecto ya compila con:
+
+```bash
+npm.cmd run lint
+npm.cmd run build
+```
+
+## Notas del modelo
+
+- Todos los usuarios autenticados comparten permisos operativos.
+- Las migraciones `20260318152000_auth_profile_sync.sql` y `20260318164000_profile_self_heal_and_policy.sql` corrigen usuarios ya existentes en `auth.users`, dejan triggers para altas/updates futuros y endurecen la policy de `profiles`.
+- La migracion `20260318180000_inventory_history_and_batch_guards.sql` agrega historial legible de movimientos y evita completar lotes con insumos insuficientes o sin salidas cargadas.
+- Las compras aumentan stock de insumos y generan un gasto en la categoria `Insumos`.
+- El stock actual se calcula desde `inventory_movements`.
+- Los lotes impactan inventario solo al completarse.

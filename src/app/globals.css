@@ -1,26 +1,92 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #fdfcf8;
+  --foreground: #2d3329;
+  --card: rgba(255, 255, 255, 0.65);
+  --muted: #798075;
+  --line: rgba(45, 51, 41, 0.12);
+  --accent: #3b5f42;
+  --accent-strong: #27432d;
+  --danger: #a54b3d;
+  --warning: #b77f28;
+  --highlight: #e8e6d2;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --font-sans: var(--font-sans);
+  --font-heading: var(--font-heading);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+* {
+  border-color: var(--line);
+}
+
+html {
+  background:
+    radial-gradient(ellipse at top left, rgba(206, 222, 202, 0.6), transparent 50%),
+    radial-gradient(ellipse at bottom right, rgba(228, 209, 163, 0.45), transparent 55%),
+    linear-gradient(150deg, #fbfaf5 0%, #f4f2e9 100%);
+  background-attachment: fixed;
+  min-height: 100vh;
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-sans), sans-serif;
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  font-family: var(--font-heading), serif;
+  letter-spacing: -0.03em;
+}
+
+button,
+input,
+select,
+textarea {
+  outline: none;
+}
+
+::selection {
+  background: rgba(15, 107, 74, 0.18);
+}
+
+.glass-panel {
+  background: var(--card);
+  backdrop-filter: blur(18px);
+}
+
+.page-grid {
+  display: grid;
+  gap: 1.25rem;
+}
+
+.shadow-soft {
+  box-shadow:
+    0 4px 24px -6px rgba(45, 51, 41, 0.08),
+    0 1px 4px rgba(45, 51, 41, 0.03);
+}
+
+.animate-enter {
+  animation: enter 320ms ease-out;
+}
+
+@keyframes enter {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
