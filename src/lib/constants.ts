@@ -49,6 +49,8 @@ export const CONTACT_TYPES = [
   { value: "supplier", label: "Proveedor" },
 ] as const;
 
+export const ANONYMOUS_CUSTOMER_NAME = "Cliente N/A";
+
 export const ENTITY_TYPES = [
   { value: "product", label: "Producto" },
   { value: "supply", label: "Insumo" },

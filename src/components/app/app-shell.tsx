@@ -1,9 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { Bell, Leaf, LogOut, Menu, X } from "lucide-react";
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { signOutAction } from "@/actions/auth";
 import { Button } from "@/components/ui/button";
 import { APP_NAVIGATION } from "@/lib/constants";
@@ -21,10 +21,23 @@ function getPageMeta(pathname: string) {
 
 export function AppShell({ profile, children }: AppShellProps) {
   const pathname = usePathname();
+  const router = useRouter();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [pending, startTransition] = useTransition();
 
   const closeMobile = () => setMobileOpen(false);
+
+  useEffect(() => {
+    const timeoutId = window.setTimeout(() => {
+      APP_NAVIGATION.forEach((item) => {
+        if (item.href !== pathname) {
+          router.prefetch(item.href);
+        }
+      });
+    }, 120);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [pathname, router]);
 
   const handleSignOut = () => {
     startTransition(async () => {
@@ -32,12 +45,18 @@ export function AppShell({ profile, children }: AppShellProps) {
     });
   };
 
+  const prefetchRoute = (href: string) => {
+    if (href !== pathname) {
+      router.prefetch(href);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-transparent text-[var(--foreground)]">
-      <div className="mx-auto flex min-h-screen max-w-[1720px] gap-4 px-3 py-3 md:px-5">
+      <div className="mx-auto flex min-h-screen max-w-[1720px] gap-3 px-2 py-2 sm:gap-4 sm:px-3 sm:py-3 md:px-5">
         <aside
           className={cn(
-            "fixed inset-y-3 left-3 z-50 flex w-[290px] flex-col rounded-[30px] border border-white/10 bg-gradient-to-b from-[#123925] via-[#0f2d1f] to-[#091b12] p-4 text-white shadow-[0_24px_60px_rgba(9,27,18,0.34)] transition md:static md:translate-x-0",
+            "fixed inset-y-2 left-2 z-50 flex w-[min(86vw,320px)] flex-col rounded-[28px] border border-white/10 bg-gradient-to-b from-[#123925] via-[#0f2d1f] to-[#091b12] p-4 text-white shadow-[0_24px_60px_rgba(9,27,18,0.34)] transition sm:inset-y-3 sm:left-3 sm:w-[290px] sm:rounded-[30px] md:static md:translate-x-0",
             mobileOpen ? "translate-x-0" : "-translate-x-[120%]",
           )}
         >
@@ -60,7 +79,7 @@ export function AppShell({ profile, children }: AppShellProps) {
             </button>
           </div>
 
-          <nav className="mt-8 space-y-2">
+          <nav className="mt-8 space-y-2 overflow-y-auto pr-1">
             {APP_NAVIGATION.map((item) => {
               const active = pathname === item.href;
               const Icon = item.icon;
@@ -69,6 +88,10 @@ export function AppShell({ profile, children }: AppShellProps) {
                   key={item.href}
                   href={item.href}
                   onClick={closeMobile}
+                  onFocus={() => prefetchRoute(item.href)}
+                  onMouseEnter={() => prefetchRoute(item.href)}
+                  onTouchStart={() => prefetchRoute(item.href)}
+                  aria-current={active ? "page" : undefined}
                   className={cn(
                     "flex items-center gap-3 rounded-2xl px-4 py-3 text-sm font-medium transition",
                     active
@@ -108,9 +131,9 @@ export function AppShell({ profile, children }: AppShellProps) {
           />
         ) : null}
 
-        <div className="flex min-h-[calc(100vh-1.5rem)] w-full flex-1 flex-col md:pl-0">
-          <header className="shadow-soft sticky top-3 z-30 mb-4 flex items-center justify-between rounded-[30px] border border-white/70 bg-[rgba(253,252,248,0.95)] px-4 py-4 md:px-6">
-            <div className="flex items-center gap-3">
+        <div className="flex min-h-[calc(100vh-1rem)] w-full flex-1 flex-col md:min-h-[calc(100vh-1.5rem)] md:pl-0">
+          <header className="shadow-soft sticky top-2 z-30 mb-3 flex flex-wrap items-center justify-between gap-3 rounded-[24px] border border-white/70 bg-[rgba(253,252,248,0.95)] px-3 py-3 sm:top-3 sm:mb-4 sm:px-4 sm:py-4 md:px-6">
+            <div className="flex min-w-0 items-center gap-3">
               <button
                 type="button"
                 className="rounded-full p-2 text-[var(--foreground)] transition hover:bg-white/80 md:hidden"
@@ -118,13 +141,13 @@ export function AppShell({ profile, children }: AppShellProps) {
               >
                 <Menu className="h-5 w-5" />
               </button>
-              <div>
-                <h1 className="text-2xl font-semibold">{getPageMeta(pathname)}</h1>
+              <div className="min-w-0">
+                <h1 className="truncate text-xl font-semibold sm:text-2xl">{getPageMeta(pathname)}</h1>
                 <p className="text-sm text-[var(--muted)] capitalize">{formatMonthLabel()}</p>
               </div>
             </div>
 
-            <div className="flex items-center gap-3">
+            <div className="flex w-full items-center justify-end gap-3 sm:w-auto">
               <div className="hidden rounded-full border border-[var(--line)] bg-white/70 px-4 py-2 text-sm text-[var(--muted)] md:block">
                 Operacion del mes en ARS
               </div>
@@ -138,7 +161,7 @@ export function AppShell({ profile, children }: AppShellProps) {
             </div>
           </header>
 
-          <main className="flex-1">{children}</main>
+          <main className="flex-1 pb-4 sm:pb-0">{children}</main>
         </div>
       </div>
     </div>

@@ -21,7 +21,7 @@ function NewContactModal() {
 
   return (
     <>
-      <Button type="button" onClick={() => setOpen(true)}>
+      <Button type="button" className="w-full sm:w-auto" onClick={() => setOpen(true)}>
         <Plus className="h-4 w-4" />
         Nuevo contacto
       </Button>
@@ -70,7 +70,7 @@ export function ContactsShell({ contacts }: ContactsShellProps) {
             </p>
           </div>
           <div className="flex flex-col gap-3 md:flex-row">
-            <label className="flex min-w-[240px] items-center gap-3 rounded-2xl border border-[var(--line)] bg-white/80 px-4 py-3">
+            <label className="flex w-full items-center gap-3 rounded-2xl border border-[var(--line)] bg-white/80 px-4 py-3 sm:min-w-[240px] sm:flex-1">
               <Search className="h-4 w-4 text-[var(--muted)]" />
               <input
                 value={search}
@@ -79,12 +79,12 @@ export function ContactsShell({ contacts }: ContactsShellProps) {
                 className="flex-1 bg-transparent text-sm placeholder:text-[#7e867e]"
               />
             </label>
-            <div className="flex items-center gap-2 rounded-2xl border border-[var(--line)] bg-white/80 px-4 py-3">
+            <div className="flex w-full items-center gap-2 rounded-2xl border border-[var(--line)] bg-white/80 px-4 py-3 sm:w-auto">
               <Filter className="h-4 w-4 text-[var(--muted)]" />
               <select
                 value={typeFilter}
                 onChange={(event) => setTypeFilter(event.target.value as typeof typeFilter)}
-                className="bg-transparent text-sm"
+                className="min-w-0 flex-1 bg-transparent text-sm sm:min-w-[160px]"
               >
                 <option value="all">Todos</option>
                 <option value="client">Clientes</option>

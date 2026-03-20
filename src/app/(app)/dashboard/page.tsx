@@ -1,5 +1,13 @@
 import Link from "next/link";
-import { AlertTriangle, BarChart3, DollarSign, Package, ShoppingCart, TrendingDown, TrendingUp } from "lucide-react";
+import {
+  AlertTriangle,
+  BarChart3,
+  DollarSign,
+  Package,
+  ShoppingCart,
+  TrendingDown,
+  TrendingUp,
+} from "lucide-react";
 import { LazyDonutChart } from "@/components/app/charts/lazy-donut-chart";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -48,7 +56,7 @@ export default async function DashboardPage() {
 
       <div className="grid gap-4 xl:grid-cols-[1.9fr_1.1fr]">
         <Panel>
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between gap-3">
             <div>
               <p className="text-sm font-semibold uppercase tracking-[0.18em] text-[#55755e]">Actividad</p>
               <h2 className="mt-2 text-3xl font-semibold">Ultimas ventas</h2>
@@ -71,14 +79,24 @@ export default async function DashboardPage() {
                   <div>
                     <p className="font-semibold">{sale.contactName ?? "Sin cliente"}</p>
                     <p className="text-sm text-[var(--muted)]">
-                      {sale.items.map((item) => `${item.productName} x${item.quantity}`).join(" • ")}
+                      {sale.items.map((item) => `${item.productName} x${item.quantity}`).join(" / ")}
                     </p>
-                    <p className="text-xs uppercase tracking-[0.18em] text-[#55755e]">{formatDate(sale.saleDate)}</p>
+                    <p className="text-xs uppercase tracking-[0.18em] text-[#55755e]">
+                      {formatDate(sale.saleDate)}
+                    </p>
                   </div>
                 </div>
-                <div className="text-right">
+                <div className="text-left md:text-right">
                   <p className="text-lg font-semibold">{formatCurrency(sale.totalAmount)}</p>
-                  <Badge tone={sale.paymentStatus === "paid" ? "success" : sale.paymentStatus === "partial" ? "warning" : "neutral"}>
+                  <Badge
+                    tone={
+                      sale.paymentStatus === "paid"
+                        ? "success"
+                        : sale.paymentStatus === "partial"
+                          ? "warning"
+                          : "neutral"
+                    }
+                  >
                     {sale.channelName ?? "Sin canal"}
                   </Badge>
                 </div>
@@ -105,13 +123,21 @@ export default async function DashboardPage() {
 
           <Panel>
             <h3 className="text-2xl font-semibold">Ventas por canal</h3>
-            <div className="mt-4 grid grid-cols-[1fr_1.2fr] items-center gap-4">
-              <LazyDonutChart data={data.channelShare} colors={["#3b5f42", "#a54b3d", "#b77f28", "#798075"]} />
+            <div className="mt-4 grid gap-6 lg:grid-cols-[1fr_1.2fr] lg:items-center">
+              <LazyDonutChart
+                data={data.channelShare}
+                colors={["#3b5f42", "#a54b3d", "#b77f28", "#798075"]}
+              />
               <div className="space-y-3">
                 {data.channelShare.map((entry, i) => {
-                  const colors = ["bg-[#3b5f42]", "bg-[#a54b3d]", "bg-[#b77f28]", "bg-[#798075]"];
+                  const colors = [
+                    "bg-[#3b5f42]",
+                    "bg-[#a54b3d]",
+                    "bg-[#b77f28]",
+                    "bg-[#798075]",
+                  ];
                   return (
-                    <div key={entry.name} className="flex items-center justify-between text-sm">
+                    <div key={entry.name} className="flex items-center justify-between gap-3 text-sm">
                       <div className="flex items-center gap-2">
                         <span className={`h-2.5 w-2.5 rounded-full ${colors[i % colors.length]}`} />
                         <span>{entry.name}</span>
@@ -134,7 +160,9 @@ export default async function DashboardPage() {
             </div>
             <div>
               <h3 className="text-2xl font-semibold">Alertas de stock bajo</h3>
-              <p className="text-sm text-[var(--muted)]">Productos e insumos por debajo del minimo operativo.</p>
+              <p className="text-sm text-[var(--muted)]">
+                Productos e insumos por debajo del minimo operativo.
+              </p>
             </div>
           </div>
 
@@ -146,14 +174,16 @@ export default async function DashboardPage() {
             ) : (
               alerts.map((alert) => (
                 <div key={alert.id} className="rounded-[24px] border border-[var(--line)] bg-white/80 p-4">
-                  <div className="flex items-center justify-between">
+                  <div className="flex items-center justify-between gap-3">
                     <div>
                       <p className="font-semibold">{alert.label}</p>
                       <p className="text-sm text-[var(--muted)]">
                         Stock actual: {alert.currentStock} {alert.unit}
                       </p>
                     </div>
-                    <Badge tone={alert.type === "product" ? "danger" : "warning"}>Min {alert.minStock}</Badge>
+                    <Badge tone={alert.type === "product" ? "danger" : "warning"}>
+                      Min {alert.minStock}
+                    </Badge>
                   </div>
                 </div>
               ))
@@ -168,16 +198,26 @@ export default async function DashboardPage() {
             </div>
             <div>
               <h3 className="text-2xl font-semibold">Gastos por categoria</h3>
-              <p className="text-sm text-[var(--muted)]">Distribucion mensual para lectura rapida.</p>
+              <p className="text-sm text-[var(--muted)]">
+                Distribucion mensual para lectura rapida.
+              </p>
             </div>
           </div>
-          <div className="mt-6 grid grid-cols-[1fr_1.2fr] items-center gap-4">
-            <LazyDonutChart data={data.expenseShare} colors={["#a54b3d", "#b77f28", "#3b5f42", "#798075"]} />
+          <div className="mt-6 grid gap-6 lg:grid-cols-[1fr_1.2fr] lg:items-center">
+            <LazyDonutChart
+              data={data.expenseShare}
+              colors={["#a54b3d", "#b77f28", "#3b5f42", "#798075"]}
+            />
             <div className="space-y-3">
               {data.expenseShare.map((entry, i) => {
-                const colors = ["bg-[#a54b3d]", "bg-[#b77f28]", "bg-[#3b5f42]", "bg-[#798075]"];
+                const colors = [
+                  "bg-[#a54b3d]",
+                  "bg-[#b77f28]",
+                  "bg-[#3b5f42]",
+                  "bg-[#798075]",
+                ];
                 return (
-                  <div key={entry.name} className="flex items-center justify-between text-sm">
+                  <div key={entry.name} className="flex items-center justify-between gap-3 text-sm">
                     <div className="flex items-center gap-2">
                       <span className={`h-2.5 w-2.5 rounded-full ${colors[i % colors.length]}`} />
                       <span>{entry.name}</span>

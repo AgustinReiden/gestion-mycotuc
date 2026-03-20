@@ -30,12 +30,14 @@ html {
     radial-gradient(ellipse at bottom right, rgba(228, 209, 163, 0.45), transparent 55%),
     linear-gradient(150deg, #fbfaf5 0%, #f4f2e9 100%);
   min-height: 100vh;
+  overflow-x: hidden;
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
   font-family: var(--font-sans), sans-serif;
+  overflow-x: hidden;
 }
 
 h1,
@@ -74,17 +76,24 @@ textarea {
     0 1px 4px rgba(45, 51, 41, 0.03);
 }
 
-.animate-enter {
-  animation: enter 150ms ease-out;
+.skeleton-block {
+  border-radius: 1rem;
+  background:
+    linear-gradient(
+      90deg,
+      rgba(255, 255, 255, 0.64) 0%,
+      rgba(245, 242, 233, 0.96) 50%,
+      rgba(255, 255, 255, 0.64) 100%
+    );
+  background-size: 220% 100%;
+  animation: shimmer 1.2s linear infinite;
 }
 
-@keyframes enter {
+@keyframes shimmer {
   from {
-    opacity: 0;
-    transform: translateY(6px);
+    background-position: 200% 0;
   }
   to {
-    opacity: 1;
-    transform: translateY(0);
+    background-position: -200% 0;
   }
 }

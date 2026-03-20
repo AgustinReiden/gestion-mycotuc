@@ -15,7 +15,7 @@ type SupplyFormValues = z.input<typeof supplyFormSchema>;
 
 type SupplyFormProps = {
   supply?: SupplyRecord | null;
-  onSuccess: () => void;
+  onSuccess: (supply: SupplyRecord) => void;
 };
 
 export function SupplyForm({ supply, onSuccess }: SupplyFormProps) {
@@ -51,9 +51,8 @@ export function SupplyForm({ supply, onSuccess }: SupplyFormProps) {
         setFeedback(null);
         startTransition(async () => {
           const result = await saveSupplyAction(values);
-          if (result.success) {
-            setFeedback({ tone: "success", message: result.message });
-            onSuccess();
+          if (result.success && result.data) {
+            onSuccess(result.data);
             form.reset({
               name: "",
               unit: "kg",

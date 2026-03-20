@@ -25,7 +25,7 @@ function NewProductModal() {
 
   return (
     <>
-      <Button type="button" onClick={() => setOpen(true)}>
+      <Button type="button" className="w-full sm:w-auto" onClick={() => setOpen(true)}>
         <Plus className="h-4 w-4" />
         Nuevo producto
       </Button>
@@ -79,7 +79,7 @@ export function ProductsShell({ products, movements }: ProductsShellProps) {
             </p>
           </div>
           <div className="flex flex-col gap-3 sm:flex-row">
-            <label className="flex min-w-[260px] items-center gap-3 rounded-2xl border border-[var(--line)] bg-white/80 px-4 py-3">
+            <label className="flex w-full items-center gap-3 rounded-2xl border border-[var(--line)] bg-white/80 px-4 py-3 sm:min-w-[260px] sm:flex-1">
               <Search className="h-4 w-4 text-[var(--muted)]" />
               <input
                 value={search}
@@ -135,7 +135,7 @@ export function ProductsShell({ products, movements }: ProductsShellProps) {
 
               {product.notes ? <p className="text-sm text-[var(--muted)]">{product.notes}</p> : null}
 
-              <div className="mt-auto flex gap-3">
+              <div className="mt-auto flex flex-col gap-3 sm:flex-row">
                 <Button type="button" variant="secondary" className="flex-1" onClick={() => setSelectedProduct(product)}>
                   <Edit3 className="h-4 w-4" />
                   Editar

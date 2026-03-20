@@ -9,7 +9,7 @@ export function Panel({ children, className }: PanelProps) {
   return (
     <section
       className={cn(
-        "glass-panel shadow-soft rounded-[28px] border border-white/70 p-5 animate-enter",
+        "glass-panel shadow-soft rounded-[28px] border border-white/70 p-5",
         className,
       )}
     >

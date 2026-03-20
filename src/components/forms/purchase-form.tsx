@@ -9,7 +9,13 @@ import { registerSupplyPurchaseAction } from "@/actions/core";
 import { ActionNotice } from "@/components/forms/action-notice";
 import { Button } from "@/components/ui/button";
 import { Field, SelectInput, TextInput, TextareaInput } from "@/components/ui/fields";
-import type { ContactRecord, SupplyRecord } from "@/lib/domain";
+import type {
+  ContactRecord,
+  ExpenseRecord,
+  InventoryMovementRecord,
+  PurchaseRecord,
+  SupplyRecord,
+} from "@/lib/domain";
 import { purchaseFormSchema } from "@/lib/validators";
 import { formatCurrency } from "@/lib/utils";
 
@@ -18,7 +24,12 @@ type PurchaseFormValues = z.input<typeof purchaseFormSchema>;
 type PurchaseFormProps = {
   suppliers: ContactRecord[];
   supplies: SupplyRecord[];
-  onSuccess: () => void;
+  onSuccess: (result: {
+    purchase: PurchaseRecord;
+    expense: ExpenseRecord | null;
+    supplies: SupplyRecord[];
+    movements: InventoryMovementRecord[];
+  }) => void;
 };
 
 function getInitialItem(supplies: SupplyRecord[]) {
@@ -69,9 +80,8 @@ export function PurchaseForm({ suppliers, supplies, onSuccess }: PurchaseFormPro
         setFeedback(null);
         startTransition(async () => {
           const result = await registerSupplyPurchaseAction(values);
-          if (result.success) {
-            setFeedback({ tone: "success", message: result.message });
-            onSuccess();
+          if (result.success && result.data) {
+            onSuccess(result.data);
             form.reset({
               supplierId: suppliers[0]?.id ?? "",
               purchaseDate: new Date().toISOString().slice(0, 10),

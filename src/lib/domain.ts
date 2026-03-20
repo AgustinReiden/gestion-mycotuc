@@ -2,11 +2,13 @@ export type PaymentStatus = "pending" | "partial" | "paid";
 export type ContactType = "client" | "supplier";
 export type EntityType = "product" | "supply";
 export type BatchStatus = "draft" | "active" | "completed" | "cancelled";
+export type SaleCustomerMode = "existing" | "inline" | "anonymous";
 
-export type ActionResponse = {
+export type ActionResponse<T = void> = {
   success: boolean;
   message: string;
   error?: string;
+  data?: T;
 };
 
 export type ProfileSummary = {

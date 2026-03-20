@@ -8,14 +8,14 @@ import { createExpenseAction } from "@/actions/core";
 import { ActionNotice } from "@/components/forms/action-notice";
 import { Button } from "@/components/ui/button";
 import { Field, SelectInput, TextInput, TextareaInput } from "@/components/ui/fields";
-import type { LookupOption } from "@/lib/domain";
+import type { ExpenseRecord, LookupOption } from "@/lib/domain";
 import { expenseFormSchema } from "@/lib/validators";
 
 type ExpenseFormValues = z.input<typeof expenseFormSchema>;
 
 type ExpenseFormProps = {
   categories: LookupOption[];
-  onSuccess: () => void;
+  onSuccess: (expense: ExpenseRecord) => void;
 };
 
 export function ExpenseForm({ categories, onSuccess }: ExpenseFormProps) {
@@ -39,9 +39,8 @@ export function ExpenseForm({ categories, onSuccess }: ExpenseFormProps) {
         setFeedback(null);
         startTransition(async () => {
           const result = await createExpenseAction(values);
-          if (result.success) {
-            setFeedback({ tone: "success", message: result.message });
-            onSuccess();
+          if (result.success && result.data) {
+            onSuccess(result.data);
             form.reset({
               concept: "",
               expenseDate: new Date().toISOString().slice(0, 10),

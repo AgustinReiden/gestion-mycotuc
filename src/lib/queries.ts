@@ -1,4 +1,9 @@
 import { endOfMonth, startOfMonth } from "date-fns";
+import { unstable_cache } from "next/cache";
+import { cache } from "react";
+import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+import { dedupeTags, CACHE_TAGS } from "@/lib/cache";
+import type { Database } from "@/lib/database.types";
 import type {
   ContactRecord,
   DashboardData,
@@ -14,11 +19,18 @@ import type {
   StockAlertRecord,
   SupplyRecord,
 } from "@/lib/domain";
+import { getSupabaseEnv } from "@/lib/env";
 import { ensureProfileForUser } from "@/lib/profile-sync";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { sumBy, toNumber } from "@/lib/utils";
 
 type RawRecord = Record<string, unknown>;
+type QueryClient = SupabaseClient<Database>;
+type AuthContext = {
+  accessToken: string | null;
+  email: string | null;
+  userId: string;
+};
 
 function asRecord(value: unknown): RawRecord {
   return value && typeof value === "object" ? (value as RawRecord) : {};
@@ -211,108 +223,298 @@ function toStockAlert(record: ProductRecord | SupplyRecord, type: "product" | "s
   };
 }
 
-async function getSupabase() {
-  return createSupabaseServerClient();
+function createSupabaseAuthorizedClient(accessToken: string): QueryClient {
+  const { url, anonKey } = getSupabaseEnv();
+
+  return createClient<Database>(url, anonKey, {
+    auth: {
+      autoRefreshToken: false,
+      detectSessionInUrl: false,
+      persistSession: false,
+    },
+    global: {
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+      },
+    },
+  });
 }
 
-export async function getProfileSummary(): Promise<ProfileSummary | null> {
+const getSupabase = cache(async () => createSupabaseServerClient());
+
+const getAuthContext = cache(async (): Promise<AuthContext | null> => {
   const supabase = await getSupabase();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const [
+    {
+      data: { user },
+    },
+    {
+      data: { session },
+    },
+  ] = await Promise.all([supabase.auth.getUser(), supabase.auth.getSession()]);
 
   if (!user) {
     return null;
   }
 
+  return {
+    accessToken: session?.access_token ?? null,
+    email: user.email ?? null,
+    userId: user.id,
+  };
+});
+
+async function runLiveQuery<T>(query: (supabase: QueryClient) => Promise<T>) {
+  const supabase = await getSupabase();
+  return query(supabase);
+}
+
+async function runUserCachedQuery<T>({
+  key,
+  query,
+  revalidate = 120,
+  tags,
+}: {
+  key: string[];
+  query: (supabase: QueryClient) => Promise<T>;
+  revalidate?: number;
+  tags: string[];
+}) {
+  const auth = await getAuthContext();
+
+  if (!auth?.userId || !auth.accessToken) {
+    return runLiveQuery(query);
+  }
+
+  const cachedQuery = unstable_cache(
+    async () => query(createSupabaseAuthorizedClient(auth.accessToken!)),
+    [...key, auth.userId],
+    {
+      revalidate,
+      tags,
+    },
+  );
+
+  return cachedQuery();
+}
+
+const getSalesOrdersData = cache(async () =>
+  runUserCachedQuery({
+    key: ["sales-orders-data"],
+    query: async (supabase) => {
+      const { data } = await supabase
+        .from("sales_orders")
+        .select(
+          "id, sale_date, total_amount, payment_status, payment_method, paid_at, notes, created_at, contacts(name), sales_channels(name), sales_order_items(id, product_id, quantity, unit_price, line_total, products(name))",
+        )
+        .order("sale_date", { ascending: false })
+        .order("created_at", { ascending: false });
+
+      return (data ?? []).map(mapSale);
+    },
+    revalidate: 90,
+    tags: [CACHE_TAGS.sales],
+  }),
+);
+
+const getExpensesRecordsData = cache(async () =>
+  runUserCachedQuery({
+    key: ["expenses-records-data"],
+    query: async (supabase) => {
+      const { data } = await supabase
+        .from("expenses")
+        .select(
+          "id, expense_date, concept, amount, source, notes, linked_purchase_id, created_at, expense_categories(name), purchases(contacts(name))",
+        )
+        .order("expense_date", { ascending: false })
+        .order("created_at", { ascending: false });
+
+      return (data ?? []).map(mapExpense);
+    },
+    revalidate: 90,
+    tags: [CACHE_TAGS.expenses],
+  }),
+);
+
+const getProductionBatchesData = cache(async () =>
+  runUserCachedQuery({
+    key: ["production-batches-data"],
+    query: async (supabase) => {
+      const { data } = await supabase
+        .from("production_batches")
+        .select(
+          "id, product_id, status, started_at, completed_at, expected_qty, actual_qty, notes, inventory_posted_at, created_at, products(name), production_batch_inputs(id, supply_id, quantity, supplies(name)), production_batch_outputs(id, product_id, quantity, products(name))",
+        )
+        .order("started_at", { ascending: false })
+        .order("created_at", { ascending: false });
+
+      return (data ?? []).map(mapBatch);
+    },
+    revalidate: 90,
+    tags: [CACHE_TAGS.production],
+  }),
+);
+
+export async function getProfileSummary(): Promise<ProfileSummary | null> {
+  const auth = await getAuthContext();
+
+  if (!auth) {
+    return null;
+  }
+
+  const cachedProfile = await runUserCachedQuery({
+    key: ["profile-summary"],
+    query: async (supabase) => {
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("id, full_name, email")
+        .eq("id", auth.userId)
+        .maybeSingle();
+
+      return profile
+        ? {
+            email: profile.email ?? null,
+            fullName: profile.full_name ?? null,
+          }
+        : null;
+    },
+    revalidate: 300,
+    tags: [CACHE_TAGS.profile],
+  });
+
+  if (cachedProfile) {
+    return {
+      id: auth.userId,
+      fullName: cachedProfile.fullName ?? auth.email?.split("@")[0] ?? null,
+      email: cachedProfile.email ?? auth.email ?? null,
+    };
+  }
+
+  const supabase = await getSupabase();
   const { data: profile } = await supabase
     .from("profiles")
     .select("id, full_name, email")
-    .eq("id", user.id)
+    .eq("id", auth.userId)
     .maybeSingle();
 
   const syncedProfile = profile ?? (await ensureProfileForUser(supabase));
 
   return {
-    id: user.id,
-    fullName: syncedProfile?.full_name ?? user.email?.split("@")[0] ?? null,
-    email: syncedProfile?.email ?? user.email ?? null,
+    id: auth.userId,
+    fullName: syncedProfile?.full_name ?? auth.email?.split("@")[0] ?? null,
+    email: syncedProfile?.email ?? auth.email ?? null,
   };
 }
 
-export async function getLookupData() {
-  const supabase = await getSupabase();
+export const getLookupData = cache(async () =>
+  runUserCachedQuery({
+    key: ["lookup-data"],
+    query: async (supabase) => {
+      const [{ data: channels }, { data: categories }] = await Promise.all([
+        supabase.from("sales_channels").select("id, name").eq("is_active", true).order("name"),
+        supabase.from("expense_categories").select("id, name").eq("is_active", true).order("name"),
+      ]);
 
-  const [{ data: channels }, { data: categories }] = await Promise.all([
-    supabase.from("sales_channels").select("id, name").eq("is_active", true).order("name"),
-    supabase.from("expense_categories").select("id, name").eq("is_active", true).order("name"),
-  ]);
+      return {
+        channels: (channels ?? []).map(mapLookup),
+        categories: (categories ?? []).map(mapLookup),
+      };
+    },
+    revalidate: 900,
+    tags: [CACHE_TAGS.lookups],
+  }),
+);
 
-  return {
-    channels: (channels ?? []).map(mapLookup),
-    categories: (categories ?? []).map(mapLookup),
-  };
-}
+export const getContactsData = cache(async () =>
+  runUserCachedQuery({
+    key: ["contacts-data"],
+    query: async (supabase) => {
+      const { data } = await supabase.from("contacts").select("*").order("name");
+      return (data ?? []).map(mapContact);
+    },
+    revalidate: 120,
+    tags: [CACHE_TAGS.contacts],
+  }),
+);
 
-export async function getContactsData() {
-  const supabase = await getSupabase();
-  const { data } = await supabase.from("contacts").select("*").order("name");
-  return (data ?? []).map(mapContact);
-}
+export const getProductsData = cache(async () =>
+  runUserCachedQuery({
+    key: ["products-data"],
+    query: async (supabase) => {
+      const { data } = await supabase.from("product_inventory_overview").select("*").order("name");
+      return (data ?? []).map(mapProduct);
+    },
+    revalidate: 120,
+    tags: [CACHE_TAGS.products],
+  }),
+);
 
-export async function getProductsData() {
-  const supabase = await getSupabase();
-  const { data } = await supabase.from("product_inventory_overview").select("*").order("name");
-  return (data ?? []).map(mapProduct);
-}
+export const getSuppliesData = cache(async () =>
+  runUserCachedQuery({
+    key: ["supplies-data"],
+    query: async (supabase) => {
+      const { data } = await supabase.from("supply_inventory_overview").select("*").order("name");
+      return (data ?? []).map(mapSupply);
+    },
+    revalidate: 120,
+    tags: [CACHE_TAGS.supplies],
+  }),
+);
 
-export async function getSuppliesData() {
-  const supabase = await getSupabase();
-  const { data } = await supabase.from("supply_inventory_overview").select("*").order("name");
-  return (data ?? []).map(mapSupply);
-}
+export const getInventoryMovementsData = cache(
+  async (entityType?: "product" | "supply", limit = 12) =>
+    runUserCachedQuery({
+      key: ["inventory-movements-data", entityType ?? "all", String(limit)],
+      query: async (supabase) => {
+        let query = supabase
+          .from("inventory_movement_details")
+          .select("*")
+          .order("movement_date", { ascending: false })
+          .limit(limit);
 
-export async function getInventoryMovementsData(entityType?: "product" | "supply", limit = 12) {
-  const supabase = await getSupabase();
-  let query = supabase.from("inventory_movement_details").select("*").order("movement_date", { ascending: false }).limit(limit);
+        if (entityType) {
+          query = query.eq("entity_type", entityType);
+        }
 
-  if (entityType) {
-    query = query.eq("entity_type", entityType);
-  }
+        const { data } = await query;
+        return (data ?? []).map((record) => mapInventoryMovement(asRecord(record)));
+      },
+      revalidate: 60,
+      tags: dedupeTags(
+        entityType !== "supply" && CACHE_TAGS.inventoryProduct,
+        entityType !== "product" && CACHE_TAGS.inventorySupply,
+      ),
+    }),
+);
 
-  const { data } = await query;
-  return (data ?? []).map((record) => mapInventoryMovement(asRecord(record)));
-}
+export const getPurchasesData = cache(async (limit = 8) =>
+  runUserCachedQuery({
+    key: ["purchases-data", String(limit)],
+    query: async (supabase) => {
+      const { data } = await supabase
+        .from("purchases")
+        .select("id, purchase_date, total_amount, notes, created_at, contacts(name)")
+        .order("purchase_date", { ascending: false })
+        .order("created_at", { ascending: false })
+        .limit(limit);
 
-export async function getPurchasesData(limit = 8) {
-  const supabase = await getSupabase();
-  const { data } = await supabase
-    .from("purchases")
-    .select("id, purchase_date, total_amount, notes, created_at, contacts(name)")
-    .order("purchase_date", { ascending: false })
-    .order("created_at", { ascending: false })
-    .limit(limit);
-
-  return (data ?? []).map((record) => mapPurchase(asRecord(record)));
-}
+      return (data ?? []).map((record) => mapPurchase(asRecord(record)));
+    },
+    revalidate: 120,
+    tags: [CACHE_TAGS.purchases],
+  }),
+);
 
 export async function getSalesData() {
-  const supabase = await getSupabase();
-  const [{ data: sales }, contacts, products, lookup] = await Promise.all([
-    supabase
-      .from("sales_orders")
-      .select(
-        "id, sale_date, total_amount, payment_status, payment_method, paid_at, notes, created_at, contacts(name), sales_channels(name), sales_order_items(id, product_id, quantity, unit_price, line_total, products(name))",
-      )
-      .order("sale_date", { ascending: false })
-      .order("created_at", { ascending: false }),
+  const [sales, contacts, products, lookup] = await Promise.all([
+    getSalesOrdersData(),
     getContactsData(),
     getProductsData(),
     getLookupData(),
   ]);
 
   return {
-    sales: (sales ?? []).map(mapSale),
+    sales,
     contacts: contacts.filter((contact) => contact.type === "client" && contact.isActive),
     products: products.filter((product) => product.isActive),
     channels: lookup.channels,
@@ -320,20 +522,10 @@ export async function getSalesData() {
 }
 
 export async function getExpensesData() {
-  const supabase = await getSupabase();
-  const [{ data: expenses }, lookup] = await Promise.all([
-    supabase
-      .from("expenses")
-      .select(
-        "id, expense_date, concept, amount, source, notes, linked_purchase_id, created_at, expense_categories(name), purchases(contacts(name))",
-      )
-      .order("expense_date", { ascending: false })
-      .order("created_at", { ascending: false }),
-    getLookupData(),
-  ]);
+  const [expenses, lookup] = await Promise.all([getExpensesRecordsData(), getLookupData()]);
 
   return {
-    expenses: (expenses ?? []).map(mapExpense),
+    expenses,
     categories: lookup.categories,
   };
 }
@@ -355,7 +547,10 @@ export async function getSuppliesPageData() {
 }
 
 export async function getProductsPageData() {
-  const [products, movements] = await Promise.all([getProductsData(), getInventoryMovementsData("product")]);
+  const [products, movements] = await Promise.all([
+    getProductsData(),
+    getInventoryMovementsData("product"),
+  ]);
 
   return {
     products,
@@ -364,92 +559,55 @@ export async function getProductsPageData() {
 }
 
 export async function getProductionData() {
-  const supabase = await getSupabase();
-  const [{ data: batches }, products, supplies] = await Promise.all([
-    supabase
-      .from("production_batches")
-      .select(
-        "id, product_id, status, started_at, completed_at, expected_qty, actual_qty, notes, inventory_posted_at, created_at, products(name), production_batch_inputs(id, supply_id, quantity, supplies(name)), production_batch_outputs(id, product_id, quantity, products(name))",
-      )
-      .order("started_at", { ascending: false })
-      .order("created_at", { ascending: false }),
+  const [batches, products, supplies] = await Promise.all([
+    getProductionBatchesData(),
     getProductsData(),
     getSuppliesData(),
   ]);
 
   return {
-    batches: (batches ?? []).map(mapBatch),
+    batches,
     products: products.filter((product) => product.isActive),
     supplies: supplies.filter((supply) => supply.isActive),
   };
 }
 
 export async function getReportData() {
-  const supabase = await getSupabase();
-  const [salesData, expensesData, products, supplies, productionData] = await Promise.all([
-    supabase
-      .from("sales_orders")
-      .select(
-        "id, sale_date, total_amount, payment_status, sales_channels(name), sales_order_items(id, product_id, quantity, unit_price, line_total, products(name))",
-      )
-      .order("sale_date", { ascending: false }),
-    supabase
-      .from("expenses")
-      .select("id, expense_date, amount, expense_categories(name)")
-      .order("expense_date", { ascending: false }),
+  const [sales, expenses, products, supplies, batches] = await Promise.all([
+    getSalesOrdersData(),
+    getExpensesRecordsData(),
     getProductsData(),
     getSuppliesData(),
-    getProductionData(),
+    getProductionBatchesData(),
   ]);
 
   return {
-    sales: (salesData.data ?? []).map(mapSale),
-    expenses: (expensesData.data ?? []).map(mapExpense),
+    sales,
+    expenses,
     products,
     supplies,
-    batches: productionData.batches,
+    batches,
   };
 }
 
 export async function getDashboardData(): Promise<DashboardData> {
-  const supabase = await getSupabase();
-  const monthStart = startOfMonth(new Date()).toISOString().slice(0, 10);
-  const monthEnd = endOfMonth(new Date()).toISOString().slice(0, 10);
-
-  const [
-    { data: monthlySalesRows },
-    { data: monthlyExpenseRows },
-    { data: recentSalesRows },
-    products,
-    supplies,
-  ] = await Promise.all([
-    supabase
-      .from("sales_orders")
-      .select(
-        "id, sale_date, total_amount, payment_status, payment_method, paid_at, notes, created_at, contacts(name), sales_channels(name), sales_order_items(id, product_id, quantity, unit_price, line_total, products(name))",
-      )
-      .gte("sale_date", monthStart)
-      .lte("sale_date", monthEnd),
-    supabase
-      .from("expenses")
-      .select("id, expense_date, concept, amount, source, notes, created_at, expense_categories(name), purchases(contacts(name))")
-      .gte("expense_date", monthStart)
-      .lte("expense_date", monthEnd),
-    supabase
-      .from("sales_orders")
-      .select(
-        "id, sale_date, total_amount, payment_status, payment_method, paid_at, notes, created_at, contacts(name), sales_channels(name), sales_order_items(id, product_id, quantity, unit_price, line_total, products(name))",
-      )
-      .order("sale_date", { ascending: false })
-      .order("created_at", { ascending: false })
-      .limit(5),
+  const [sales, expenses, products, supplies] = await Promise.all([
+    getSalesOrdersData(),
+    getExpensesRecordsData(),
     getProductsData(),
     getSuppliesData(),
   ]);
 
-  const monthlySales = (monthlySalesRows ?? []).map(mapSale);
-  const monthlyExpenses = (monthlyExpenseRows ?? []).map(mapExpense);
-  const recentSales = (recentSalesRows ?? []).map(mapSale);
+  const monthStart = startOfMonth(new Date()).toISOString().slice(0, 10);
+  const monthEnd = endOfMonth(new Date()).toISOString().slice(0, 10);
+
+  const monthlySales = sales.filter(
+    (sale) => sale.saleDate >= monthStart && sale.saleDate <= monthEnd,
+  );
+  const monthlyExpenses = expenses.filter(
+    (expense) => expense.expenseDate >= monthStart && expense.expenseDate <= monthEnd,
+  );
+  const recentSales = sales.slice(0, 5);
 
   const channelTotals = new Map<string, number>();
   monthlySales.forEach((sale) => {
@@ -491,7 +649,8 @@ export async function getDashboardData(): Promise<DashboardData> {
     expenseShare: Array.from(expenseTotals.entries())
       .map(([name, amount]) => ({
         name,
-        percentage: totalExpensesAmount > 0 ? Math.round((amount / totalExpensesAmount) * 100) : 0,
+        percentage:
+          totalExpensesAmount > 0 ? Math.round((amount / totalExpensesAmount) * 100) : 0,
       }))
       .sort((left, right) => right.percentage - left.percentage)
       .slice(0, 4),

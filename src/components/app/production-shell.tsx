@@ -38,7 +38,7 @@ function NewBatchModal({ products, supplies }: { products: ProductRecord[]; supp
 
   return (
     <>
-      <Button type="button" onClick={() => setOpen(true)}>
+      <Button type="button" className="w-full sm:w-auto" onClick={() => setOpen(true)}>
         <Plus className="h-4 w-4" />
         Nuevo lote
       </Button>
@@ -84,8 +84,8 @@ export function ProductionShell({ batches, products, supplies }: ProductionShell
               Sigue cada lote simple y registra impacto real sobre insumos y producto terminado.
             </p>
           </div>
-          <div className="flex flex-col gap-3 md:flex-row">
-            <label className="flex min-w-[260px] items-center gap-3 rounded-2xl border border-[var(--line)] bg-white/80 px-4 py-3">
+          <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
+            <label className="flex w-full items-center gap-3 rounded-2xl border border-[var(--line)] bg-white/80 px-4 py-3 sm:min-w-[260px] sm:flex-1">
               <Warehouse className="h-4 w-4 text-[var(--muted)]" />
               <input
                 value={search}

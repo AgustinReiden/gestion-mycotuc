@@ -61,19 +61,27 @@ export function StockHistoryPanel({ title, description, movements }: StockHistor
               <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                 <div className="flex items-start gap-3">
                   <div className="mt-1 flex h-10 w-10 items-center justify-center rounded-2xl bg-[#f4f1e8] text-[#617166]">
-                    {movement.quantity >= 0 ? <ArrowUpCircle className="h-5 w-5" /> : <ArrowDownCircle className="h-5 w-5" />}
+                    {movement.quantity >= 0 ? (
+                      <ArrowUpCircle className="h-5 w-5" />
+                    ) : (
+                      <ArrowDownCircle className="h-5 w-5" />
+                    )}
                   </div>
                   <div>
                     <p className="font-semibold">{movement.entityName}</p>
                     <p className="text-sm text-[var(--muted)]">
-                      {formatDate(movement.movementDate, "dd MMM yyyy HH:mm")} • {movement.createdByName ?? "Sistema"}
+                      {formatDate(movement.movementDate, "dd MMM yyyy HH:mm")} / {movement.createdByName ?? "Sistema"}
                     </p>
-                    {movement.notes ? <p className="mt-1 text-sm text-[var(--muted)]">{movement.notes}</p> : null}
+                    {movement.notes ? (
+                      <p className="mt-1 text-sm text-[var(--muted)]">{movement.notes}</p>
+                    ) : null}
                   </div>
                 </div>
 
                 <div className="flex flex-col items-start gap-2 text-left md:items-end md:text-right">
-                  <Badge tone={getMovementTone(movement.movementType)}>{getMovementLabel(movement.movementType)}</Badge>
+                  <Badge tone={getMovementTone(movement.movementType)}>
+                    {getMovementLabel(movement.movementType)}
+                  </Badge>
                   <p className="text-lg font-semibold">
                     {movement.quantity > 0 ? "+" : ""}
                     {movement.quantity} {movement.entityUnit ?? ""}

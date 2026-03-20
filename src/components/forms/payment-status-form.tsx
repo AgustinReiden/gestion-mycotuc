@@ -6,7 +6,7 @@ import { useForm } from "react-hook-form";
 import type { z } from "zod";
 import { updateSalePaymentStatusAction } from "@/actions/core";
 import { PAYMENT_STATUSES } from "@/lib/constants";
-import type { PaymentStatus } from "@/lib/domain";
+import type { PaymentStatus, SaleOrderRecord } from "@/lib/domain";
 import { paymentStatusUpdateSchema } from "@/lib/validators";
 import { ActionNotice } from "@/components/forms/action-notice";
 import { Button } from "@/components/ui/button";
@@ -19,7 +19,7 @@ type PaymentStatusFormProps = {
   paymentStatus: PaymentStatus;
   paymentMethod: string | null;
   paidAt: string | null;
-  onSuccess: () => void;
+  onSuccess: (sale: SaleOrderRecord) => void;
 };
 
 export function PaymentStatusForm({
@@ -48,9 +48,9 @@ export function PaymentStatusForm({
         setFeedback(null);
         startTransition(async () => {
           const result = await updateSalePaymentStatusAction(values);
-          if (result.success) {
+          if (result.success && result.data) {
             setFeedback({ tone: "success", message: result.message });
-            onSuccess();
+            onSuccess(result.data);
             return;
           }
 

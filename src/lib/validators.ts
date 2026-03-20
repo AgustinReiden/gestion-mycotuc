@@ -64,16 +64,38 @@ export const saleItemSchema = z.object({
   unitPrice: z.coerce.number().nonnegative("El precio unitario es obligatorio."),
 });
 
-export const saleOrderFormSchema = z.object({
-  contactId: z.string().uuid("Selecciona un cliente."),
-  saleDate: z.string().min(1, "La fecha es obligatoria."),
-  channelId: z.string().uuid("Selecciona un canal."),
-  paymentStatus: z.enum(["pending", "partial", "paid"]),
-  paymentMethod: optionalTrimmedString,
-  paidAt: optionalTrimmedString,
-  notes: optionalTrimmedString,
-  items: z.array(saleItemSchema).min(1, "Agrega al menos un item."),
-});
+export const saleOrderFormSchema = z
+  .object({
+    customerMode: z.enum(["existing", "inline", "anonymous"]).default("inline"),
+    contactId: z.string().uuid().nullish(),
+    customerName: optionalTrimmedString,
+    customerPhone: optionalTrimmedString,
+    customerEmail: optionalTrimmedString,
+    saleDate: z.string().min(1, "La fecha es obligatoria."),
+    channelId: z.string().uuid("Selecciona un canal."),
+    paymentStatus: z.enum(["pending", "partial", "paid"]),
+    paymentMethod: optionalTrimmedString,
+    paidAt: optionalTrimmedString,
+    notes: optionalTrimmedString,
+    items: z.array(saleItemSchema).min(1, "Agrega al menos un item."),
+  })
+  .superRefine((data, ctx) => {
+    if (data.customerMode === "existing" && !data.contactId) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["customerName"],
+        message: "Selecciona un cliente sugerido o ingresa uno nuevo.",
+      });
+    }
+
+    if (data.customerMode !== "anonymous" && (!data.customerName || data.customerName.length < 2)) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["customerName"],
+        message: "Ingresa el nombre del cliente.",
+      });
+    }
+  });
 
 export const purchaseItemSchema = z.object({
   supplyId: z.string().uuid("Selecciona un insumo."),
