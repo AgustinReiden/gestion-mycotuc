@@ -109,7 +109,7 @@ export function AppShell({ profile, children }: AppShellProps) {
         ) : null}
 
         <div className="flex min-h-[calc(100vh-1.5rem)] w-full flex-1 flex-col md:pl-0">
-          <header className="glass-panel shadow-soft sticky top-3 z-30 mb-4 flex items-center justify-between rounded-[30px] border border-white/70 px-4 py-4 md:px-6">
+          <header className="shadow-soft sticky top-3 z-30 mb-4 flex items-center justify-between rounded-[30px] border border-white/70 bg-[rgba(253,252,248,0.95)] px-4 py-4 md:px-6">
             <div className="flex items-center gap-3">
               <button
                 type="button"

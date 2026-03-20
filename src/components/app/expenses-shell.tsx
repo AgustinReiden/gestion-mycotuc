@@ -17,10 +17,25 @@ type ExpensesShellProps = {
   categories: LookupOption[];
 };
 
-export function ExpensesShell({ expenses, categories }: ExpensesShellProps) {
+function NewExpenseModal({ categories }: { categories: LookupOption[] }) {
   const router = useRouter();
+  const [open, setOpen] = useState(false);
+
+  return (
+    <>
+      <Button type="button" onClick={() => setOpen(true)}>
+        <Plus className="h-4 w-4" />
+        Nuevo gasto
+      </Button>
+      <Modal open={open} onClose={() => setOpen(false)} title="Registrar gasto" description="Los gastos manuales impactan en los reportes y el dashboard financiero.">
+        <ExpenseForm categories={categories} onSuccess={() => { setOpen(false); router.refresh(); }} />
+      </Modal>
+    </>
+  );
+}
+
+export function ExpensesShell({ expenses, categories }: ExpensesShellProps) {
   const [search, setSearch] = useState("");
-  const [modalOpen, setModalOpen] = useState(false);
   const deferredSearch = useDeferredValue(search);
 
   const filteredExpenses = expenses.filter((expense) => {
@@ -44,10 +59,7 @@ export function ExpensesShell({ expenses, categories }: ExpensesShellProps) {
                 Combina gastos manuales y compras de insumos con una sola lectura financiera.
               </p>
             </div>
-            <Button type="button" onClick={() => setModalOpen(true)}>
-              <Plus className="h-4 w-4" />
-              Nuevo gasto
-            </Button>
+            <NewExpenseModal categories={categories} />
           </div>
         </Panel>
 
@@ -132,21 +144,6 @@ export function ExpensesShell({ expenses, categories }: ExpensesShellProps) {
           )}
         </div>
       </Panel>
-
-      <Modal
-        open={modalOpen}
-        onClose={() => setModalOpen(false)}
-        title="Registrar gasto"
-        description="Los gastos manuales impactan en los reportes y el dashboard financiero."
-      >
-        <ExpenseForm
-          categories={categories}
-          onSuccess={() => {
-            setModalOpen(false);
-            router.refresh();
-          }}
-        />
-      </Modal>
     </div>
   );
 }

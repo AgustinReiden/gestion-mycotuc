@@ -32,10 +32,35 @@ function getStatusLabel(status: ProductionBatchRecord["status"]) {
   return "Borrador";
 }
 
-export function ProductionShell({ batches, products, supplies }: ProductionShellProps) {
+function NewBatchModal({ products, supplies }: { products: ProductRecord[]; supplies: SupplyRecord[] }) {
   const router = useRouter();
+  const [open, setOpen] = useState(false);
+
+  return (
+    <>
+      <Button type="button" onClick={() => setOpen(true)}>
+        <Plus className="h-4 w-4" />
+        Nuevo lote
+      </Button>
+      <Modal open={open} onClose={() => setOpen(false)} title="Nuevo lote" description="Al completar el lote se impactan insumos y productos en inventario." size="xl">
+        <ProductionBatchForm batch={null} products={products} supplies={supplies} onSuccess={() => { setOpen(false); router.refresh(); }} />
+      </Modal>
+    </>
+  );
+}
+
+function EditBatchModal({ batch, products, supplies, onClose }: { batch: ProductionBatchRecord; products: ProductRecord[]; supplies: SupplyRecord[]; onClose: () => void }) {
+  const router = useRouter();
+
+  return (
+    <Modal open onClose={onClose} title="Editar lote" description="Al completar el lote se impactan insumos y productos en inventario." size="xl">
+      <ProductionBatchForm batch={batch} products={products} supplies={supplies} onSuccess={() => { onClose(); router.refresh(); }} />
+    </Modal>
+  );
+}
+
+export function ProductionShell({ batches, products, supplies }: ProductionShellProps) {
   const [search, setSearch] = useState("");
-  const [modalOpen, setModalOpen] = useState(false);
   const [selectedBatch, setSelectedBatch] = useState<ProductionBatchRecord | null>(null);
   const deferredSearch = useDeferredValue(search);
 
@@ -69,10 +94,7 @@ export function ProductionShell({ batches, products, supplies }: ProductionShell
                 className="flex-1 bg-transparent text-sm placeholder:text-[#7e867e]"
               />
             </label>
-            <Button type="button" onClick={() => setModalOpen(true)}>
-              <Plus className="h-4 w-4" />
-              Nuevo lote
-            </Button>
+            <NewBatchModal products={products} supplies={supplies} />
           </div>
         </div>
       </Panel>
@@ -101,7 +123,7 @@ export function ProductionShell({ batches, products, supplies }: ProductionShell
                 <div className="flex h-2 w-full overflow-hidden rounded-full bg-[#e8e6d2]">
                   <div
                     className={cn(
-                      "h-full rounded-full transition-all duration-500",
+                      "h-full rounded-full",
                       batch.status === "draft" ? "w-1/3 bg-[#b77f28]" : batch.status === "active" ? "w-2/3 bg-[#3b5f42]" : "w-full bg-[#27432d]"
                     )}
                   />
@@ -170,27 +192,7 @@ export function ProductionShell({ batches, products, supplies }: ProductionShell
         </div>
       )}
 
-      <Modal
-        open={modalOpen || selectedBatch !== null}
-        onClose={() => {
-          setModalOpen(false);
-          setSelectedBatch(null);
-        }}
-        title={selectedBatch ? "Editar lote" : "Nuevo lote"}
-        description="Al completar el lote se impactan insumos y productos en inventario."
-        size="xl"
-      >
-        <ProductionBatchForm
-          batch={selectedBatch}
-          products={products}
-          supplies={supplies}
-          onSuccess={() => {
-            setModalOpen(false);
-            setSelectedBatch(null);
-            router.refresh();
-          }}
-        />
-      </Modal>
+      {selectedBatch ? <EditBatchModal batch={selectedBatch} products={products} supplies={supplies} onClose={() => setSelectedBatch(null)} /> : null}
     </div>
   );
 }

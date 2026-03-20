@@ -28,7 +28,7 @@ export function Modal({
   }
 
   return (
-    <div className="fixed inset-0 z-[80] flex items-center justify-center bg-[#122116]/55 px-4 py-8 backdrop-blur-sm">
+    <div className="fixed inset-0 z-[80] flex items-center justify-center bg-[#122116]/60 px-4 py-8">
       <div
         className={cn(
           "glass-panel shadow-soft w-full overflow-hidden rounded-[30px] border border-white/70",

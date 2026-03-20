@@ -32,11 +32,42 @@ function getPaymentLabel(status: SaleOrderRecord["paymentStatus"]) {
   return "Pendiente";
 }
 
-export function SalesShell({ sales, contacts, products, channels }: SalesShellProps) {
+function NewSaleModal({ contacts, products, channels }: { contacts: ContactRecord[]; products: ProductRecord[]; channels: LookupOption[] }) {
   const router = useRouter();
+  const [open, setOpen] = useState(false);
+
+  return (
+    <>
+      <Button type="button" onClick={() => setOpen(true)}>
+        <Plus className="h-4 w-4" />
+        Nueva venta
+      </Button>
+      <Modal open={open} onClose={() => setOpen(false)} title="Nueva venta" description="Registra un pedido y descuenta stock automaticamente." size="xl">
+        <SaleOrderForm contacts={contacts} products={products} channels={channels} onSuccess={() => { setOpen(false); router.refresh(); }} />
+      </Modal>
+    </>
+  );
+}
+
+function PaymentModal({ sale, onClose }: { sale: SaleOrderRecord; onClose: () => void }) {
+  const router = useRouter();
+
+  return (
+    <Modal open onClose={onClose} title="Actualizar estado de cobro" description="Ajusta el estado, metodo y fecha de cobro del pedido.">
+      <PaymentStatusForm
+        saleOrderId={sale.id}
+        paymentStatus={sale.paymentStatus}
+        paymentMethod={sale.paymentMethod}
+        paidAt={sale.paidAt}
+        onSuccess={() => { onClose(); router.refresh(); }}
+      />
+    </Modal>
+  );
+}
+
+export function SalesShell({ sales, contacts, products, channels }: SalesShellProps) {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<"all" | SaleOrderRecord["paymentStatus"]>("all");
-  const [saleModalOpen, setSaleModalOpen] = useState(false);
   const [selectedSale, setSelectedSale] = useState<SaleOrderRecord | null>(null);
   const deferredSearch = useDeferredValue(search);
 
@@ -71,10 +102,7 @@ export function SalesShell({ sales, contacts, products, channels }: SalesShellPr
               </p>
             </div>
 
-            <Button type="button" onClick={() => setSaleModalOpen(true)}>
-              <Plus className="h-4 w-4" />
-              Nueva venta
-            </Button>
+            <NewSaleModal contacts={contacts} products={products} channels={channels} />
           </div>
         </Panel>
 
@@ -188,43 +216,7 @@ export function SalesShell({ sales, contacts, products, channels }: SalesShellPr
         </div>
       </Panel>
 
-      <Modal
-        open={saleModalOpen}
-        onClose={() => setSaleModalOpen(false)}
-        title="Nueva venta"
-        description="Registra un pedido y descuenta stock automaticamente."
-        size="xl"
-      >
-        <SaleOrderForm
-          contacts={contacts}
-          products={products}
-          channels={channels}
-          onSuccess={() => {
-            setSaleModalOpen(false);
-            router.refresh();
-          }}
-        />
-      </Modal>
-
-      <Modal
-        open={selectedSale !== null}
-        onClose={() => setSelectedSale(null)}
-        title="Actualizar estado de cobro"
-        description="Ajusta el estado, metodo y fecha de cobro del pedido."
-      >
-        {selectedSale ? (
-          <PaymentStatusForm
-            saleOrderId={selectedSale.id}
-            paymentStatus={selectedSale.paymentStatus}
-            paymentMethod={selectedSale.paymentMethod}
-            paidAt={selectedSale.paidAt}
-            onSuccess={() => {
-              setSelectedSale(null);
-              router.refresh();
-            }}
-          />
-        ) : null}
-      </Modal>
+      {selectedSale ? <PaymentModal sale={selectedSale} onClose={() => setSelectedSale(null)} /> : null}
     </div>
   );
 }

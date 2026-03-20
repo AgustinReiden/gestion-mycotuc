@@ -15,12 +15,37 @@ type ContactsShellProps = {
   contacts: ContactRecord[];
 };
 
-export function ContactsShell({ contacts }: ContactsShellProps) {
+function NewContactModal() {
   const router = useRouter();
+  const [open, setOpen] = useState(false);
+
+  return (
+    <>
+      <Button type="button" onClick={() => setOpen(true)}>
+        <Plus className="h-4 w-4" />
+        Nuevo contacto
+      </Button>
+      <Modal open={open} onClose={() => setOpen(false)} title="Nuevo contacto" description="Los contactos pueden reutilizarse en ventas o compras.">
+        <ContactForm contact={null} onSuccess={() => { setOpen(false); router.refresh(); }} />
+      </Modal>
+    </>
+  );
+}
+
+function EditContactModal({ contact, onClose }: { contact: ContactRecord; onClose: () => void }) {
+  const router = useRouter();
+
+  return (
+    <Modal open onClose={onClose} title="Editar contacto" description="Los contactos pueden reutilizarse en ventas o compras.">
+      <ContactForm contact={contact} onSuccess={() => { onClose(); router.refresh(); }} />
+    </Modal>
+  );
+}
+
+export function ContactsShell({ contacts }: ContactsShellProps) {
   const [search, setSearch] = useState("");
   const [typeFilter, setTypeFilter] = useState<"all" | ContactRecord["type"]>("all");
   const [selectedContact, setSelectedContact] = useState<ContactRecord | null>(null);
-  const [modalOpen, setModalOpen] = useState(false);
   const deferredSearch = useDeferredValue(search);
 
   const filteredContacts = contacts.filter((contact) => {
@@ -66,10 +91,7 @@ export function ContactsShell({ contacts }: ContactsShellProps) {
                 <option value="supplier">Proveedores</option>
               </select>
             </div>
-            <Button type="button" onClick={() => setModalOpen(true)}>
-              <Plus className="h-4 w-4" />
-              Nuevo contacto
-            </Button>
+            <NewContactModal />
           </div>
         </div>
       </Panel>
@@ -114,24 +136,7 @@ export function ContactsShell({ contacts }: ContactsShellProps) {
         </div>
       )}
 
-      <Modal
-        open={modalOpen || selectedContact !== null}
-        onClose={() => {
-          setModalOpen(false);
-          setSelectedContact(null);
-        }}
-        title={selectedContact ? "Editar contacto" : "Nuevo contacto"}
-        description="Los contactos pueden reutilizarse en ventas o compras."
-      >
-        <ContactForm
-          contact={selectedContact}
-          onSuccess={() => {
-            setModalOpen(false);
-            setSelectedContact(null);
-            router.refresh();
-          }}
-        />
-      </Modal>
+      {selectedContact ? <EditContactModal contact={selectedContact} onClose={() => setSelectedContact(null)} /> : null}
     </div>
   );
 }

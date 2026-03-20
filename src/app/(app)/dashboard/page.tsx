@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { AlertTriangle, BarChart3, DollarSign, Package, ShoppingCart, TrendingDown, TrendingUp } from "lucide-react";
-import { DonutChart } from "@/components/app/charts/donut-chart";
+import { LazyDonutChart } from "@/components/app/charts/lazy-donut-chart";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { MetricCard } from "@/components/ui/metric-card";
@@ -106,7 +106,7 @@ export default async function DashboardPage() {
           <Panel>
             <h3 className="text-2xl font-semibold">Ventas por canal</h3>
             <div className="mt-4 grid grid-cols-[1fr_1.2fr] items-center gap-4">
-              <DonutChart data={data.channelShare} colors={["#3b5f42", "#a54b3d", "#b77f28", "#798075"]} />
+              <LazyDonutChart data={data.channelShare} colors={["#3b5f42", "#a54b3d", "#b77f28", "#798075"]} />
               <div className="space-y-3">
                 {data.channelShare.map((entry, i) => {
                   const colors = ["bg-[#3b5f42]", "bg-[#a54b3d]", "bg-[#b77f28]", "bg-[#798075]"];
@@ -172,7 +172,7 @@ export default async function DashboardPage() {
             </div>
           </div>
           <div className="mt-6 grid grid-cols-[1fr_1.2fr] items-center gap-4">
-            <DonutChart data={data.expenseShare} colors={["#a54b3d", "#b77f28", "#3b5f42", "#798075"]} />
+            <LazyDonutChart data={data.expenseShare} colors={["#a54b3d", "#b77f28", "#3b5f42", "#798075"]} />
             <div className="space-y-3">
               {data.expenseShare.map((entry, i) => {
                 const colors = ["bg-[#a54b3d]", "bg-[#b77f28]", "bg-[#3b5f42]", "bg-[#798075]"];

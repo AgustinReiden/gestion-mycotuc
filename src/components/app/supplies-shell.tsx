@@ -23,13 +23,64 @@ type SuppliesShellProps = {
   movements: InventoryMovementRecord[];
 };
 
-export function SuppliesShell({ supplies, suppliers, purchases, movements }: SuppliesShellProps) {
+function NewSupplyModal() {
   const router = useRouter();
+  const [open, setOpen] = useState(false);
+
+  return (
+    <>
+      <Button type="button" onClick={() => setOpen(true)}>
+        <Plus className="h-4 w-4" />
+        Nuevo insumo
+      </Button>
+      <Modal open={open} onClose={() => setOpen(false)} title="Nuevo insumo" description="Mantiene al dia el catalogo base para compras y produccion.">
+        <SupplyForm supply={null} onSuccess={() => { setOpen(false); router.refresh(); }} />
+      </Modal>
+    </>
+  );
+}
+
+function NewPurchaseModal({ suppliers, supplies }: { suppliers: ContactRecord[]; supplies: SupplyRecord[] }) {
+  const router = useRouter();
+  const [open, setOpen] = useState(false);
+
+  return (
+    <>
+      <Button type="button" variant="secondary" onClick={() => setOpen(true)}>
+        <ShoppingBasket className="h-4 w-4" />
+        Registrar compra
+      </Button>
+      <Modal open={open} onClose={() => setOpen(false)} title="Registrar compra de insumos" description="La compra aumenta stock y crea automaticamente el gasto asociado." size="xl">
+        <PurchaseForm suppliers={suppliers} supplies={supplies} onSuccess={() => { setOpen(false); router.refresh(); }} />
+      </Modal>
+    </>
+  );
+}
+
+function EditSupplyModal({ supply, onClose }: { supply: SupplyRecord; onClose: () => void }) {
+  const router = useRouter();
+
+  return (
+    <Modal open onClose={onClose} title="Editar insumo" description="Mantiene al dia el catalogo base para compras y produccion.">
+      <SupplyForm supply={supply} onSuccess={() => { onClose(); router.refresh(); }} />
+    </Modal>
+  );
+}
+
+function AdjustSupplyStockModal({ supply, onClose }: { supply: SupplyRecord; onClose: () => void }) {
+  const router = useRouter();
+
+  return (
+    <Modal open onClose={onClose} title="Ajustar stock" description="Deja trazabilidad de correcciones manuales sobre inventario.">
+      <StockAdjustmentForm entityType="supply" entityId={supply.id} entityLabel={supply.name} onSuccess={() => { onClose(); router.refresh(); }} />
+    </Modal>
+  );
+}
+
+export function SuppliesShell({ supplies, suppliers, purchases, movements }: SuppliesShellProps) {
   const [search, setSearch] = useState("");
-  const [createOpen, setCreateOpen] = useState(false);
   const [selectedSupply, setSelectedSupply] = useState<SupplyRecord | null>(null);
   const [adjustmentSupply, setAdjustmentSupply] = useState<SupplyRecord | null>(null);
-  const [purchaseOpen, setPurchaseOpen] = useState(false);
   const deferredSearch = useDeferredValue(search);
 
   const filteredSupplies = supplies.filter((supply) =>
@@ -58,14 +109,8 @@ export function SuppliesShell({ supplies, suppliers, purchases, movements }: Sup
                 className="flex-1 bg-transparent text-sm placeholder:text-[#7e867e]"
               />
             </label>
-            <Button type="button" variant="secondary" onClick={() => setPurchaseOpen(true)}>
-              <ShoppingBasket className="h-4 w-4" />
-              Registrar compra
-            </Button>
-            <Button type="button" onClick={() => setCreateOpen(true)}>
-              <Plus className="h-4 w-4" />
-              Nuevo insumo
-            </Button>
+            <NewPurchaseModal suppliers={suppliers} supplies={supplies} />
+            <NewSupplyModal />
           </div>
         </div>
       </Panel>
@@ -140,60 +185,8 @@ export function SuppliesShell({ supplies, suppliers, purchases, movements }: Sup
         />
       </div>
 
-      <Modal
-        open={createOpen || selectedSupply !== null}
-        onClose={() => {
-          setCreateOpen(false);
-          setSelectedSupply(null);
-        }}
-        title={selectedSupply ? "Editar insumo" : "Nuevo insumo"}
-        description="Mantiene al dia el catalogo base para compras y produccion."
-      >
-        <SupplyForm
-          supply={selectedSupply}
-          onSuccess={() => {
-            setCreateOpen(false);
-            setSelectedSupply(null);
-            router.refresh();
-          }}
-        />
-      </Modal>
-
-      <Modal
-        open={purchaseOpen}
-        onClose={() => setPurchaseOpen(false)}
-        title="Registrar compra de insumos"
-        description="La compra aumenta stock y crea automaticamente el gasto asociado."
-        size="xl"
-      >
-        <PurchaseForm
-          suppliers={suppliers}
-          supplies={supplies}
-          onSuccess={() => {
-            setPurchaseOpen(false);
-            router.refresh();
-          }}
-        />
-      </Modal>
-
-      <Modal
-        open={adjustmentSupply !== null}
-        onClose={() => setAdjustmentSupply(null)}
-        title="Ajustar stock"
-        description="Deja trazabilidad de correcciones manuales sobre inventario."
-      >
-        {adjustmentSupply ? (
-          <StockAdjustmentForm
-            entityType="supply"
-            entityId={adjustmentSupply.id}
-            entityLabel={adjustmentSupply.name}
-            onSuccess={() => {
-              setAdjustmentSupply(null);
-              router.refresh();
-            }}
-          />
-        ) : null}
-      </Modal>
+      {selectedSupply ? <EditSupplyModal supply={selectedSupply} onClose={() => setSelectedSupply(null)} /> : null}
+      {adjustmentSupply ? <AdjustSupplyStockModal supply={adjustmentSupply} onClose={() => setAdjustmentSupply(null)} /> : null}
     </div>
   );
 }

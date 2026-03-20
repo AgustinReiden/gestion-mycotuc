@@ -19,12 +19,47 @@ type ProductsShellProps = {
   movements: InventoryMovementRecord[];
 };
 
-export function ProductsShell({ products, movements }: ProductsShellProps) {
+function NewProductModal() {
   const router = useRouter();
+  const [open, setOpen] = useState(false);
+
+  return (
+    <>
+      <Button type="button" onClick={() => setOpen(true)}>
+        <Plus className="h-4 w-4" />
+        Nuevo producto
+      </Button>
+      <Modal open={open} onClose={() => setOpen(false)} title="Nuevo producto" description="Actualiza catalogo, precio y stock minimo.">
+        <ProductForm product={null} onSuccess={() => { setOpen(false); router.refresh(); }} />
+      </Modal>
+    </>
+  );
+}
+
+function EditProductModal({ product, onClose }: { product: ProductRecord; onClose: () => void }) {
+  const router = useRouter();
+
+  return (
+    <Modal open onClose={onClose} title="Editar producto" description="Actualiza catalogo, precio y stock minimo.">
+      <ProductForm product={product} onSuccess={() => { onClose(); router.refresh(); }} />
+    </Modal>
+  );
+}
+
+function AdjustStockModal({ product, onClose }: { product: ProductRecord; onClose: () => void }) {
+  const router = useRouter();
+
+  return (
+    <Modal open onClose={onClose} title="Ajustar stock" description="Registra una correccion manual para mantener inventario trazable.">
+      <StockAdjustmentForm entityType="product" entityId={product.id} entityLabel={product.name} onSuccess={() => { onClose(); router.refresh(); }} />
+    </Modal>
+  );
+}
+
+export function ProductsShell({ products, movements }: ProductsShellProps) {
   const [search, setSearch] = useState("");
   const [selectedProduct, setSelectedProduct] = useState<ProductRecord | null>(null);
   const [adjustmentProduct, setAdjustmentProduct] = useState<ProductRecord | null>(null);
-  const [createOpen, setCreateOpen] = useState(false);
   const deferredSearch = useDeferredValue(search);
 
   const filteredProducts = products.filter((product) => {
@@ -53,10 +88,7 @@ export function ProductsShell({ products, movements }: ProductsShellProps) {
                 className="flex-1 bg-transparent text-sm placeholder:text-[#7e867e]"
               />
             </label>
-            <Button type="button" onClick={() => setCreateOpen(true)}>
-              <Plus className="h-4 w-4" />
-              Nuevo producto
-            </Button>
+            <NewProductModal />
           </div>
         </div>
       </Panel>
@@ -124,43 +156,8 @@ export function ProductsShell({ products, movements }: ProductsShellProps) {
         movements={movements}
       />
 
-      <Modal
-        open={createOpen || selectedProduct !== null}
-        onClose={() => {
-          setCreateOpen(false);
-          setSelectedProduct(null);
-        }}
-        title={selectedProduct ? "Editar producto" : "Nuevo producto"}
-        description="Actualiza catalogo, precio y stock minimo."
-      >
-        <ProductForm
-          product={selectedProduct}
-          onSuccess={() => {
-            setCreateOpen(false);
-            setSelectedProduct(null);
-            router.refresh();
-          }}
-        />
-      </Modal>
-
-      <Modal
-        open={adjustmentProduct !== null}
-        onClose={() => setAdjustmentProduct(null)}
-        title="Ajustar stock"
-        description="Registra una correccion manual para mantener inventario trazable."
-      >
-        {adjustmentProduct ? (
-          <StockAdjustmentForm
-            entityType="product"
-            entityId={adjustmentProduct.id}
-            entityLabel={adjustmentProduct.name}
-            onSuccess={() => {
-              setAdjustmentProduct(null);
-              router.refresh();
-            }}
-          />
-        ) : null}
-      </Modal>
+      {selectedProduct ? <EditProductModal product={selectedProduct} onClose={() => setSelectedProduct(null)} /> : null}
+      {adjustmentProduct ? <AdjustStockModal product={adjustmentProduct} onClose={() => setAdjustmentProduct(null)} /> : null}
     </div>
   );
 }
