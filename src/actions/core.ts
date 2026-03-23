@@ -9,6 +9,8 @@ import type {
   ContactRecord,
   ExpenseRecord,
   InventoryMovementRecord,
+  ProductRecord,
+  ProductionBatchRecord,
   PurchaseRecord,
   SaleOrderRecord,
   SupplyRecord,
@@ -41,6 +43,7 @@ type RegisterPurchaseResult = {
 };
 type StockAdjustmentResult = {
   movement: InventoryMovementRecord;
+  product: ProductRecord | null;
   supply: SupplyRecord | null;
 };
 
@@ -49,6 +52,8 @@ const SALE_ORDER_SELECT =
 const EXPENSE_SELECT =
   "id, expense_date, concept, amount, source, notes, linked_purchase_id, created_at, expense_categories(name), purchases(contacts(name))";
 const PURCHASE_SELECT = "id, purchase_date, total_amount, notes, created_at, contacts(name)";
+const PRODUCTION_BATCH_SELECT =
+  "id, product_id, status, started_at, completed_at, expected_qty, actual_qty, notes, inventory_posted_at, created_at, products(name), production_batch_inputs(id, supply_id, quantity, supplies(name)), production_batch_outputs(id, product_id, quantity, products(name))";
 
 async function getAuthenticatedClient() {
   const supabase = await createSupabaseServerClient();
@@ -81,11 +86,12 @@ function asArray(value: unknown): RawRecord[] {
 
 function toNumber(value: unknown) {
   if (typeof value === "number") {
-    return value;
+    return Number.isFinite(value) ? value : 0;
   }
 
   if (typeof value === "string" && value.trim() !== "") {
-    return Number(value);
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : 0;
   }
 
   return 0;
@@ -114,6 +120,21 @@ function mapSupply(record: RawRecord): SupplyRecord {
     isActive: Boolean(record.is_active),
     currentStock: toNumber(record.current_stock),
     lastPurchaseAt: (record.last_purchase_at as string | null | undefined) ?? null,
+    createdAt: String(record.created_at ?? ""),
+  };
+}
+
+function mapProduct(record: RawRecord): ProductRecord {
+  return {
+    id: String(record.id ?? ""),
+    name: String(record.name ?? ""),
+    category: String(record.category ?? ""),
+    unit: String(record.unit ?? ""),
+    salePrice: toNumber(record.sale_price),
+    minStock: toNumber(record.min_stock),
+    notes: (record.notes as string | null | undefined) ?? null,
+    isActive: Boolean(record.is_active),
+    currentStock: toNumber(record.current_stock),
     createdAt: String(record.created_at ?? ""),
   };
 }
@@ -201,6 +222,44 @@ function mapInventoryMovement(record: RawRecord): InventoryMovementRecord {
   };
 }
 
+function mapBatch(record: RawRecord): ProductionBatchRecord {
+  const product = asRecord(record.products);
+
+  return {
+    id: String(record.id ?? ""),
+    productId: String(record.product_id ?? ""),
+    productName: String(product.name ?? "Producto"),
+    status: (record.status as ProductionBatchRecord["status"]) ?? "draft",
+    startedAt: String(record.started_at ?? ""),
+    completedAt: (record.completed_at as string | null | undefined) ?? null,
+    expectedQty: record.expected_qty === null ? null : toNumber(record.expected_qty),
+    actualQty: record.actual_qty === null ? null : toNumber(record.actual_qty),
+    notes: (record.notes as string | null | undefined) ?? null,
+    inventoryPostedAt: (record.inventory_posted_at as string | null | undefined) ?? null,
+    createdAt: String(record.created_at ?? ""),
+    inputs: asArray(record.production_batch_inputs).map((input) => {
+      const supply = asRecord(input.supplies);
+
+      return {
+        id: String(input.id ?? ""),
+        supplyId: String(input.supply_id ?? ""),
+        supplyName: String(supply.name ?? "Insumo"),
+        quantity: toNumber(input.quantity),
+      };
+    }),
+    outputs: asArray(record.production_batch_outputs).map((output) => {
+      const outputProduct = asRecord(output.products);
+
+      return {
+        id: String(output.id ?? ""),
+        productId: String(output.product_id ?? ""),
+        productName: String(outputProduct.name ?? "Producto"),
+        quantity: toNumber(output.quantity),
+      };
+    }),
+  };
+}
+
 async function getContactRecord(supabase: SupabaseServerClient, contactId: string) {
   const { data, error } = await supabase.from("contacts").select("*").eq("id", contactId).maybeSingle();
 
@@ -223,6 +282,34 @@ async function getSupplyRecord(supabase: SupabaseServerClient, supplyId: string)
   }
 
   return data ? mapSupply(asRecord(data)) : null;
+}
+
+async function getProductRecord(supabase: SupabaseServerClient, productId: string) {
+  const { data, error } = await supabase
+    .from("product_inventory_overview")
+    .select("*")
+    .eq("id", productId)
+    .maybeSingle();
+
+  if (error) {
+    throw error;
+  }
+
+  return data ? mapProduct(asRecord(data)) : null;
+}
+
+async function getProductionBatchRecord(supabase: SupabaseServerClient, batchId: string) {
+  const { data, error } = await supabase
+    .from("production_batches")
+    .select(PRODUCTION_BATCH_SELECT)
+    .eq("id", batchId)
+    .maybeSingle();
+
+  if (error) {
+    throw error;
+  }
+
+  return data ? mapBatch(asRecord(data)) : null;
 }
 
 async function getSupplyRecords(supabase: SupabaseServerClient, supplyIds: string[]) {
@@ -482,7 +569,7 @@ function refreshTags(...tags: string[]) {
   tags.forEach((tag) => updateTag(tag));
 }
 
-export async function saveContactAction(input: unknown): Promise<ActionResponse> {
+export async function saveContactAction(input: unknown): Promise<ActionResponse<ContactRecord>> {
   const parsed = contactFormSchema.safeParse(input);
 
   if (!parsed.success) {
@@ -502,25 +589,48 @@ export async function saveContactAction(input: unknown): Promise<ActionResponse>
       is_active: data.isActive,
     };
 
+    let contactId = id ?? null;
+
     if (id) {
-      const { error } = await supabase.from("contacts").update(payload).eq("id", id);
+      const { data: updatedContact, error } = await supabase
+        .from("contacts")
+        .update(payload)
+        .eq("id", id)
+        .select("id")
+        .single();
       if (error) throw error;
+      contactId = String(updatedContact.id);
     } else {
-      const { error } = await supabase.from("contacts").insert(payload);
+      const { data: createdContact, error } = await supabase
+        .from("contacts")
+        .insert(payload)
+        .select("id")
+        .single();
       if (error) throw error;
+      contactId = String(createdContact.id);
+    }
+
+    if (!contactId) {
+      throw new Error("No pudimos recuperar el contacto guardado.");
+    }
+
+    const contact = await getContactRecord(supabase, contactId);
+
+    if (!contact) {
+      throw new Error("No pudimos recuperar el contacto actualizado.");
     }
 
     refreshTags(CACHE_TAGS.contacts);
     revalidatePath("/contactos");
     revalidatePath("/ventas");
     revalidatePath("/insumos");
-    return success("Contacto guardado.");
+    return success("Contacto guardado.", contact);
   } catch (error) {
     return failure("No pudimos guardar el contacto.", error);
   }
 }
 
-export async function saveProductAction(input: unknown): Promise<ActionResponse> {
+export async function saveProductAction(input: unknown): Promise<ActionResponse<ProductRecord>> {
   const parsed = productFormSchema.safeParse(input);
 
   if (!parsed.success) {
@@ -541,12 +651,35 @@ export async function saveProductAction(input: unknown): Promise<ActionResponse>
       is_active: data.isActive,
     };
 
+    let productId = id ?? null;
+
     if (id) {
-      const { error } = await supabase.from("products").update(payload).eq("id", id);
+      const { data: updatedProduct, error } = await supabase
+        .from("products")
+        .update(payload)
+        .eq("id", id)
+        .select("id")
+        .single();
       if (error) throw error;
+      productId = String(updatedProduct.id);
     } else {
-      const { error } = await supabase.from("products").insert(payload);
+      const { data: createdProduct, error } = await supabase
+        .from("products")
+        .insert(payload)
+        .select("id")
+        .single();
       if (error) throw error;
+      productId = String(createdProduct.id);
+    }
+
+    if (!productId) {
+      throw new Error("No pudimos recuperar el producto guardado.");
+    }
+
+    const product = await getProductRecord(supabase, productId);
+
+    if (!product) {
+      throw new Error("No pudimos recuperar el producto actualizado.");
     }
 
     refreshTags(CACHE_TAGS.products);
@@ -554,7 +687,7 @@ export async function saveProductAction(input: unknown): Promise<ActionResponse>
     revalidatePath("/ventas");
     revalidatePath("/dashboard");
     revalidatePath("/reportes");
-    return success("Producto guardado.");
+    return success("Producto guardado.", product);
   } catch (error) {
     return failure("No pudimos guardar el producto.", error);
   }
@@ -811,7 +944,9 @@ export async function registerSupplyPurchaseAction(
   }
 }
 
-export async function saveProductionBatchAction(input: unknown): Promise<ActionResponse> {
+export async function saveProductionBatchAction(
+  input: unknown,
+): Promise<ActionResponse<ProductionBatchRecord>> {
   const parsed = productionBatchFormSchema.safeParse(input);
 
   if (!parsed.success) {
@@ -820,7 +955,7 @@ export async function saveProductionBatchAction(input: unknown): Promise<ActionR
 
   try {
     const { supabase } = await getAuthenticatedClient();
-    const { error } = await supabase.rpc("create_production_batch", {
+    const { data, error } = await supabase.rpc("create_production_batch", {
       payload: {
         id: parsed.data.id,
         productId: parsed.data.productId,
@@ -837,6 +972,18 @@ export async function saveProductionBatchAction(input: unknown): Promise<ActionR
 
     if (error) throw error;
 
+    const batchId = data?.id ? String(data.id) : parsed.data.id ?? null;
+
+    if (!batchId) {
+      throw new Error("No pudimos recuperar el lote guardado.");
+    }
+
+    const batch = await getProductionBatchRecord(supabase, batchId);
+
+    if (!batch) {
+      throw new Error("No pudimos recuperar el lote actualizado.");
+    }
+
     refreshTags(
       CACHE_TAGS.production,
       CACHE_TAGS.products,
@@ -849,7 +996,7 @@ export async function saveProductionBatchAction(input: unknown): Promise<ActionR
     revalidatePath("/insumos");
     revalidatePath("/productos");
     revalidatePath("/reportes");
-    return success("Lote guardado.");
+    return success("Lote guardado.", batch);
   } catch (error) {
     return failure("No pudimos guardar el lote.", error);
   }
@@ -884,8 +1031,11 @@ export async function applyStockAdjustmentAction(
       throw new Error("No pudimos recuperar el movimiento de ajuste.");
     }
 
-    const [movement, updatedSupply] = await Promise.all([
+    const [movement, updatedProduct, updatedSupply] = await Promise.all([
       getMovementRecord(supabase, movementId),
+      parsed.data.entityType === "product"
+        ? getProductRecord(supabase, parsed.data.entityId)
+        : Promise.resolve(null),
       parsed.data.entityType === "supply"
         ? getSupplyRecord(supabase, parsed.data.entityId)
         : Promise.resolve(null),
@@ -907,6 +1057,7 @@ export async function applyStockAdjustmentAction(
     revalidatePath("/reportes");
     return success("Stock ajustado.", {
       movement,
+      product: updatedProduct,
       supply: updatedSupply,
     });
   } catch (error) {

@@ -19,17 +19,14 @@ export default function Error({
   return (
     <div className="flex min-h-[70vh] items-center justify-center p-4">
       <Panel className="flex max-w-md flex-col items-center justify-center text-center">
-        <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-[#faebe8] text-[#a54b3d] mb-6">
+        <div className="mb-6 flex h-16 w-16 items-center justify-center rounded-2xl bg-[#faebe8] text-[#a54b3d]">
           <AlertTriangle className="h-8 w-8" />
         </div>
-        <h2 className="text-3xl font-semibold">Algo salió mal</h2>
+        <h2 className="text-3xl font-semibold">Algo salio mal</h2>
         <p className="mt-3 text-[var(--muted)]">
-          Ocurrió un error inesperado. Por favor, intenta de nuevo.
+          Ocurrio un error inesperado. Por favor, intenta de nuevo.
         </p>
-        <Button
-          onClick={() => reset()}
-          className="mt-8"
-        >
+        <Button onClick={() => reset()} className="mt-8">
           Intentar de nuevo
         </Button>
       </Panel>

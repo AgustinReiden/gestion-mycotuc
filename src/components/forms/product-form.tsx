@@ -15,7 +15,7 @@ type ProductFormValues = z.input<typeof productFormSchema>;
 
 type ProductFormProps = {
   product?: ProductRecord | null;
-  onSuccess: () => void;
+  onSuccess: (product: ProductRecord) => void;
 };
 
 export function ProductForm({ product, onSuccess }: ProductFormProps) {
@@ -55,9 +55,9 @@ export function ProductForm({ product, onSuccess }: ProductFormProps) {
         setFeedback(null);
         startTransition(async () => {
           const result = await saveProductAction(values);
-          if (result.success) {
+          if (result.success && result.data) {
             setFeedback({ tone: "success", message: result.message });
-            onSuccess();
+            onSuccess(result.data);
             form.reset({
               name: "",
               category: "",

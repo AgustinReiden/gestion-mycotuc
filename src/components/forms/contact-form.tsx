@@ -16,7 +16,7 @@ type ContactFormValues = z.input<typeof contactFormSchema>;
 
 type ContactFormProps = {
   contact?: ContactRecord | null;
-  onSuccess: () => void;
+  onSuccess: (contact: ContactRecord) => void;
 };
 
 export function ContactForm({ contact, onSuccess }: ContactFormProps) {
@@ -55,9 +55,9 @@ export function ContactForm({ contact, onSuccess }: ContactFormProps) {
         setFeedback(null);
         startTransition(async () => {
           const result = await saveContactAction(values);
-          if (result.success) {
+          if (result.success && result.data) {
             setFeedback({ tone: "success", message: result.message });
-            onSuccess();
+            onSuccess(result.data);
             form.reset({
               type: "client",
               name: "",

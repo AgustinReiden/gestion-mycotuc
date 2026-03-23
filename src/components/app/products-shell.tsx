@@ -1,8 +1,7 @@
 "use client";
 
-import { useDeferredValue, useState } from "react";
+import { useDeferredValue, useEffect, useState } from "react";
 import { Edit3, Package, Plus, Search, Settings2 } from "lucide-react";
-import { useRouter } from "next/navigation";
 import { StockHistoryPanel } from "@/components/app/stock-history-panel";
 import { ProductForm } from "@/components/forms/product-form";
 import { StockAdjustmentForm } from "@/components/forms/stock-adjustment-form";
@@ -19,8 +18,38 @@ type ProductsShellProps = {
   movements: InventoryMovementRecord[];
 };
 
-function NewProductModal() {
-  const router = useRouter();
+function sortProducts(list: ProductRecord[]) {
+  return [...list].sort((left, right) => left.name.localeCompare(right.name, "es", { sensitivity: "base" }));
+}
+
+function upsertProduct(list: ProductRecord[], product: ProductRecord) {
+  return sortProducts([product, ...list.filter((entry) => entry.id !== product.id)]);
+}
+
+function sortMovements(list: InventoryMovementRecord[]) {
+  return [...list].sort((left, right) => {
+    const movementDateComparison = right.movementDate.localeCompare(left.movementDate);
+
+    if (movementDateComparison !== 0) {
+      return movementDateComparison;
+    }
+
+    return right.createdAt.localeCompare(left.createdAt);
+  });
+}
+
+function mergeMovements(
+  list: InventoryMovementRecord[],
+  nextMovements: InventoryMovementRecord[],
+  limit: number,
+) {
+  return sortMovements([
+    ...nextMovements,
+    ...list.filter((entry) => !nextMovements.some((movement) => movement.id === entry.id)),
+  ]).slice(0, limit);
+}
+
+function NewProductModal({ onProductSaved }: { onProductSaved: (product: ProductRecord) => void }) {
   const [open, setOpen] = useState(false);
 
   return (
@@ -30,39 +59,74 @@ function NewProductModal() {
         Nuevo producto
       </Button>
       <Modal open={open} onClose={() => setOpen(false)} title="Nuevo producto" description="Actualiza catalogo, precio y stock minimo.">
-        <ProductForm product={null} onSuccess={() => { setOpen(false); router.refresh(); }} />
+        <ProductForm product={null} onSuccess={(product) => { setOpen(false); onProductSaved(product); }} />
       </Modal>
     </>
   );
 }
 
-function EditProductModal({ product, onClose }: { product: ProductRecord; onClose: () => void }) {
-  const router = useRouter();
-
+function EditProductModal({
+  product,
+  onClose,
+  onProductSaved,
+}: {
+  product: ProductRecord;
+  onClose: () => void;
+  onProductSaved: (product: ProductRecord) => void;
+}) {
   return (
     <Modal open onClose={onClose} title="Editar producto" description="Actualiza catalogo, precio y stock minimo.">
-      <ProductForm product={product} onSuccess={() => { onClose(); router.refresh(); }} />
+      <ProductForm product={product} onSuccess={(updatedProduct) => { onProductSaved(updatedProduct); onClose(); }} />
     </Modal>
   );
 }
 
-function AdjustStockModal({ product, onClose }: { product: ProductRecord; onClose: () => void }) {
-  const router = useRouter();
-
+function AdjustStockModal({
+  product,
+  onClose,
+  onAdjustmentApplied,
+}: {
+  product: ProductRecord;
+  onClose: () => void;
+  onAdjustmentApplied: (result: {
+    movement: InventoryMovementRecord;
+    product: ProductRecord | null;
+  }) => void;
+}) {
   return (
     <Modal open onClose={onClose} title="Ajustar stock" description="Registra una correccion manual para mantener inventario trazable.">
-      <StockAdjustmentForm entityType="product" entityId={product.id} entityLabel={product.name} onSuccess={() => { onClose(); router.refresh(); }} />
+      <StockAdjustmentForm
+        entityType="product"
+        entityId={product.id}
+        entityLabel={product.name}
+        onSuccess={(result) => {
+          onAdjustmentApplied(result);
+          onClose();
+        }}
+      />
     </Modal>
   );
 }
 
 export function ProductsShell({ products, movements }: ProductsShellProps) {
   const [search, setSearch] = useState("");
+  const [productRecords, setProductRecords] = useState(() => sortProducts(products));
+  const [movementRecords, setMovementRecords] = useState(() => sortMovements(movements));
   const [selectedProduct, setSelectedProduct] = useState<ProductRecord | null>(null);
   const [adjustmentProduct, setAdjustmentProduct] = useState<ProductRecord | null>(null);
   const deferredSearch = useDeferredValue(search);
+  const hasSearchQuery = deferredSearch.trim().length > 0;
+  const movementHistoryLimit = Math.max(movements.length, 12);
 
-  const filteredProducts = products.filter((product) => {
+  useEffect(() => {
+    setProductRecords(sortProducts(products));
+  }, [products]);
+
+  useEffect(() => {
+    setMovementRecords(sortMovements(movements));
+  }, [movements]);
+
+  const filteredProducts = productRecords.filter((product) => {
     const query = deferredSearch.toLowerCase();
     return product.name.toLowerCase().includes(query) || product.category.toLowerCase().includes(query);
   });
@@ -85,10 +149,15 @@ export function ProductsShell({ products, movements }: ProductsShellProps) {
                 value={search}
                 onChange={(event) => setSearch(event.target.value)}
                 placeholder="Buscar producto..."
+                aria-label="Buscar productos"
                 className="flex-1 bg-transparent text-sm placeholder:text-[#7e867e]"
               />
             </label>
-            <NewProductModal />
+            <NewProductModal
+              onProductSaved={(product) => {
+                setProductRecords((current) => upsertProduct(current, product));
+              }}
+            />
           </div>
         </div>
       </Panel>
@@ -96,8 +165,12 @@ export function ProductsShell({ products, movements }: ProductsShellProps) {
       {filteredProducts.length === 0 ? (
         <Panel>
           <EmptyState
-            title="No hay productos para mostrar"
-            description="Crea tu primer producto o prueba otra busqueda."
+            title={hasSearchQuery ? "No encontramos productos" : "No hay productos para mostrar"}
+            description={
+              hasSearchQuery
+                ? "Prueba otro termino de busqueda o crea un producto nuevo."
+                : "Crea tu primer producto o prueba otra busqueda."
+            }
             icon={Package}
           />
         </Panel>
@@ -153,11 +226,32 @@ export function ProductsShell({ products, movements }: ProductsShellProps) {
       <StockHistoryPanel
         title="Historial de stock de productos"
         description="Ultimos movimientos que afectaron el inventario de producto terminado."
-        movements={movements}
+        movements={movementRecords}
       />
 
-      {selectedProduct ? <EditProductModal product={selectedProduct} onClose={() => setSelectedProduct(null)} /> : null}
-      {adjustmentProduct ? <AdjustStockModal product={adjustmentProduct} onClose={() => setAdjustmentProduct(null)} /> : null}
+      {selectedProduct ? (
+        <EditProductModal
+          product={selectedProduct}
+          onClose={() => setSelectedProduct(null)}
+          onProductSaved={(product) => {
+            setProductRecords((current) => upsertProduct(current, product));
+          }}
+        />
+      ) : null}
+      {adjustmentProduct ? (
+        <AdjustStockModal
+          product={adjustmentProduct}
+          onClose={() => setAdjustmentProduct(null)}
+          onAdjustmentApplied={(result) => {
+            if (result.product) {
+              setProductRecords((current) => upsertProduct(current, result.product!));
+            }
+            setMovementRecords((current) =>
+              mergeMovements(current, [result.movement], movementHistoryLimit),
+            );
+          }}
+        />
+      ) : null}
     </div>
   );
 }

@@ -1,8 +1,7 @@
 "use client";
 
-import { useDeferredValue, useState } from "react";
+import { useDeferredValue, useEffect, useState } from "react";
 import { ClipboardList, Filter, Plus, Search } from "lucide-react";
-import { useRouter } from "next/navigation";
 import { ContactForm } from "@/components/forms/contact-form";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -15,8 +14,15 @@ type ContactsShellProps = {
   contacts: ContactRecord[];
 };
 
-function NewContactModal() {
-  const router = useRouter();
+function sortContacts(list: ContactRecord[]) {
+  return [...list].sort((left, right) => left.name.localeCompare(right.name, "es", { sensitivity: "base" }));
+}
+
+function upsertContact(list: ContactRecord[], contact: ContactRecord) {
+  return sortContacts([contact, ...list.filter((entry) => entry.id !== contact.id)]);
+}
+
+function NewContactModal({ onContactSaved }: { onContactSaved: (contact: ContactRecord) => void }) {
   const [open, setOpen] = useState(false);
 
   return (
@@ -26,18 +32,24 @@ function NewContactModal() {
         Nuevo contacto
       </Button>
       <Modal open={open} onClose={() => setOpen(false)} title="Nuevo contacto" description="Los contactos pueden reutilizarse en ventas o compras.">
-        <ContactForm contact={null} onSuccess={() => { setOpen(false); router.refresh(); }} />
+        <ContactForm contact={null} onSuccess={(contact) => { setOpen(false); onContactSaved(contact); }} />
       </Modal>
     </>
   );
 }
 
-function EditContactModal({ contact, onClose }: { contact: ContactRecord; onClose: () => void }) {
-  const router = useRouter();
-
+function EditContactModal({
+  contact,
+  onClose,
+  onContactSaved,
+}: {
+  contact: ContactRecord;
+  onClose: () => void;
+  onContactSaved: (contact: ContactRecord) => void;
+}) {
   return (
     <Modal open onClose={onClose} title="Editar contacto" description="Los contactos pueden reutilizarse en ventas o compras.">
-      <ContactForm contact={contact} onSuccess={() => { onClose(); router.refresh(); }} />
+      <ContactForm contact={contact} onSuccess={(updatedContact) => { onContactSaved(updatedContact); onClose(); }} />
     </Modal>
   );
 }
@@ -45,10 +57,16 @@ function EditContactModal({ contact, onClose }: { contact: ContactRecord; onClos
 export function ContactsShell({ contacts }: ContactsShellProps) {
   const [search, setSearch] = useState("");
   const [typeFilter, setTypeFilter] = useState<"all" | ContactRecord["type"]>("all");
+  const [contactRecords, setContactRecords] = useState(() => sortContacts(contacts));
   const [selectedContact, setSelectedContact] = useState<ContactRecord | null>(null);
   const deferredSearch = useDeferredValue(search);
+  const hasActiveFilters = deferredSearch.trim().length > 0 || typeFilter !== "all";
 
-  const filteredContacts = contacts.filter((contact) => {
+  useEffect(() => {
+    setContactRecords(sortContacts(contacts));
+  }, [contacts]);
+
+  const filteredContacts = contactRecords.filter((contact) => {
     const query = deferredSearch.toLowerCase();
     const matchesSearch =
       contact.name.toLowerCase().includes(query) ||
@@ -76,6 +94,7 @@ export function ContactsShell({ contacts }: ContactsShellProps) {
                 value={search}
                 onChange={(event) => setSearch(event.target.value)}
                 placeholder="Buscar contacto..."
+                aria-label="Buscar contactos"
                 className="flex-1 bg-transparent text-sm placeholder:text-[#7e867e]"
               />
             </label>
@@ -84,6 +103,7 @@ export function ContactsShell({ contacts }: ContactsShellProps) {
               <select
                 value={typeFilter}
                 onChange={(event) => setTypeFilter(event.target.value as typeof typeFilter)}
+                aria-label="Filtrar contactos por tipo"
                 className="min-w-0 flex-1 bg-transparent text-sm sm:min-w-[160px]"
               >
                 <option value="all">Todos</option>
@@ -91,7 +111,11 @@ export function ContactsShell({ contacts }: ContactsShellProps) {
                 <option value="supplier">Proveedores</option>
               </select>
             </div>
-            <NewContactModal />
+            <NewContactModal
+              onContactSaved={(contact) => {
+                setContactRecords((current) => upsertContact(current, contact));
+              }}
+            />
           </div>
         </div>
       </Panel>
@@ -99,8 +123,12 @@ export function ContactsShell({ contacts }: ContactsShellProps) {
       {filteredContacts.length === 0 ? (
         <Panel>
           <EmptyState
-            title="No encontramos contactos"
-            description="Crea la agenda inicial para reutilizar clientes y proveedores en toda la app."
+            title={hasActiveFilters ? "No encontramos contactos" : "Todavia no hay contactos"}
+            description={
+              hasActiveFilters
+                ? "Prueba otro filtro o crea un contacto nuevo."
+                : "Crea la agenda inicial para reutilizar clientes y proveedores en toda la app."
+            }
             icon={ClipboardList}
           />
         </Panel>
@@ -136,7 +164,15 @@ export function ContactsShell({ contacts }: ContactsShellProps) {
         </div>
       )}
 
-      {selectedContact ? <EditContactModal contact={selectedContact} onClose={() => setSelectedContact(null)} /> : null}
+      {selectedContact ? (
+        <EditContactModal
+          contact={selectedContact}
+          onClose={() => setSelectedContact(null)}
+          onContactSaved={(contact) => {
+            setContactRecords((current) => upsertContact(current, contact));
+          }}
+        />
+      ) : null}
     </div>
   );
 }

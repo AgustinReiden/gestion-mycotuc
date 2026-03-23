@@ -16,13 +16,13 @@ export default async function PrivateLayout({
   } = await supabase.auth.getUser();
 
   if (!user) {
-    redirect("/login");
+    redirect("/login?reason=session-expired");
   }
 
   const profile = await getProfileSummary();
 
   if (!profile) {
-    redirect("/login");
+    redirect("/login?reason=profile-missing");
   }
 
   return <AppShell profile={profile}>{children}</AppShell>;

@@ -239,6 +239,7 @@ export function SuppliesShell({
   const [selectedSupplyId, setSelectedSupplyId] = useState<string | null>(null);
   const [adjustmentSupplyId, setAdjustmentSupplyId] = useState<string | null>(null);
   const deferredSearch = useDeferredValue(search);
+  const hasSearchQuery = deferredSearch.trim().length > 0;
   const purchaseHistoryLimit = Math.max(purchases.length, 8);
   const movementHistoryLimit = Math.max(movements.length, 12);
   const selectedSupply = selectedSupplyId
@@ -283,6 +284,7 @@ export function SuppliesShell({
                 value={search}
                 onChange={(event) => setSearch(event.target.value)}
                 placeholder="Buscar insumo..."
+                aria-label="Buscar insumos"
                 className="flex-1 bg-transparent text-sm placeholder:text-[#7e867e]"
               />
             </label>
@@ -311,8 +313,12 @@ export function SuppliesShell({
       {filteredSupplies.length === 0 ? (
         <Panel>
           <EmptyState
-            title="No encontramos insumos"
-            description="Crea insumos base o cambia el termino de busqueda."
+            title={hasSearchQuery ? "No encontramos insumos" : "Todavia no hay insumos"}
+            description={
+              hasSearchQuery
+                ? "Prueba otro termino de busqueda o crea un insumo nuevo."
+                : "Crea insumos base para empezar a registrar compras y movimientos."
+            }
             icon={Archive}
           />
         </Panel>

@@ -37,8 +37,17 @@ export async function loginAction(input: unknown): Promise<ActionResponse> {
   redirect("/dashboard");
 }
 
-export async function signOutAction() {
+export async function signOutAction(): Promise<ActionResponse> {
   const supabase = await createSupabaseServerClient();
-  await supabase.auth.signOut();
-  redirect("/login");
+  const { error } = await supabase.auth.signOut();
+
+  if (error) {
+    return {
+      success: false,
+      message: "No pudimos cerrar la sesion.",
+      error: error.message,
+    };
+  }
+
+  redirect("/login?reason=signed-out");
 }

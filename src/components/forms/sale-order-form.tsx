@@ -68,6 +68,10 @@ function toSearchTerms(value: string) {
     .filter(Boolean);
 }
 
+function sortContactsByRecent(list: ContactRecord[]) {
+  return [...list].sort((left, right) => right.createdAt.localeCompare(left.createdAt));
+}
+
 function getCustomerHint(mode: SaleCustomerMode, hasSelectedContact: boolean) {
   if (mode === "anonymous") {
     return "La venta se guardara con un cliente generico para no frenar la carga.";
@@ -98,11 +102,18 @@ export function SaleOrderForm({ contacts, products, channels, onSuccess }: SaleO
     control: form.control,
     name: "items",
   });
+  const hasProducts = products.length > 0;
+  const hasChannels = channels.length > 0;
+  const missingDependencies = [
+    !hasProducts ? "al menos un producto activo" : null,
+    !hasChannels ? "al menos un canal de venta activo" : null,
+  ].filter(Boolean);
+  const canSubmitSale = missingDependencies.length === 0;
 
   const watchedItems = useWatch({
     control: form.control,
     name: "items",
-  });
+  }) ?? [];
   const customerMode = (useWatch({
     control: form.control,
     name: "customerMode",
@@ -121,9 +132,9 @@ export function SaleOrderForm({ contacts, products, channels, onSuccess }: SaleO
   );
   const selectedContact = contacts.find((contact) => contact.id === selectedContactId) ?? null;
   const customerTerms = customerMode === "anonymous" ? [] : toSearchTerms(customerName);
-  const matchingContacts =
+  const suggestedContacts =
     customerTerms.length === 0
-      ? []
+      ? sortContactsByRecent(contacts).slice(0, 6)
       : contacts
           .filter((contact) => {
             const haystack = [contact.name, contact.phone, contact.email]
@@ -184,6 +195,14 @@ export function SaleOrderForm({ contacts, products, channels, onSuccess }: SaleO
     <form
       className="space-y-5"
       onSubmit={form.handleSubmit((values) => {
+        if (!canSubmitSale) {
+          setFeedback({
+            tone: "error",
+            message: `No podemos guardar la venta todavia: falta ${missingDependencies.join(" y ")}.`,
+          });
+          return;
+        }
+
         setFeedback(null);
         startTransition(async () => {
           const result = await createSaleOrderAction(values);
@@ -197,6 +216,13 @@ export function SaleOrderForm({ contacts, products, channels, onSuccess }: SaleO
         });
       })}
     >
+      {!canSubmitSale ? (
+        <ActionNotice
+          tone="warning"
+          message={`Antes de registrar una venta, crea ${missingDependencies.join(" y ")}.`}
+        />
+      ) : null}
+
       <div className="grid gap-4 md:grid-cols-[1.4fr_0.8fr]">
         <Field
           label="Cliente"
@@ -226,13 +252,13 @@ export function SaleOrderForm({ contacts, products, channels, onSuccess }: SaleO
                 }}
               />
 
-              {showSuggestions && matchingContacts.length > 0 ? (
+              {showSuggestions && suggestedContacts.length > 0 ? (
                 <div className="absolute inset-x-0 top-[calc(100%+0.5rem)] z-20 rounded-[22px] border border-[var(--line)] bg-white p-2 shadow-[0_18px_40px_rgba(46,54,40,0.12)]">
                   <p className="px-3 py-2 text-xs font-semibold uppercase tracking-[0.18em] text-[#55755e]">
-                    Sugerencias
+                    {customerTerms.length > 0 ? "Sugerencias" : "Clientes recientes"}
                   </p>
                   <div className="space-y-1">
-                    {matchingContacts.map((contact) => (
+                    {suggestedContacts.map((contact) => (
                       <button
                         key={contact.id}
                         type="button"
@@ -260,7 +286,7 @@ export function SaleOrderForm({ contacts, products, channels, onSuccess }: SaleO
               ) : null}
             </div>
 
-            {showSuggestions && customerTerms.length > 0 && matchingContacts.length === 0 ? (
+            {showSuggestions && customerTerms.length > 0 && suggestedContacts.length === 0 ? (
               <p className="text-xs text-[var(--muted)]">
                 No encontramos coincidencias. Si sigues con este nombre, se guardara como cliente nuevo.
               </p>
@@ -280,7 +306,10 @@ export function SaleOrderForm({ contacts, products, channels, onSuccess }: SaleO
         </Field>
 
         <Field label="Canal" error={form.formState.errors.channelId?.message}>
-          <SelectInput {...form.register("channelId")}>
+          <SelectInput {...form.register("channelId")} disabled={!hasChannels}>
+            {!hasChannels ? (
+              <option value="">No hay canales activos disponibles</option>
+            ) : null}
             {channels.map((channel) => (
               <option key={channel.id} value={channel.id}>
                 {channel.name}
@@ -332,7 +361,12 @@ export function SaleOrderForm({ contacts, products, channels, onSuccess }: SaleO
             <h4 className="text-lg font-semibold">Items del pedido</h4>
             <p className="text-sm text-[var(--muted)]">Cada linea descuenta stock al confirmar la venta.</p>
           </div>
-          <Button type="button" variant="secondary" onClick={() => items.append(getInitialItem(products))}>
+          <Button
+            type="button"
+            variant="secondary"
+            disabled={!hasProducts}
+            onClick={() => items.append(getInitialItem(products))}
+          >
             <Plus className="h-4 w-4" />
             Agregar item
           </Button>
@@ -351,12 +385,16 @@ export function SaleOrderForm({ contacts, products, channels, onSuccess }: SaleO
                 <Field label="Producto" error={form.formState.errors.items?.[index]?.productId?.message}>
                   <SelectInput
                     {...form.register(`items.${index}.productId`)}
+                    disabled={!hasProducts}
                     onChange={(event) => {
                       form.register(`items.${index}.productId`).onChange(event);
                       const product = products.find((entry) => entry.id === event.target.value);
                       form.setValue(`items.${index}.unitPrice`, product?.salePrice ?? 0);
                     }}
                   >
+                    {!hasProducts ? (
+                      <option value="">No hay productos activos disponibles</option>
+                    ) : null}
                     {products.map((product) => (
                       <option key={product.id} value={product.id}>
                         {product.name}
@@ -396,6 +434,8 @@ export function SaleOrderForm({ contacts, products, channels, onSuccess }: SaleO
                   <Button
                     type="button"
                     variant="ghost"
+                    aria-label={`Quitar item ${index + 1}`}
+                    disabled={items.fields.length <= 1}
                     onClick={() => (items.fields.length > 1 ? items.remove(index) : null)}
                   >
                     <Trash2 className="h-4 w-4" />
@@ -418,7 +458,7 @@ export function SaleOrderForm({ contacts, products, channels, onSuccess }: SaleO
           <p className="text-sm text-[#55755e]">Total estimado</p>
           <p className="text-2xl font-semibold text-[#15553e]">{formatCurrency(total)}</p>
         </div>
-        <Button type="submit" busy={pending}>
+        <Button type="submit" busy={pending} disabled={!canSubmitSale}>
           Guardar venta
         </Button>
       </div>

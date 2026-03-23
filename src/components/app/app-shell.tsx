@@ -1,10 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
-import { Bell, Leaf, LogOut, Menu, X } from "lucide-react";
-import { useEffect, useState, useTransition } from "react";
+import { usePathname } from "next/navigation";
+import { Leaf, LogOut, Menu, X } from "lucide-react";
+import { useState, useTransition } from "react";
 import { signOutAction } from "@/actions/auth";
+import { ActionNotice } from "@/components/forms/action-notice";
 import { Button } from "@/components/ui/button";
 import { APP_NAVIGATION } from "@/lib/constants";
 import type { ProfileSummary } from "@/lib/domain";
@@ -21,40 +22,28 @@ function getPageMeta(pathname: string) {
 
 export function AppShell({ profile, children }: AppShellProps) {
   const pathname = usePathname();
-  const router = useRouter();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [signOutFeedback, setSignOutFeedback] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
   const closeMobile = () => setMobileOpen(false);
 
-  useEffect(() => {
-    const timeoutId = window.setTimeout(() => {
-      APP_NAVIGATION.forEach((item) => {
-        if (item.href !== pathname) {
-          router.prefetch(item.href);
-        }
-      });
-    }, 120);
-
-    return () => window.clearTimeout(timeoutId);
-  }, [pathname, router]);
-
   const handleSignOut = () => {
+    setSignOutFeedback(null);
     startTransition(async () => {
-      await signOutAction();
-    });
-  };
+      const result = await signOutAction();
 
-  const prefetchRoute = (href: string) => {
-    if (href !== pathname) {
-      router.prefetch(href);
-    }
+      if (!result?.success) {
+        setSignOutFeedback(result?.error ?? result?.message ?? "No pudimos cerrar la sesion.");
+      }
+    });
   };
 
   return (
     <div className="min-h-screen bg-transparent text-[var(--foreground)]">
       <div className="mx-auto flex min-h-screen max-w-[1720px] gap-3 px-2 py-2 sm:gap-4 sm:px-3 sm:py-3 md:px-5">
         <aside
+          id="app-navigation"
           className={cn(
             "fixed inset-y-2 left-2 z-50 flex w-[min(86vw,320px)] flex-col rounded-[28px] border border-white/10 bg-gradient-to-b from-[#123925] via-[#0f2d1f] to-[#091b12] p-4 text-white shadow-[0_24px_60px_rgba(9,27,18,0.34)] transition sm:inset-y-3 sm:left-3 sm:w-[290px] sm:rounded-[30px] md:static md:translate-x-0",
             mobileOpen ? "translate-x-0" : "-translate-x-[120%]",
@@ -74,6 +63,7 @@ export function AppShell({ profile, children }: AppShellProps) {
               type="button"
               className="rounded-full p-2 text-[#a9c7b5] transition hover:bg-white/10 md:hidden"
               onClick={closeMobile}
+              aria-label="Cerrar menu lateral"
             >
               <X className="h-5 w-5" />
             </button>
@@ -88,9 +78,6 @@ export function AppShell({ profile, children }: AppShellProps) {
                   key={item.href}
                   href={item.href}
                   onClick={closeMobile}
-                  onFocus={() => prefetchRoute(item.href)}
-                  onMouseEnter={() => prefetchRoute(item.href)}
-                  onTouchStart={() => prefetchRoute(item.href)}
                   aria-current={active ? "page" : undefined}
                   className={cn(
                     "flex items-center gap-3 rounded-2xl px-4 py-3 text-sm font-medium transition",
@@ -128,6 +115,7 @@ export function AppShell({ profile, children }: AppShellProps) {
             type="button"
             className="fixed inset-0 z-40 bg-[#122116]/55 md:hidden"
             onClick={closeMobile}
+            aria-label="Cerrar menu lateral"
           />
         ) : null}
 
@@ -138,6 +126,9 @@ export function AppShell({ profile, children }: AppShellProps) {
                 type="button"
                 className="rounded-full p-2 text-[var(--foreground)] transition hover:bg-white/80 md:hidden"
                 onClick={() => setMobileOpen(true)}
+                aria-label="Abrir menu lateral"
+                aria-expanded={mobileOpen}
+                aria-controls="app-navigation"
               >
                 <Menu className="h-5 w-5" />
               </button>
@@ -151,17 +142,20 @@ export function AppShell({ profile, children }: AppShellProps) {
               <div className="hidden rounded-full border border-[var(--line)] bg-white/70 px-4 py-2 text-sm text-[var(--muted)] md:block">
                 Operacion del mes en ARS
               </div>
-              <button
-                type="button"
-                className="relative rounded-full border border-[var(--line)] bg-white/70 p-3 text-[var(--foreground)] transition hover:bg-white"
-              >
-                <Bell className="h-4 w-4" />
-                <span className="absolute right-2 top-2 h-2.5 w-2.5 rounded-full bg-[#d4634f]" />
-              </button>
+              <div className="rounded-full border border-[var(--line)] bg-white/70 px-4 py-2 text-sm text-[var(--muted)]">
+                Sin alertas nuevas
+              </div>
             </div>
           </header>
 
-          <main className="flex-1 pb-4 sm:pb-0">{children}</main>
+          <main className="flex-1 pb-4 sm:pb-0">
+            {signOutFeedback ? (
+              <div className="mb-4">
+                <ActionNotice tone="error" message={signOutFeedback} />
+              </div>
+            ) : null}
+            {children}
+          </main>
         </div>
       </div>
     </div>

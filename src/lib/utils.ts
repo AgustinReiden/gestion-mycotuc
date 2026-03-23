@@ -1,5 +1,5 @@
 import { clsx, type ClassValue } from "clsx";
-import { format, parseISO } from "date-fns";
+import { format, isValid, parseISO } from "date-fns";
 import { es } from "date-fns/locale";
 import { twMerge } from "tailwind-merge";
 
@@ -14,7 +14,7 @@ const currencyFormatter = new Intl.NumberFormat("es-AR", {
 });
 
 export function formatCurrency(amount: number) {
-  return currencyFormatter.format(amount);
+  return currencyFormatter.format(Number.isFinite(amount) ? amount : 0);
 }
 
 export function formatDate(value: string | null | undefined, dateFormat = "dd MMM yyyy") {
@@ -22,7 +22,13 @@ export function formatDate(value: string | null | undefined, dateFormat = "dd MM
     return "-";
   }
 
-  return format(parseISO(value), dateFormat, { locale: es });
+  const parsedDate = parseISO(value);
+
+  if (!isValid(parsedDate)) {
+    return "-";
+  }
+
+  return format(parsedDate, dateFormat, { locale: es });
 }
 
 export function formatMonthLabel(date = new Date()) {
@@ -31,11 +37,12 @@ export function formatMonthLabel(date = new Date()) {
 
 export function toNumber(value: unknown) {
   if (typeof value === "number") {
-    return value;
+    return Number.isFinite(value) ? value : 0;
   }
 
   if (typeof value === "string" && value.trim() !== "") {
-    return Number(value);
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : 0;
   }
 
   return 0;

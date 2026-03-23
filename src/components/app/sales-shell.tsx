@@ -140,6 +140,8 @@ export function SalesShell({ sales, contacts, products, channels }: SalesShellPr
   const [contactRecords, setContactRecords] = useState(contacts);
   const [selectedSaleId, setSelectedSaleId] = useState<string | null>(null);
   const deferredSearch = useDeferredValue(search);
+  const hasSearchQuery = deferredSearch.trim().length > 0;
+  const hasStatusFilter = statusFilter !== "all";
   const selectedSale = selectedSaleId
     ? saleRecords.find((sale) => sale.id === selectedSaleId) ?? null
     : null;
@@ -226,6 +228,7 @@ export function SalesShell({ sales, contacts, products, channels }: SalesShellPr
                 value={search}
                 onChange={(event) => setSearch(event.target.value)}
                 placeholder="Buscar por cliente, canal o producto..."
+                aria-label="Buscar ventas"
                 className="min-w-0 flex-1 bg-transparent text-sm placeholder:text-[#7e867e]"
               />
             </label>
@@ -234,6 +237,7 @@ export function SalesShell({ sales, contacts, products, channels }: SalesShellPr
               <select
                 value={statusFilter}
                 onChange={(event) => setStatusFilter(event.target.value as typeof statusFilter)}
+                aria-label="Filtrar ventas por estado de cobro"
                 className="min-w-0 flex-1 bg-transparent text-sm sm:min-w-[190px]"
               >
                 <option value="all">Todos los estados</option>
@@ -249,8 +253,16 @@ export function SalesShell({ sales, contacts, products, channels }: SalesShellPr
           {filteredSales.length === 0 ? (
             <div className="p-6">
               <EmptyState
-                title="No hay ventas para este filtro"
-                description="Prueba otro termino de busqueda o registra un nuevo pedido."
+                title={
+                  hasSearchQuery || hasStatusFilter
+                    ? "No encontramos ventas"
+                    : "Todavia no hay ventas"
+                }
+                description={
+                  hasSearchQuery || hasStatusFilter
+                    ? "Prueba otro termino de busqueda, cambia el filtro o registra un nuevo pedido."
+                    : "Registra tu primera venta para empezar a seguir pedidos y cobros."
+                }
                 icon={CircleDollarSign}
               />
             </div>

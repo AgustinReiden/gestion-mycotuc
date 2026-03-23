@@ -8,7 +8,7 @@ import { applyStockAdjustmentAction } from "@/actions/core";
 import { ActionNotice } from "@/components/forms/action-notice";
 import { Button } from "@/components/ui/button";
 import { Field, TextInput, TextareaInput } from "@/components/ui/fields";
-import type { EntityType, InventoryMovementRecord, SupplyRecord } from "@/lib/domain";
+import type { EntityType, InventoryMovementRecord, ProductRecord, SupplyRecord } from "@/lib/domain";
 import { stockAdjustmentSchema } from "@/lib/validators";
 
 type AdjustmentValues = z.input<typeof stockAdjustmentSchema>;
@@ -17,7 +17,11 @@ type StockAdjustmentFormProps = {
   entityType: EntityType;
   entityId: string;
   entityLabel: string;
-  onSuccess: (result: { movement: InventoryMovementRecord; supply: SupplyRecord | null }) => void;
+  onSuccess: (result: {
+    movement: InventoryMovementRecord;
+    product: ProductRecord | null;
+    supply: SupplyRecord | null;
+  }) => void;
 };
 
 export function StockAdjustmentForm({

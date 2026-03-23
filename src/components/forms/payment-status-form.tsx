@@ -1,7 +1,7 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { useForm } from "react-hook-form";
 import type { z } from "zod";
 import { updateSalePaymentStatusAction } from "@/actions/core";
@@ -40,6 +40,15 @@ export function PaymentStatusForm({
       paidAt: paidAt ?? "",
     },
   });
+
+  useEffect(() => {
+    form.reset({
+      saleOrderId,
+      paymentStatus,
+      paymentMethod: paymentMethod ?? "",
+      paidAt: paidAt ?? "",
+    });
+  }, [form, paidAt, paymentMethod, paymentStatus, saleOrderId]);
 
   return (
     <form

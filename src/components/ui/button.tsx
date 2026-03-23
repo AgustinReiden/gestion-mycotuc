@@ -39,6 +39,7 @@ export function Button({
     <button
       className={classes}
       disabled={disabled || busy}
+      aria-busy={busy || undefined}
       {...props}
     >
       {busy ? <LoaderCircle className="h-4 w-4 animate-spin" /> : null}

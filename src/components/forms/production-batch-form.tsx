@@ -3,7 +3,7 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Plus, Trash2 } from "lucide-react";
 import { useEffect, useState, useTransition } from "react";
-import { useFieldArray, useForm } from "react-hook-form";
+import { useFieldArray, useForm, useWatch } from "react-hook-form";
 import type { z } from "zod";
 import { saveProductionBatchAction } from "@/actions/core";
 import { ActionNotice } from "@/components/forms/action-notice";
@@ -19,7 +19,13 @@ type ProductionBatchFormProps = {
   batch?: ProductionBatchRecord | null;
   products: ProductRecord[];
   supplies: SupplyRecord[];
-  onSuccess: () => void;
+  onSuccess: (batch: ProductionBatchRecord) => void;
+};
+
+type SelectableOption = {
+  id: string;
+  name: string;
+  isFallback?: boolean;
 };
 
 function createDefaultInput(supplies: SupplyRecord[]) {
@@ -36,67 +42,127 @@ function createDefaultOutput(products: ProductRecord[]) {
   };
 }
 
+function mergeSelectableOptions(
+  primary: SelectableOption[],
+  fallback: Array<SelectableOption | null | undefined>,
+) {
+  const registry = new Map<string, SelectableOption>();
+
+  [...primary, ...fallback.filter(Boolean)].forEach((option) => {
+    if (!option?.id || registry.has(option.id)) {
+      return;
+    }
+
+    registry.set(option.id, option);
+  });
+
+  return Array.from(registry.values());
+}
+
+function getDefaultValues(
+  batch: ProductionBatchRecord | null | undefined,
+  products: ProductRecord[],
+  supplies: SupplyRecord[],
+): ProductionBatchValues {
+  return {
+    id: batch?.id,
+    productId: batch?.productId ?? products[0]?.id ?? "",
+    status: batch?.status ?? "draft",
+    startedAt: batch?.startedAt ?? new Date().toISOString().slice(0, 10),
+    completedAt: batch?.completedAt ?? "",
+    expectedQty: batch?.expectedQty ?? null,
+    actualQty: batch?.actualQty ?? null,
+    notes: batch?.notes ?? "",
+    inputs:
+      batch?.inputs.map((input) => ({ supplyId: input.supplyId, quantity: input.quantity })) ??
+      (supplies.length > 0 ? [createDefaultInput(supplies)] : []),
+    outputs:
+      batch?.outputs.map((output) => ({ productId: output.productId, quantity: output.quantity })) ??
+      (products.length > 0
+        ? [
+            {
+              productId: batch?.productId ?? products[0]?.id ?? "",
+              quantity: 1,
+            },
+          ]
+        : []),
+  };
+}
+
 export function ProductionBatchForm({ batch, products, supplies, onSuccess }: ProductionBatchFormProps) {
   const [pending, startTransition] = useTransition();
   const [feedback, setFeedback] = useState<{ tone: "success" | "error"; message: string } | null>(null);
   const form = useForm<ProductionBatchValues>({
     resolver: zodResolver(productionBatchFormSchema),
-    defaultValues: {
-      id: batch?.id,
-      productId: batch?.productId ?? products[0]?.id ?? "",
-      status: batch?.status ?? "draft",
-      startedAt: batch?.startedAt ?? new Date().toISOString().slice(0, 10),
-      completedAt: batch?.completedAt ?? "",
-      expectedQty: batch?.expectedQty ?? null,
-      actualQty: batch?.actualQty ?? null,
-      notes: batch?.notes ?? "",
-      inputs: batch?.inputs.map((input) => ({ supplyId: input.supplyId, quantity: input.quantity })) ?? [
-        createDefaultInput(supplies),
-      ],
-      outputs: batch?.outputs.map((output) => ({ productId: output.productId, quantity: output.quantity })) ?? [
-        {
-          productId: batch?.productId ?? products[0]?.id ?? "",
-          quantity: 1,
-        },
-      ],
-    },
+    defaultValues: getDefaultValues(batch, products, supplies),
   });
 
   const inputs = useFieldArray({ control: form.control, name: "inputs" });
   const outputs = useFieldArray({ control: form.control, name: "outputs" });
+  const watchedInputs = useWatch({ control: form.control, name: "inputs" }) ?? [];
+  const watchedOutputs = useWatch({ control: form.control, name: "outputs" }) ?? [];
+  const productOptions = mergeSelectableOptions(
+    products.map((product) => ({ id: product.id, name: product.name })),
+    [
+      batch?.productId && batch?.productName && !products.some((product) => product.id === batch.productId)
+        ? {
+            id: batch.productId,
+            name: `${batch.productName} (no activo)`,
+            isFallback: true,
+          }
+        : null,
+      ...(batch?.outputs ?? []).map((output) =>
+        products.some((product) => product.id === output.productId)
+          ? null
+          : {
+              id: output.productId,
+              name: `${output.productName} (no activo)`,
+              isFallback: true,
+            },
+      ),
+    ],
+  );
+  const supplyOptions = mergeSelectableOptions(
+    supplies.map((supply) => ({ id: supply.id, name: supply.name })),
+    (batch?.inputs ?? []).map((input) =>
+      supplies.some((supply) => supply.id === input.supplyId)
+        ? null
+        : {
+            id: input.supplyId,
+            name: `${input.supplyName} (no activo)`,
+            isFallback: true,
+          },
+    ),
+  );
+  const hasActiveProducts = products.length > 0;
+  const hasActiveSupplies = supplies.length > 0;
+  const hasProductOptions = productOptions.length > 0;
+  const hasSupplyOptions = supplyOptions.length > 0;
+  const hasHistoricalReferences =
+    productOptions.some((option) => option.isFallback) || supplyOptions.some((option) => option.isFallback);
 
   useEffect(() => {
-    form.reset({
-      id: batch?.id,
-      productId: batch?.productId ?? products[0]?.id ?? "",
-      status: batch?.status ?? "draft",
-      startedAt: batch?.startedAt ?? new Date().toISOString().slice(0, 10),
-      completedAt: batch?.completedAt ?? "",
-      expectedQty: batch?.expectedQty ?? null,
-      actualQty: batch?.actualQty ?? null,
-      notes: batch?.notes ?? "",
-      inputs: batch?.inputs.map((input) => ({ supplyId: input.supplyId, quantity: input.quantity })) ?? [
-        createDefaultInput(supplies),
-      ],
-      outputs: batch?.outputs.map((output) => ({ productId: output.productId, quantity: output.quantity })) ?? [
-        {
-          productId: batch?.productId ?? products[0]?.id ?? "",
-          quantity: 1,
-        },
-      ],
-    });
+    form.reset(getDefaultValues(batch, products, supplies));
   }, [batch, form, products, supplies]);
 
   return (
     <form
       className="space-y-5"
       onSubmit={form.handleSubmit((values) => {
+        if (!hasProductOptions) {
+          setFeedback({
+            tone: "error",
+            message: "No podemos guardar el lote todavia: falta al menos un producto disponible.",
+          });
+          return;
+        }
+
         setFeedback(null);
         startTransition(async () => {
           const result = await saveProductionBatchAction(values);
-          if (result.success) {
+          if (result.success && result.data) {
             setFeedback({ tone: "success", message: result.message });
-            onSuccess();
+            onSuccess(result.data);
             return;
           }
 
@@ -104,10 +170,24 @@ export function ProductionBatchForm({ batch, products, supplies, onSuccess }: Pr
         });
       })}
     >
+      {!hasProductOptions ? (
+        <ActionNotice
+          tone="warning"
+          message="Antes de registrar un lote, crea al menos un producto disponible."
+        />
+      ) : null}
+      {hasHistoricalReferences ? (
+        <ActionNotice
+          tone="warning"
+          message="Este lote incluye referencias historicas a productos o insumos no activos. Se mantendran para evitar perder trazabilidad."
+        />
+      ) : null}
+
       <div className="grid gap-4 md:grid-cols-2">
         <Field label="Producto objetivo" error={form.formState.errors.productId?.message}>
-          <SelectInput {...form.register("productId")}>
-            {products.map((product) => (
+          <SelectInput {...form.register("productId")} disabled={!hasProductOptions}>
+            {!hasProductOptions ? <option value="">No hay productos disponibles</option> : null}
+            {productOptions.map((product) => (
               <option key={product.id} value={product.id}>
                 {product.name}
               </option>
@@ -160,17 +240,35 @@ export function ProductionBatchForm({ batch, products, supplies, onSuccess }: Pr
               <h4 className="text-lg font-semibold">Consumos</h4>
               <p className="text-sm text-[var(--muted)]">Se descuentan al cerrar el lote.</p>
             </div>
-            <Button type="button" variant="secondary" onClick={() => inputs.append(createDefaultInput(supplies))}>
+            <Button
+              type="button"
+              variant="secondary"
+              disabled={!hasActiveSupplies}
+              onClick={() => inputs.append(createDefaultInput(supplies))}
+            >
               <Plus className="h-4 w-4" />
               Agregar insumo
             </Button>
           </div>
+          {!hasActiveSupplies ? (
+            <div className="mb-4">
+              <ActionNotice
+                tone="warning"
+                message="No hay insumos activos disponibles. Puedes crear el lote y cargar consumos cuando existan."
+              />
+            </div>
+          ) : null}
           <div className="space-y-3">
             {inputs.fields.map((field, index) => (
               <div key={field.id} className="grid gap-3 rounded-[24px] border border-[var(--line)] bg-white/90 p-4 md:grid-cols-[1.6fr_0.8fr_auto]">
                 <Field label="Insumo" error={form.formState.errors.inputs?.[index]?.supplyId?.message}>
-                  <SelectInput {...form.register(`inputs.${index}.supplyId`)}>
-                    {supplies.map((supply) => (
+                  <SelectInput {...form.register(`inputs.${index}.supplyId`)} disabled={!hasSupplyOptions}>
+                    {!hasSupplyOptions ? <option value="">No hay insumos disponibles</option> : null}
+                    {!supplyOptions.some((option) => option.id === watchedInputs[index]?.supplyId) &&
+                    watchedInputs[index]?.supplyId ? (
+                      <option value={watchedInputs[index]?.supplyId}>Insumo no disponible</option>
+                    ) : null}
+                    {supplyOptions.map((supply) => (
                       <option key={supply.id} value={supply.id}>
                         {supply.name}
                       </option>
@@ -186,7 +284,13 @@ export function ProductionBatchForm({ batch, products, supplies, onSuccess }: Pr
                   />
                 </Field>
                 <div className="flex items-end">
-                  <Button type="button" variant="ghost" onClick={() => (inputs.fields.length > 1 ? inputs.remove(index) : null)}>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    aria-label={`Quitar insumo ${index + 1}`}
+                    disabled={inputs.fields.length <= 1}
+                    onClick={() => (inputs.fields.length > 1 ? inputs.remove(index) : null)}
+                  >
                     <Trash2 className="h-4 w-4" />
                   </Button>
                 </div>
@@ -201,7 +305,12 @@ export function ProductionBatchForm({ batch, products, supplies, onSuccess }: Pr
               <h4 className="text-lg font-semibold">Salidas</h4>
               <p className="text-sm text-[var(--muted)]">Se suman al stock cuando el lote se completa.</p>
             </div>
-            <Button type="button" variant="secondary" onClick={() => outputs.append(createDefaultOutput(products))}>
+            <Button
+              type="button"
+              variant="secondary"
+              disabled={!hasActiveProducts}
+              onClick={() => outputs.append(createDefaultOutput(products))}
+            >
               <Plus className="h-4 w-4" />
               Agregar salida
             </Button>
@@ -210,8 +319,13 @@ export function ProductionBatchForm({ batch, products, supplies, onSuccess }: Pr
             {outputs.fields.map((field, index) => (
               <div key={field.id} className="grid gap-3 rounded-[24px] border border-[var(--line)] bg-white/90 p-4 md:grid-cols-[1.6fr_0.8fr_auto]">
                 <Field label="Producto" error={form.formState.errors.outputs?.[index]?.productId?.message}>
-                  <SelectInput {...form.register(`outputs.${index}.productId`)}>
-                    {products.map((product) => (
+                  <SelectInput {...form.register(`outputs.${index}.productId`)} disabled={!hasProductOptions}>
+                    {!hasProductOptions ? <option value="">No hay productos disponibles</option> : null}
+                    {!productOptions.some((option) => option.id === watchedOutputs[index]?.productId) &&
+                    watchedOutputs[index]?.productId ? (
+                      <option value={watchedOutputs[index]?.productId}>Producto no disponible</option>
+                    ) : null}
+                    {productOptions.map((product) => (
                       <option key={product.id} value={product.id}>
                         {product.name}
                       </option>
@@ -227,7 +341,13 @@ export function ProductionBatchForm({ batch, products, supplies, onSuccess }: Pr
                   />
                 </Field>
                 <div className="flex items-end">
-                  <Button type="button" variant="ghost" onClick={() => (outputs.fields.length > 1 ? outputs.remove(index) : null)}>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    aria-label={`Quitar salida ${index + 1}`}
+                    disabled={outputs.fields.length <= 1}
+                    onClick={() => (outputs.fields.length > 1 ? outputs.remove(index) : null)}
+                  >
                     <Trash2 className="h-4 w-4" />
                   </Button>
                 </div>
@@ -244,7 +364,7 @@ export function ProductionBatchForm({ batch, products, supplies, onSuccess }: Pr
       {feedback ? <ActionNotice tone={feedback.tone} message={feedback.message} /> : null}
 
       <div className="flex justify-end">
-        <Button type="submit" busy={pending}>
+        <Button type="submit" busy={pending} disabled={!hasProductOptions}>
           {batch ? "Guardar lote" : "Crear lote"}
         </Button>
       </div>

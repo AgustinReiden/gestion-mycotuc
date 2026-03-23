@@ -2,10 +2,15 @@
 
 import { useState, useTransition } from "react";
 import { loginAction } from "@/actions/auth";
+import { ActionNotice } from "@/components/forms/action-notice";
 import { Button } from "@/components/ui/button";
 import { Field, TextInput } from "@/components/ui/fields";
 
-export function LoginForm() {
+type LoginFormProps = {
+  notice?: string | null;
+};
+
+export function LoginForm({ notice = null }: LoginFormProps) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [feedback, setFeedback] = useState<string | null>(null);
@@ -45,6 +50,8 @@ export function LoginForm() {
           autoComplete="current-password"
         />
       </Field>
+
+      {notice ? <ActionNotice tone="warning" message={notice} /> : null}
 
       {feedback ? (
         <div className="rounded-2xl border border-[#ebc7bf] bg-[#fff1ed] px-4 py-3 text-sm text-[#9a4635]">

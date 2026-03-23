@@ -13,7 +13,8 @@ function SkeletonPanel({ className }: { className?: string }) {
 
 export default function AppLoading() {
   return (
-    <div className="page-grid">
+    <div className="page-grid" role="status" aria-live="polite" aria-busy="true">
+      <span className="sr-only">Cargando datos de la pantalla.</span>
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         {Array.from({ length: 4 }).map((_, index) => (
           <SkeletonPanel key={index} />

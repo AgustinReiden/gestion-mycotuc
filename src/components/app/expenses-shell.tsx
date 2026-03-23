@@ -69,6 +69,7 @@ export function ExpensesShell({ expenses, categories }: ExpensesShellProps) {
   const [search, setSearch] = useState("");
   const [expenseRecords, setExpenseRecords] = useState(() => sortExpenses(expenses));
   const deferredSearch = useDeferredValue(search);
+  const hasSearchQuery = deferredSearch.trim().length > 0;
 
   useEffect(() => {
     setExpenseRecords(sortExpenses(expenses));
@@ -133,6 +134,7 @@ export function ExpensesShell({ expenses, categories }: ExpensesShellProps) {
             value={search}
             onChange={(event) => setSearch(event.target.value)}
             placeholder="Buscar por concepto, categoria o proveedor..."
+            aria-label="Buscar gastos"
             className="flex-1 bg-transparent text-sm placeholder:text-[#7e867e]"
           />
         </label>
@@ -141,8 +143,12 @@ export function ExpensesShell({ expenses, categories }: ExpensesShellProps) {
           {filteredExpenses.length === 0 ? (
             <div className="p-6">
               <EmptyState
-                title="No hay gastos para este filtro"
-                description="Carga un gasto manual o registra una compra de insumos."
+                title={hasSearchQuery ? "No encontramos gastos" : "Todavia no hay gastos"}
+                description={
+                  hasSearchQuery
+                    ? "Prueba otro termino de busqueda o registra un nuevo gasto."
+                    : "Carga un gasto manual o registra una compra de insumos para empezar a ver movimientos."
+                }
                 icon={ReceiptText}
               />
             </div>

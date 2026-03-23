@@ -1,8 +1,8 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useState, useTransition } from "react";
-import { useForm } from "react-hook-form";
+import { useEffect, useState, useTransition } from "react";
+import { useForm, useWatch } from "react-hook-form";
 import type { z } from "zod";
 import { createExpenseAction } from "@/actions/core";
 import { ActionNotice } from "@/components/forms/action-notice";
@@ -18,36 +18,61 @@ type ExpenseFormProps = {
   onSuccess: (expense: ExpenseRecord) => void;
 };
 
+function getDefaultValues(categories: LookupOption[]): ExpenseFormValues {
+  return {
+    concept: "",
+    expenseDate: new Date().toISOString().slice(0, 10),
+    categoryId: categories[0]?.id ?? "",
+    amount: 0,
+    notes: "",
+  };
+}
+
 export function ExpenseForm({ categories, onSuccess }: ExpenseFormProps) {
   const [pending, startTransition] = useTransition();
   const [feedback, setFeedback] = useState<{ tone: "success" | "error"; message: string } | null>(null);
+  const hasCategories = categories.length > 0;
   const form = useForm<ExpenseFormValues>({
     resolver: zodResolver(expenseFormSchema),
-    defaultValues: {
-      concept: "",
-      expenseDate: new Date().toISOString().slice(0, 10),
-      categoryId: categories[0]?.id ?? "",
-      amount: 0,
-      notes: "",
-    },
+    defaultValues: getDefaultValues(categories),
   });
+
+  const selectedCategoryId = useWatch({
+    control: form.control,
+    name: "categoryId",
+  });
+
+  useEffect(() => {
+    const hasSelectedCategory = categories.some((category) => category.id === selectedCategoryId);
+
+    if (selectedCategoryId && hasSelectedCategory) {
+      return;
+    }
+
+    form.reset({
+      ...form.getValues(),
+      categoryId: categories[0]?.id ?? "",
+    });
+  }, [categories, form, selectedCategoryId]);
 
   return (
     <form
       className="space-y-4"
       onSubmit={form.handleSubmit((values) => {
+        if (!hasCategories) {
+          setFeedback({
+            tone: "error",
+            message: "No podemos registrar el gasto todavia: falta al menos una categoria activa.",
+          });
+          return;
+        }
+
         setFeedback(null);
         startTransition(async () => {
           const result = await createExpenseAction(values);
           if (result.success && result.data) {
             onSuccess(result.data);
-            form.reset({
-              concept: "",
-              expenseDate: new Date().toISOString().slice(0, 10),
-              categoryId: categories[0]?.id ?? "",
-              amount: 0,
-              notes: "",
-            });
+            form.reset(getDefaultValues(categories));
             return;
           }
 
@@ -55,6 +80,13 @@ export function ExpenseForm({ categories, onSuccess }: ExpenseFormProps) {
         });
       })}
     >
+      {!hasCategories ? (
+        <ActionNotice
+          tone="warning"
+          message="Antes de registrar un gasto manual, crea al menos una categoria activa."
+        />
+      ) : null}
+
       <Field label="Concepto" error={form.formState.errors.concept?.message}>
         <TextInput {...form.register("concept")} placeholder="Factura de luz" />
       </Field>
@@ -64,7 +96,8 @@ export function ExpenseForm({ categories, onSuccess }: ExpenseFormProps) {
           <TextInput {...form.register("amount", { valueAsNumber: true })} type="number" min="0" step="0.01" />
         </Field>
         <Field label="Categoria" error={form.formState.errors.categoryId?.message}>
-          <SelectInput {...form.register("categoryId")}>
+          <SelectInput {...form.register("categoryId")} disabled={!hasCategories}>
+            {!hasCategories ? <option value="">No hay categorias activas disponibles</option> : null}
             {categories.map((category) => (
               <option key={category.id} value={category.id}>
                 {category.name}
@@ -84,7 +117,7 @@ export function ExpenseForm({ categories, onSuccess }: ExpenseFormProps) {
       {feedback ? <ActionNotice tone={feedback.tone} message={feedback.message} /> : null}
 
       <div className="flex justify-end">
-        <Button type="submit" busy={pending}>
+        <Button type="submit" busy={pending} disabled={!hasCategories}>
           Registrar gasto
         </Button>
       </div>

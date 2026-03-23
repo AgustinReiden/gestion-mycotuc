@@ -1,8 +1,7 @@
 "use client";
 
-import { useDeferredValue, useState } from "react";
+import { useDeferredValue, useEffect, useState } from "react";
 import { Plus, Sprout, Warehouse } from "lucide-react";
-import { useRouter } from "next/navigation";
 import { ProductionBatchForm } from "@/components/forms/production-batch-form";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -32,8 +31,31 @@ function getStatusLabel(status: ProductionBatchRecord["status"]) {
   return "Borrador";
 }
 
-function NewBatchModal({ products, supplies }: { products: ProductRecord[]; supplies: SupplyRecord[] }) {
-  const router = useRouter();
+function sortBatches(list: ProductionBatchRecord[]) {
+  return [...list].sort((left, right) => {
+    const startedAtComparison = right.startedAt.localeCompare(left.startedAt);
+
+    if (startedAtComparison !== 0) {
+      return startedAtComparison;
+    }
+
+    return right.createdAt.localeCompare(left.createdAt);
+  });
+}
+
+function upsertBatch(list: ProductionBatchRecord[], batch: ProductionBatchRecord) {
+  return sortBatches([batch, ...list.filter((entry) => entry.id !== batch.id)]);
+}
+
+function NewBatchModal({
+  products,
+  supplies,
+  onBatchSaved,
+}: {
+  products: ProductRecord[];
+  supplies: SupplyRecord[];
+  onBatchSaved: (batch: ProductionBatchRecord) => void;
+}) {
   const [open, setOpen] = useState(false);
 
   return (
@@ -43,28 +65,63 @@ function NewBatchModal({ products, supplies }: { products: ProductRecord[]; supp
         Nuevo lote
       </Button>
       <Modal open={open} onClose={() => setOpen(false)} title="Nuevo lote" description="Al completar el lote se impactan insumos y productos en inventario." size="xl">
-        <ProductionBatchForm batch={null} products={products} supplies={supplies} onSuccess={() => { setOpen(false); router.refresh(); }} />
+        <ProductionBatchForm
+          batch={null}
+          products={products}
+          supplies={supplies}
+          onSuccess={(batch) => {
+            setOpen(false);
+            onBatchSaved(batch);
+          }}
+        />
       </Modal>
     </>
   );
 }
 
-function EditBatchModal({ batch, products, supplies, onClose }: { batch: ProductionBatchRecord; products: ProductRecord[]; supplies: SupplyRecord[]; onClose: () => void }) {
-  const router = useRouter();
-
+function EditBatchModal({
+  batch,
+  products,
+  supplies,
+  onClose,
+  onBatchSaved,
+}: {
+  batch: ProductionBatchRecord;
+  products: ProductRecord[];
+  supplies: SupplyRecord[];
+  onClose: () => void;
+  onBatchSaved: (batch: ProductionBatchRecord) => void;
+}) {
   return (
     <Modal open onClose={onClose} title="Editar lote" description="Al completar el lote se impactan insumos y productos en inventario." size="xl">
-      <ProductionBatchForm batch={batch} products={products} supplies={supplies} onSuccess={() => { onClose(); router.refresh(); }} />
+      <ProductionBatchForm
+        batch={batch}
+        products={products}
+        supplies={supplies}
+        onSuccess={(updatedBatch) => {
+          onBatchSaved(updatedBatch);
+          onClose();
+        }}
+      />
     </Modal>
   );
 }
 
 export function ProductionShell({ batches, products, supplies }: ProductionShellProps) {
   const [search, setSearch] = useState("");
-  const [selectedBatch, setSelectedBatch] = useState<ProductionBatchRecord | null>(null);
+  const [batchRecords, setBatchRecords] = useState(() => sortBatches(batches));
+  const [selectedBatchId, setSelectedBatchId] = useState<string | null>(null);
   const deferredSearch = useDeferredValue(search);
+  const hasSearchQuery = deferredSearch.trim().length > 0;
+  const selectedBatch = selectedBatchId
+    ? batchRecords.find((batch) => batch.id === selectedBatchId) ?? null
+    : null;
 
-  const filteredBatches = batches.filter((batch) => {
+  useEffect(() => {
+    setBatchRecords(sortBatches(batches));
+  }, [batches]);
+
+  const filteredBatches = batchRecords.filter((batch) => {
     const query = deferredSearch.toLowerCase();
     return (
       batch.productName.toLowerCase().includes(query) ||
@@ -91,10 +148,17 @@ export function ProductionShell({ batches, products, supplies }: ProductionShell
                 value={search}
                 onChange={(event) => setSearch(event.target.value)}
                 placeholder="Buscar lote o insumo..."
+                aria-label="Buscar lotes de produccion"
                 className="flex-1 bg-transparent text-sm placeholder:text-[#7e867e]"
               />
             </label>
-            <NewBatchModal products={products} supplies={supplies} />
+            <NewBatchModal
+              products={products}
+              supplies={supplies}
+              onBatchSaved={(batch) => {
+                setBatchRecords((current) => upsertBatch(current, batch));
+              }}
+            />
           </div>
         </div>
       </Panel>
@@ -102,8 +166,12 @@ export function ProductionShell({ batches, products, supplies }: ProductionShell
       {filteredBatches.length === 0 ? (
         <Panel>
           <EmptyState
-            title="Todavia no hay lotes"
-            description="Crea un lote para empezar a seguir produccion y rendimiento."
+            title={hasSearchQuery ? "No encontramos lotes" : "Todavia no hay lotes"}
+            description={
+              hasSearchQuery
+                ? "Prueba otro termino de busqueda o crea un lote nuevo."
+                : "Crea un lote para empezar a seguir produccion y rendimiento."
+            }
             icon={Sprout}
           />
         </Panel>
@@ -183,7 +251,7 @@ export function ProductionShell({ batches, products, supplies }: ProductionShell
               {batch.notes ? <p className="text-sm text-[var(--muted)]">{batch.notes}</p> : null}
 
               <div className="mt-auto flex justify-end">
-                <Button type="button" variant="secondary" onClick={() => setSelectedBatch(batch)}>
+                <Button type="button" variant="secondary" onClick={() => setSelectedBatchId(batch.id)}>
                   Editar lote
                 </Button>
               </div>
@@ -192,7 +260,17 @@ export function ProductionShell({ batches, products, supplies }: ProductionShell
         </div>
       )}
 
-      {selectedBatch ? <EditBatchModal batch={selectedBatch} products={products} supplies={supplies} onClose={() => setSelectedBatch(null)} /> : null}
+      {selectedBatch ? (
+        <EditBatchModal
+          batch={selectedBatch}
+          products={products}
+          supplies={supplies}
+          onClose={() => setSelectedBatchId(null)}
+          onBatchSaved={(batch) => {
+            setBatchRecords((current) => upsertBatch(current, batch));
+          }}
+        />
+      ) : null}
     </div>
   );
 }

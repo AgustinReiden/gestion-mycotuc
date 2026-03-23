@@ -4,7 +4,27 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
 
-export default async function LoginPage() {
+function getLoginNotice(reason: string | string[] | undefined) {
+  if (reason === "session-expired") {
+    return "Tu sesion expiro. Vuelve a iniciar sesion para seguir usando la app.";
+  }
+
+  if (reason === "profile-missing") {
+    return "No pudimos recuperar tu perfil. Inicia sesion de nuevo para reintentar.";
+  }
+
+  if (reason === "signed-out") {
+    return "Cerraste sesion correctamente.";
+  }
+
+  return null;
+}
+
+export default async function LoginPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ reason?: string | string[] }>;
+}) {
   const supabase = await createSupabaseServerClient();
   const {
     data: { user },
@@ -13,6 +33,8 @@ export default async function LoginPage() {
   if (user) {
     redirect("/dashboard");
   }
+
+  const notice = getLoginNotice((await searchParams).reason);
 
   return (
     <main className="relative flex min-h-screen items-center justify-center overflow-hidden px-4 py-10">
@@ -54,7 +76,7 @@ export default async function LoginPage() {
               Usa una cuenta creada manualmente en Supabase Auth para entrar al panel interno.
             </p>
           </div>
-          <LoginForm />
+          <LoginForm notice={notice} />
         </section>
       </div>
     </main>

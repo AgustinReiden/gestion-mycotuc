@@ -57,11 +57,18 @@ export function PurchaseForm({ suppliers, supplies, onSuccess }: PurchaseFormPro
     control: form.control,
     name: "items",
   });
+  const hasSuppliers = suppliers.length > 0;
+  const hasSupplies = supplies.length > 0;
+  const missingDependencies = [
+    !hasSuppliers ? "al menos un proveedor activo" : null,
+    !hasSupplies ? "al menos un insumo activo" : null,
+  ].filter(Boolean);
+  const canSubmitPurchase = missingDependencies.length === 0;
 
   const watchedItems = useWatch({
     control: form.control,
     name: "items",
-  });
+  }) ?? [];
   const total = watchedItems.reduce((sum, item) => sum + (Number(item.quantity) || 0) * (Number(item.unitCost) || 0), 0);
 
   useEffect(() => {
@@ -77,6 +84,14 @@ export function PurchaseForm({ suppliers, supplies, onSuccess }: PurchaseFormPro
     <form
       className="space-y-5"
       onSubmit={form.handleSubmit((values) => {
+        if (!canSubmitPurchase) {
+          setFeedback({
+            tone: "error",
+            message: `No podemos registrar la compra todavia: falta ${missingDependencies.join(" y ")}.`,
+          });
+          return;
+        }
+
         setFeedback(null);
         startTransition(async () => {
           const result = await registerSupplyPurchaseAction(values);
@@ -95,9 +110,19 @@ export function PurchaseForm({ suppliers, supplies, onSuccess }: PurchaseFormPro
         });
       })}
     >
+      {!canSubmitPurchase ? (
+        <ActionNotice
+          tone="warning"
+          message={`Antes de registrar una compra, crea ${missingDependencies.join(" y ")}.`}
+        />
+      ) : null}
+
       <div className="grid gap-4 md:grid-cols-2">
         <Field label="Proveedor" error={form.formState.errors.supplierId?.message}>
-          <SelectInput {...form.register("supplierId")}>
+          <SelectInput {...form.register("supplierId")} disabled={!hasSuppliers}>
+            {!hasSuppliers ? (
+              <option value="">No hay proveedores activos disponibles</option>
+            ) : null}
             {suppliers.map((supplier) => (
               <option key={supplier.id} value={supplier.id}>
                 {supplier.name}
@@ -116,7 +141,12 @@ export function PurchaseForm({ suppliers, supplies, onSuccess }: PurchaseFormPro
             <h4 className="text-lg font-semibold">Items comprados</h4>
             <p className="text-sm text-[var(--muted)]">Cada linea aumenta stock y genera el gasto asociado.</p>
           </div>
-          <Button type="button" variant="secondary" onClick={() => items.append(getInitialItem(supplies))}>
+          <Button
+            type="button"
+            variant="secondary"
+            disabled={!hasSupplies}
+            onClick={() => items.append(getInitialItem(supplies))}
+          >
             <Plus className="h-4 w-4" />
             Agregar item
           </Button>
@@ -130,7 +160,10 @@ export function PurchaseForm({ suppliers, supplies, onSuccess }: PurchaseFormPro
             return (
               <div key={field.id} className="grid gap-3 rounded-[24px] border border-[var(--line)] bg-white/90 p-4 md:grid-cols-[1.7fr_0.7fr_0.8fr_auto]">
                 <Field label="Insumo" error={form.formState.errors.items?.[index]?.supplyId?.message}>
-                  <SelectInput {...form.register(`items.${index}.supplyId`)}>
+                  <SelectInput {...form.register(`items.${index}.supplyId`)} disabled={!hasSupplies}>
+                    {!hasSupplies ? (
+                      <option value="">No hay insumos activos disponibles</option>
+                    ) : null}
                     {supplies.map((supply) => (
                       <option key={supply.id} value={supply.id}>
                         {supply.name}
@@ -160,7 +193,13 @@ export function PurchaseForm({ suppliers, supplies, onSuccess }: PurchaseFormPro
                     {formatCurrency((Number(watchedItems[index]?.quantity) || 0) * (Number(watchedItems[index]?.unitCost) || 0))}
                     <div className="mt-1 text-xs font-medium text-[#55755e]">{selectedSupply?.unit ?? "unidad"}</div>
                   </div>
-                  <Button type="button" variant="ghost" onClick={() => (items.fields.length > 1 ? items.remove(index) : null)}>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    aria-label={`Quitar insumo ${index + 1}`}
+                    disabled={items.fields.length <= 1}
+                    onClick={() => (items.fields.length > 1 ? items.remove(index) : null)}
+                  >
                     <Trash2 className="h-4 w-4" />
                   </Button>
                 </div>
@@ -181,7 +220,7 @@ export function PurchaseForm({ suppliers, supplies, onSuccess }: PurchaseFormPro
           <p className="text-sm text-[#55755e]">Total estimado</p>
           <p className="text-2xl font-semibold text-[#15553e]">{formatCurrency(total)}</p>
         </div>
-        <Button type="submit" busy={pending}>
+        <Button type="submit" busy={pending} disabled={!canSubmitPurchase}>
           Registrar compra
         </Button>
       </div>

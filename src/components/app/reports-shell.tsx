@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { BarChart3, CircleAlert, Package, Sprout } from "lucide-react";
+import { ActionNotice } from "@/components/forms/action-notice";
 import { Panel } from "@/components/ui/panel";
 import type { ExpenseRecord, ProductRecord, ProductionBatchRecord, SaleOrderRecord, SupplyRecord } from "@/lib/domain";
 import { formatCurrency, sumBy } from "@/lib/utils";
@@ -23,15 +24,28 @@ function inRange(date: string, range: RangeFilter) {
   return date >= range.from && date <= range.to;
 }
 
+function normalizeRange(range: RangeFilter): RangeFilter {
+  if (range.from <= range.to) {
+    return range;
+  }
+
+  return {
+    from: range.to,
+    to: range.from,
+  };
+}
+
 export function ReportsShell({ sales, expenses, products, supplies, batches }: ReportsShellProps) {
   const [range, setRange] = useState<RangeFilter>({
     from: new Date(new Date().setDate(new Date().getDate() - 30)).toISOString().slice(0, 10),
     to: new Date().toISOString().slice(0, 10),
   });
+  const hasInvalidRange = range.from > range.to;
+  const effectiveRange = normalizeRange(range);
 
-  const filteredSales = sales.filter((sale) => inRange(sale.saleDate, range));
-  const filteredExpenses = expenses.filter((expense) => inRange(expense.expenseDate, range));
-  const filteredBatches = batches.filter((batch) => inRange(batch.startedAt, range));
+  const filteredSales = sales.filter((sale) => inRange(sale.saleDate, effectiveRange));
+  const filteredExpenses = expenses.filter((expense) => inRange(expense.expenseDate, effectiveRange));
+  const filteredBatches = batches.filter((batch) => inRange(batch.startedAt, effectiveRange));
 
   const salesByProduct = new Map<string, number>();
   filteredSales.forEach((sale) => {
@@ -53,7 +67,17 @@ export function ReportsShell({ sales, expenses, products, supplies, batches }: R
   const totalSales = sumBy(filteredSales, (sale) => sale.totalAmount);
   const totalExpenses = sumBy(filteredExpenses, (expense) => expense.amount);
 
-  const criticalStock = [...products, ...supplies].filter((item) => item.currentStock <= item.minStock);
+  const criticalStock = [...products, ...supplies].filter(
+    (item) => item.isActive && item.currentStock <= item.minStock,
+  );
+  const topSalesByProduct = Array.from(salesByProduct.entries())
+    .sort((left, right) => right[1] - left[1])
+    .slice(0, 6);
+  const topExpensesByCategory = Array.from(expensesByCategory.entries())
+    .sort((left, right) => right[1] - left[1])
+    .slice(0, 6);
+  const salesByChannelCards = Array.from(salesByChannel.entries()).sort((left, right) => right[1] - left[1]);
+  const batchPerformance = filteredBatches.slice(0, 6);
 
   return (
     <div className="page-grid">
@@ -89,6 +113,13 @@ export function ReportsShell({ sales, expenses, products, supplies, batches }: R
         </div>
       </Panel>
 
+      {hasInvalidRange ? (
+        <ActionNotice
+          tone="warning"
+          message={`El rango estaba invertido. Tomamos ${effectiveRange.from} como inicio y ${effectiveRange.to} como cierre para mantener el reporte consistente.`}
+        />
+      ) : null}
+
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         <Panel>
           <p className="text-sm text-[var(--muted)]">Ventas</p>
@@ -115,10 +146,12 @@ export function ReportsShell({ sales, expenses, products, supplies, batches }: R
             <h3 className="text-2xl font-semibold">Ventas por producto</h3>
           </div>
           <div className="mt-5 space-y-4">
-            {Array.from(salesByProduct.entries())
-              .sort((left, right) => right[1] - left[1])
-              .slice(0, 6)
-              .map(([name, amount]) => (
+            {topSalesByProduct.length === 0 ? (
+              <div className="rounded-[24px] border border-[var(--line)] bg-white/80 p-4 text-sm text-[var(--muted)]">
+                No hay ventas en el rango seleccionado.
+              </div>
+            ) : (
+              topSalesByProduct.map(([name, amount]) => (
                 <div key={name}>
                   <div className="mb-1 flex items-center justify-between text-sm">
                     <span>{name}</span>
@@ -131,7 +164,8 @@ export function ReportsShell({ sales, expenses, products, supplies, batches }: R
                     />
                   </div>
                 </div>
-              ))}
+              ))
+            )}
           </div>
         </Panel>
 
@@ -141,10 +175,12 @@ export function ReportsShell({ sales, expenses, products, supplies, batches }: R
             <h3 className="text-2xl font-semibold">Gastos por categoria</h3>
           </div>
           <div className="mt-5 space-y-4">
-            {Array.from(expensesByCategory.entries())
-              .sort((left, right) => right[1] - left[1])
-              .slice(0, 6)
-              .map(([name, amount]) => (
+            {topExpensesByCategory.length === 0 ? (
+              <div className="rounded-[24px] border border-[var(--line)] bg-white/80 p-4 text-sm text-[var(--muted)]">
+                No hay gastos en el rango seleccionado.
+              </div>
+            ) : (
+              topExpensesByCategory.map(([name, amount]) => (
                 <div key={name}>
                   <div className="mb-1 flex items-center justify-between text-sm">
                     <span>{name}</span>
@@ -157,7 +193,8 @@ export function ReportsShell({ sales, expenses, products, supplies, batches }: R
                     />
                   </div>
                 </div>
-              ))}
+              ))
+            )}
           </div>
         </Panel>
       </div>
@@ -169,19 +206,25 @@ export function ReportsShell({ sales, expenses, products, supplies, batches }: R
             <h3 className="text-2xl font-semibold">Stock critico</h3>
           </div>
           <div className="mt-5 space-y-3">
-            {criticalStock.map((item) => (
-              <div key={item.id} className="rounded-[24px] border border-[var(--line)] bg-white/80 p-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="font-semibold">{item.name}</p>
-                    <p className="text-sm text-[var(--muted)]">
-                      {item.currentStock} / minimo {item.minStock}
-                    </p>
-                  </div>
-                  <CircleAlert className="h-5 w-5 text-[#d89b39]" />
-                </div>
+            {criticalStock.length === 0 ? (
+              <div className="rounded-[24px] border border-[var(--line)] bg-white/80 p-4 text-sm text-[var(--muted)]">
+                No hay productos ni insumos activos en stock critico.
               </div>
-            ))}
+            ) : (
+              criticalStock.map((item) => (
+                <div key={item.id} className="rounded-[24px] border border-[var(--line)] bg-white/80 p-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="font-semibold">{item.name}</p>
+                      <p className="text-sm text-[var(--muted)]">
+                        {item.currentStock} / minimo {item.minStock}
+                      </p>
+                    </div>
+                    <CircleAlert className="h-5 w-5 text-[#d89b39]" />
+                  </div>
+                </div>
+              ))
+            )}
           </div>
         </Panel>
 
@@ -191,9 +234,16 @@ export function ReportsShell({ sales, expenses, products, supplies, batches }: R
             <h3 className="text-2xl font-semibold">Rendimiento de lotes</h3>
           </div>
           <div className="mt-5 space-y-3">
-            {filteredBatches.slice(0, 6).map((batch) => {
+            {batchPerformance.length === 0 ? (
+              <div className="rounded-[24px] border border-[var(--line)] bg-white/80 p-4 text-sm text-[var(--muted)]">
+                No hay lotes dentro del rango seleccionado.
+              </div>
+            ) : (
+              batchPerformance.map((batch) => {
               const ratio =
-                batch.expectedQty && batch.actualQty ? Math.round((batch.actualQty / batch.expectedQty) * 100) : null;
+                batch.expectedQty && batch.expectedQty > 0 && batch.actualQty !== null
+                  ? Math.round((batch.actualQty / batch.expectedQty) * 100)
+                  : null;
 
               return (
                 <div key={batch.id} className="rounded-[24px] border border-[var(--line)] bg-white/80 p-4">
@@ -204,11 +254,12 @@ export function ReportsShell({ sales, expenses, products, supplies, batches }: R
                         Esperado {batch.expectedQty ?? "-"} / Real {batch.actualQty ?? "-"}
                       </p>
                     </div>
-                    <p className="text-lg font-semibold">{ratio ? `${ratio}%` : "-"}</p>
+                    <p className="text-lg font-semibold">{ratio !== null ? `${ratio}%` : "-"}</p>
                   </div>
                 </div>
               );
-            })}
+            })
+            )}
           </div>
         </Panel>
       </div>
@@ -216,12 +267,18 @@ export function ReportsShell({ sales, expenses, products, supplies, batches }: R
       <Panel>
         <h3 className="text-2xl font-semibold">Ventas por canal</h3>
         <div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-          {Array.from(salesByChannel.entries()).map(([name, amount]) => (
-            <div key={name} className="rounded-[24px] border border-[var(--line)] bg-white/80 p-4">
-              <p className="text-sm text-[var(--muted)]">{name}</p>
-              <p className="mt-2 text-2xl font-semibold">{formatCurrency(amount)}</p>
+          {salesByChannelCards.length === 0 ? (
+            <div className="rounded-[24px] border border-[var(--line)] bg-white/80 p-4 text-sm text-[var(--muted)] md:col-span-2 xl:col-span-4">
+              No hay ventas por canal para mostrar en este rango.
             </div>
-          ))}
+          ) : (
+            salesByChannelCards.map(([name, amount]) => (
+              <div key={name} className="rounded-[24px] border border-[var(--line)] bg-white/80 p-4">
+                <p className="text-sm text-[var(--muted)]">{name}</p>
+                <p className="mt-2 text-2xl font-semibold">{formatCurrency(amount)}</p>
+              </div>
+            ))
+          )}
         </div>
       </Panel>
     </div>

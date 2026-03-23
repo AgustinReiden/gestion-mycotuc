@@ -625,10 +625,10 @@ export async function getDashboardData(): Promise<DashboardData> {
   const totalExpensesAmount = sumBy(monthlyExpenses, (expense) => expense.amount);
 
   const lowStockProducts = products
-    .filter((product) => product.currentStock <= product.minStock)
+    .filter((product) => product.isActive && product.currentStock <= product.minStock)
     .map((product) => toStockAlert(product, "product"));
   const lowStockSupplies = supplies
-    .filter((supply) => supply.currentStock <= supply.minStock)
+    .filter((supply) => supply.isActive && supply.currentStock <= supply.minStock)
     .map((supply) => toStockAlert(supply, "supply"));
 
   return {
