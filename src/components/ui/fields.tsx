@@ -1,5 +1,6 @@
 import {
   cloneElement,
+  forwardRef,
   isValidElement,
   useId,
   type InputHTMLAttributes,
@@ -34,7 +35,8 @@ function isFieldControl(child: ReactNode): child is ReactElement<AccessibleChild
     return child.type === "input" || child.type === "select" || child.type === "textarea";
   }
 
-  const componentName = child.type.name;
+  const componentType = child.type as { displayName?: string; name?: string };
+  const componentName = componentType.displayName ?? componentType.name ?? "";
 
   return (
     componentName === "TextInput" ||
@@ -89,38 +91,51 @@ export function Field({ label, error, hint, children }: FieldProps) {
   );
 }
 
-export function TextInput(props: InputHTMLAttributes<HTMLInputElement>) {
+export const TextInput = forwardRef<HTMLInputElement, InputHTMLAttributes<HTMLInputElement>>(
+  function TextInput(props, ref) {
   return (
     <input
       {...props}
+      ref={ref}
       className={cn(
         "w-full rounded-2xl border border-[var(--line)] bg-white/90 px-4 py-3 text-sm text-[var(--foreground)] placeholder:text-[#7e867e] focus:border-[#87b89c]",
         props.className,
       )}
     />
   );
-}
+  },
+);
+TextInput.displayName = "TextInput";
 
-export function SelectInput(props: SelectHTMLAttributes<HTMLSelectElement>) {
+export const SelectInput = forwardRef<HTMLSelectElement, SelectHTMLAttributes<HTMLSelectElement>>(
+  function SelectInput(props, ref) {
   return (
     <select
       {...props}
+      ref={ref}
       className={cn(
         "w-full rounded-2xl border border-[var(--line)] bg-white/90 px-4 py-3 text-sm text-[var(--foreground)] focus:border-[#87b89c]",
         props.className,
       )}
     />
   );
-}
+  },
+);
+SelectInput.displayName = "SelectInput";
 
-export function TextareaInput(props: TextareaHTMLAttributes<HTMLTextAreaElement>) {
+export const TextareaInput = forwardRef<
+  HTMLTextAreaElement,
+  TextareaHTMLAttributes<HTMLTextAreaElement>
+>(function TextareaInput(props, ref) {
   return (
     <textarea
       {...props}
+      ref={ref}
       className={cn(
         "w-full rounded-2xl border border-[var(--line)] bg-white/90 px-4 py-3 text-sm text-[var(--foreground)] placeholder:text-[#7e867e] focus:border-[#87b89c]",
         props.className,
       )}
     />
   );
-}
+});
+TextareaInput.displayName = "TextareaInput";

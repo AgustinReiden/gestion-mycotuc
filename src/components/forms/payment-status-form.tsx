@@ -2,7 +2,7 @@
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useEffect, useState, useTransition } from "react";
-import { useForm } from "react-hook-form";
+import { useForm, useWatch } from "react-hook-form";
 import type { z } from "zod";
 import { updateSalePaymentStatusAction } from "@/actions/core";
 import { PAYMENT_STATUSES } from "@/lib/constants";
@@ -40,6 +40,10 @@ export function PaymentStatusForm({
       paidAt: paidAt ?? "",
     },
   });
+  const currentPaymentStatus = useWatch({
+    control: form.control,
+    name: "paymentStatus",
+  });
 
   useEffect(() => {
     form.reset({
@@ -49,6 +53,13 @@ export function PaymentStatusForm({
       paidAt: paidAt ?? "",
     });
   }, [form, paidAt, paymentMethod, paymentStatus, saleOrderId]);
+
+  useEffect(() => {
+    if (currentPaymentStatus === "pending") {
+      form.setValue("paymentMethod", "", { shouldDirty: true, shouldValidate: true });
+      form.setValue("paidAt", "", { shouldDirty: true, shouldValidate: true });
+    }
+  }, [currentPaymentStatus, form]);
 
   return (
     <form
@@ -79,10 +90,18 @@ export function PaymentStatusForm({
 
       <div className="grid gap-4 md:grid-cols-2">
         <Field label="Metodo">
-          <TextInput {...form.register("paymentMethod")} placeholder="Transferencia" />
+          <TextInput
+            {...form.register("paymentMethod")}
+            disabled={currentPaymentStatus === "pending"}
+            placeholder="Transferencia"
+          />
         </Field>
         <Field label="Fecha de cobro">
-          <TextInput {...form.register("paidAt")} type="date" />
+          <TextInput
+            {...form.register("paidAt")}
+            disabled={currentPaymentStatus === "pending"}
+            type="date"
+          />
         </Field>
       </div>
 

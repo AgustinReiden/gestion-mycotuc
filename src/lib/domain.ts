@@ -77,6 +77,9 @@ export type SaleOrderRecord = {
   paymentMethod: string | null;
   paidAt: string | null;
   notes: string | null;
+  isVoided: boolean;
+  voidedAt: string | null;
+  voidReason: string | null;
   totalUnits: number;
   createdAt: string;
   items: SaleOrderItemRecord[];
@@ -92,6 +95,9 @@ export type ExpenseRecord = {
   notes: string | null;
   supplierName: string | null;
   linkedPurchaseId: string | null;
+  isVoided: boolean;
+  voidedAt: string | null;
+  voidReason: string | null;
   createdAt: string;
 };
 
@@ -101,6 +107,9 @@ export type PurchaseRecord = {
   supplierName: string | null;
   totalAmount: number;
   notes: string | null;
+  isVoided: boolean;
+  voidedAt: string | null;
+  voidReason: string | null;
   createdAt: string;
 };
 
@@ -145,6 +154,9 @@ export type ProductionBatchRecord = {
   actualQty: number | null;
   notes: string | null;
   inventoryPostedAt: string | null;
+  isVoided: boolean;
+  voidedAt: string | null;
+  voidReason: string | null;
   createdAt: string;
   inputs: BatchInputRecord[];
   outputs: BatchOutputRecord[];
@@ -160,9 +172,12 @@ export type StockAlertRecord = {
 };
 
 export type DashboardData = {
-  monthlySales: number;
+  monthlyBilled: number;
+  monthlyCollected: number;
   monthlyExpenses: number;
-  netProfit: number;
+  accrualProfit: number;
+  cashProfit: number;
+  pendingReceivables: number;
   soldUnits: number;
   lowStockProducts: StockAlertRecord[];
   lowStockSupplies: StockAlertRecord[];

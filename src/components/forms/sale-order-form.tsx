@@ -126,6 +126,10 @@ export function SaleOrderForm({ contacts, products, channels, onSuccess }: SaleO
     control: form.control,
     name: "contactId",
   });
+  const paymentStatus = useWatch({
+    control: form.control,
+    name: "paymentStatus",
+  });
   const total = watchedItems.reduce(
     (sum, item) => sum + (Number(item.quantity) || 0) * (Number(item.unitPrice) || 0),
     0,
@@ -190,6 +194,13 @@ export function SaleOrderForm({ contacts, products, channels, onSuccess }: SaleO
   useEffect(() => {
     form.reset(getDefaultValues(products, channels));
   }, [channels, form, products]);
+
+  useEffect(() => {
+    if (paymentStatus === "pending") {
+      form.setValue("paymentMethod", "", { shouldDirty: true, shouldValidate: true });
+      form.setValue("paidAt", "", { shouldDirty: true, shouldValidate: true });
+    }
+  }, [form, paymentStatus]);
 
   return (
     <form
@@ -348,10 +359,18 @@ export function SaleOrderForm({ contacts, products, channels, onSuccess }: SaleO
           </SelectInput>
         </Field>
         <Field label="Metodo de pago" error={form.formState.errors.paymentMethod?.message}>
-          <TextInput {...form.register("paymentMethod")} placeholder="Transferencia" />
+          <TextInput
+            {...form.register("paymentMethod")}
+            disabled={paymentStatus === "pending"}
+            placeholder="Transferencia"
+          />
         </Field>
         <Field label="Fecha de cobro" error={form.formState.errors.paidAt?.message}>
-          <TextInput {...form.register("paidAt")} type="date" />
+          <TextInput
+            {...form.register("paidAt")}
+            disabled={paymentStatus === "pending"}
+            type="date"
+          />
         </Field>
       </div>
 
@@ -416,7 +435,7 @@ export function SaleOrderForm({ contacts, products, channels, onSuccess }: SaleO
                   <TextInput
                     {...form.register(`items.${index}.unitPrice`, { valueAsNumber: true })}
                     type="number"
-                    min="0"
+                    min="0.01"
                     step="0.01"
                   />
                 </Field>

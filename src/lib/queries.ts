@@ -117,6 +117,9 @@ function mapSale(record: RawRecord): SaleOrderRecord {
     paymentMethod: (record.payment_method as string | null | undefined) ?? null,
     paidAt: (record.paid_at as string | null | undefined) ?? null,
     notes: (record.notes as string | null | undefined) ?? null,
+    isVoided: Boolean(record.voided_at),
+    voidedAt: (record.voided_at as string | null | undefined) ?? null,
+    voidReason: (record.void_reason as string | null | undefined) ?? null,
     totalUnits: sumBy(items, (item) => item.quantity),
     createdAt: String(record.created_at ?? ""),
     items,
@@ -138,6 +141,9 @@ function mapExpense(record: RawRecord): ExpenseRecord {
     notes: (record.notes as string | null | undefined) ?? null,
     supplierName: (supplier.name as string | null | undefined) ?? null,
     linkedPurchaseId: (record.linked_purchase_id as string | null | undefined) ?? null,
+    isVoided: Boolean(record.voided_at),
+    voidedAt: (record.voided_at as string | null | undefined) ?? null,
+    voidReason: (record.void_reason as string | null | undefined) ?? null,
     createdAt: String(record.created_at ?? ""),
   };
 }
@@ -151,6 +157,9 @@ function mapPurchase(record: RawRecord): PurchaseRecord {
     supplierName: (contact.name as string | null | undefined) ?? null,
     totalAmount: toNumber(record.total_amount),
     notes: (record.notes as string | null | undefined) ?? null,
+    isVoided: Boolean(record.voided_at),
+    voidedAt: (record.voided_at as string | null | undefined) ?? null,
+    voidReason: (record.void_reason as string | null | undefined) ?? null,
     createdAt: String(record.created_at ?? ""),
   };
 }
@@ -188,6 +197,9 @@ function mapBatch(record: RawRecord): ProductionBatchRecord {
     actualQty: record.actual_qty === null ? null : toNumber(record.actual_qty),
     notes: (record.notes as string | null | undefined) ?? null,
     inventoryPostedAt: (record.inventory_posted_at as string | null | undefined) ?? null,
+    isVoided: Boolean(record.voided_at),
+    voidedAt: (record.voided_at as string | null | undefined) ?? null,
+    voidReason: (record.void_reason as string | null | undefined) ?? null,
     createdAt: String(record.created_at ?? ""),
     inputs: asArray(record.production_batch_inputs).map((input) => {
       const supply = asRecord(input.supplies);
@@ -305,7 +317,7 @@ const getSalesOrdersData = cache(async () =>
       const { data } = await supabase
         .from("sales_orders")
         .select(
-          "id, sale_date, total_amount, payment_status, payment_method, paid_at, notes, created_at, contacts(name), sales_channels(name), sales_order_items(id, product_id, quantity, unit_price, line_total, products(name))",
+          "id, sale_date, total_amount, payment_status, payment_method, paid_at, notes, voided_at, void_reason, created_at, contacts(name), sales_channels(name), sales_order_items(id, product_id, quantity, unit_price, line_total, products(name))",
         )
         .order("sale_date", { ascending: false })
         .order("created_at", { ascending: false });
@@ -324,7 +336,7 @@ const getExpensesRecordsData = cache(async () =>
       const { data } = await supabase
         .from("expenses")
         .select(
-          "id, expense_date, concept, amount, source, notes, linked_purchase_id, created_at, expense_categories(name), purchases(contacts(name))",
+          "id, expense_date, concept, amount, source, notes, linked_purchase_id, voided_at, void_reason, created_at, expense_categories(name), purchases(contacts(name))",
         )
         .order("expense_date", { ascending: false })
         .order("created_at", { ascending: false });
@@ -343,7 +355,7 @@ const getProductionBatchesData = cache(async () =>
       const { data } = await supabase
         .from("production_batches")
         .select(
-          "id, product_id, status, started_at, completed_at, expected_qty, actual_qty, notes, inventory_posted_at, created_at, products(name), production_batch_inputs(id, supply_id, quantity, supplies(name)), production_batch_outputs(id, product_id, quantity, products(name))",
+          "id, product_id, status, started_at, completed_at, expected_qty, actual_qty, notes, inventory_posted_at, voided_at, void_reason, created_at, products(name), production_batch_inputs(id, supply_id, quantity, supplies(name)), production_batch_outputs(id, product_id, quantity, products(name))",
         )
         .order("started_at", { ascending: false })
         .order("created_at", { ascending: false });
@@ -493,7 +505,7 @@ export const getPurchasesData = cache(async (limit = 8) =>
     query: async (supabase) => {
       const { data } = await supabase
         .from("purchases")
-        .select("id, purchase_date, total_amount, notes, created_at, contacts(name)")
+        .select("id, purchase_date, total_amount, notes, voided_at, void_reason, created_at, contacts(name)")
         .order("purchase_date", { ascending: false })
         .order("created_at", { ascending: false })
         .limit(limit);
@@ -601,13 +613,15 @@ export async function getDashboardData(): Promise<DashboardData> {
   const monthStart = startOfMonth(new Date()).toISOString().slice(0, 10);
   const monthEnd = endOfMonth(new Date()).toISOString().slice(0, 10);
 
-  const monthlySales = sales.filter(
+  const activeSales = sales.filter((sale) => !sale.isVoided);
+  const activeExpenses = expenses.filter((expense) => !expense.isVoided);
+  const monthlySales = activeSales.filter(
     (sale) => sale.saleDate >= monthStart && sale.saleDate <= monthEnd,
   );
-  const monthlyExpenses = expenses.filter(
+  const monthlyExpenses = activeExpenses.filter(
     (expense) => expense.expenseDate >= monthStart && expense.expenseDate <= monthEnd,
   );
-  const recentSales = sales.slice(0, 5);
+  const recentSales = activeSales.slice(0, 5);
 
   const channelTotals = new Map<string, number>();
   monthlySales.forEach((sale) => {
@@ -622,7 +636,15 @@ export async function getDashboardData(): Promise<DashboardData> {
   });
 
   const totalSalesAmount = sumBy(monthlySales, (sale) => sale.totalAmount);
+  const collectedSalesAmount = sumBy(
+    monthlySales.filter((sale) => sale.paymentStatus === "paid"),
+    (sale) => sale.totalAmount,
+  );
   const totalExpensesAmount = sumBy(monthlyExpenses, (expense) => expense.amount);
+  const pendingReceivables = sumBy(
+    activeSales.filter((sale) => sale.paymentStatus !== "paid"),
+    (sale) => sale.totalAmount,
+  );
 
   const lowStockProducts = products
     .filter((product) => product.isActive && product.currentStock <= product.minStock)
@@ -632,9 +654,12 @@ export async function getDashboardData(): Promise<DashboardData> {
     .map((supply) => toStockAlert(supply, "supply"));
 
   return {
-    monthlySales: totalSalesAmount,
+    monthlyBilled: totalSalesAmount,
+    monthlyCollected: collectedSalesAmount,
     monthlyExpenses: totalExpensesAmount,
-    netProfit: totalSalesAmount - totalExpensesAmount,
+    accrualProfit: totalSalesAmount - totalExpensesAmount,
+    cashProfit: collectedSalesAmount - totalExpensesAmount,
+    pendingReceivables,
     soldUnits: sumBy(monthlySales, (sale) => sale.totalUnits),
     lowStockProducts,
     lowStockSupplies,

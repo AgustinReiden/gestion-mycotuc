@@ -7,6 +7,36 @@ const optionalTrimmedString = z
   .nullable()
   .optional();
 
+const optionalNonnegativeNumber = z.preprocess(
+  (value) => (value === "" || value === null || value === undefined ? null : value),
+  z.coerce.number().nonnegative("El valor no puede ser negativo.").nullable().optional(),
+);
+
+function validatePaymentFields(
+  data: {
+    paymentStatus: "pending" | "partial" | "paid";
+    paymentMethod?: string | null;
+    paidAt?: string | null;
+  },
+  ctx: z.RefinementCtx,
+) {
+  if (data.paymentStatus === "pending" && (data.paymentMethod || data.paidAt)) {
+    ctx.addIssue({
+      code: "custom",
+      path: ["paymentStatus"],
+      message: "Una venta pendiente no debe tener metodo ni fecha de cobro.",
+    });
+  }
+
+  if (data.paymentStatus !== "pending" && (!data.paymentMethod || !data.paidAt)) {
+    ctx.addIssue({
+      code: "custom",
+      path: ["paymentMethod"],
+      message: "Las ventas cobradas o parciales requieren metodo y fecha de cobro.",
+    });
+  }
+}
+
 export const loginSchema = z.object({
   email: z.email("Ingresa un email valido."),
   password: z.string().min(6, "La contrasena debe tener al menos 6 caracteres."),
@@ -61,7 +91,7 @@ export const expenseFormSchema = z.object({
 export const saleItemSchema = z.object({
   productId: z.string().uuid("Selecciona un producto."),
   quantity: z.coerce.number().positive("La cantidad debe ser mayor a cero."),
-  unitPrice: z.coerce.number().nonnegative("El precio unitario es obligatorio."),
+  unitPrice: z.coerce.number().positive("El precio unitario debe ser mayor a cero."),
 });
 
 export const saleOrderFormSchema = z
@@ -80,6 +110,8 @@ export const saleOrderFormSchema = z
     items: z.array(saleItemSchema).min(1, "Agrega al menos un item."),
   })
   .superRefine((data, ctx) => {
+    validatePaymentFields(data, ctx);
+
     if (data.customerMode === "existing" && !data.contactId) {
       ctx.addIssue({
         code: "custom",
@@ -100,7 +132,7 @@ export const saleOrderFormSchema = z
 export const purchaseItemSchema = z.object({
   supplyId: z.string().uuid("Selecciona un insumo."),
   quantity: z.coerce.number().positive("La cantidad debe ser mayor a cero."),
-  unitCost: z.coerce.number().nonnegative("El costo unitario es obligatorio."),
+  unitCost: z.coerce.number().positive("El costo unitario debe ser mayor a cero."),
 });
 
 export const purchaseFormSchema = z.object({
@@ -126,16 +158,59 @@ export const productionBatchFormSchema = z.object({
   status: z.enum(["draft", "active", "completed", "cancelled"]),
   startedAt: z.string().min(1, "La fecha de inicio es obligatoria."),
   completedAt: optionalTrimmedString,
-  expectedQty: z.coerce.number().nullable().optional(),
-  actualQty: z.coerce.number().nullable().optional(),
+  expectedQty: optionalNonnegativeNumber,
+  actualQty: optionalNonnegativeNumber,
   notes: optionalTrimmedString,
   inputs: z.array(productionInputSchema).default([]),
   outputs: z.array(productionOutputSchema).default([]),
+}).superRefine((data, ctx) => {
+  if (data.status !== "completed") {
+    return;
+  }
+
+  if (!data.completedAt) {
+    ctx.addIssue({
+      code: "custom",
+      path: ["completedAt"],
+      message: "Un lote completado requiere fecha de cierre.",
+    });
+  }
+
+  if (data.inputs.length === 0) {
+    ctx.addIssue({
+      code: "custom",
+      path: ["inputs"],
+      message: "No puedes completar un lote sin insumos consumidos.",
+    });
+  }
+
+  if (data.outputs.length === 0) {
+    ctx.addIssue({
+      code: "custom",
+      path: ["outputs"],
+      message: "No puedes completar un lote sin salidas registradas.",
+    });
+  }
+
+  if (!data.outputs.some((output) => output.productId === data.productId)) {
+    ctx.addIssue({
+      code: "custom",
+      path: ["outputs"],
+      message: "La salida del lote debe incluir el producto objetivo.",
+    });
+  }
 });
 
-export const paymentStatusUpdateSchema = z.object({
-  saleOrderId: z.string().uuid(),
-  paymentStatus: z.enum(["pending", "partial", "paid"]),
-  paymentMethod: optionalTrimmedString,
-  paidAt: optionalTrimmedString,
+export const paymentStatusUpdateSchema = z
+  .object({
+    saleOrderId: z.string().uuid(),
+    paymentStatus: z.enum(["pending", "partial", "paid"]),
+    paymentMethod: optionalTrimmedString,
+    paidAt: optionalTrimmedString,
+  })
+  .superRefine(validatePaymentFields);
+
+export const reversalSchema = z.object({
+  id: z.string().uuid(),
+  reason: optionalTrimmedString,
 });

@@ -83,6 +83,7 @@ export function ExpensesShell({ expenses, categories }: ExpensesShellProps) {
       expense.supplierName?.toLowerCase().includes(query)
     );
   });
+  const activeExpenses = expenseRecords.filter((expense) => !expense.isVoided);
 
   return (
     <div className="page-grid">
@@ -109,19 +110,19 @@ export function ExpensesShell({ expenses, categories }: ExpensesShellProps) {
           <div>
             <p className="text-sm text-[var(--muted)]">Total registrado</p>
             <p className="mt-2 text-3xl font-semibold text-[#934534]">
-              {formatCurrency(sumBy(expenseRecords, (expense) => expense.amount))}
+              {formatCurrency(sumBy(activeExpenses, (expense) => expense.amount))}
             </p>
           </div>
           <div>
             <p className="text-sm text-[var(--muted)]">Compras de insumos</p>
             <p className="mt-2 text-2xl font-semibold">
-              {expenseRecords.filter((expense) => expense.source === "purchase").length}
+              {activeExpenses.filter((expense) => expense.source === "purchase").length}
             </p>
           </div>
           <div>
             <p className="text-sm text-[var(--muted)]">Gastos manuales</p>
             <p className="mt-2 text-2xl font-semibold">
-              {expenseRecords.filter((expense) => expense.source === "manual").length}
+              {activeExpenses.filter((expense) => expense.source === "manual").length}
             </p>
           </div>
         </Panel>
@@ -177,6 +178,7 @@ export function ExpensesShell({ expenses, categories }: ExpensesShellProps) {
                       <Badge tone={expense.source === "purchase" ? "accent" : "neutral"}>
                         {expense.source === "purchase" ? "Compra" : "Manual"}
                       </Badge>
+                      {expense.isVoided ? <Badge tone="danger">Anulado</Badge> : null}
                     </div>
 
                     <div className="rounded-[22px] border border-[var(--line)] bg-[#f8f6ef] p-4 text-sm text-[var(--muted)]">
@@ -215,6 +217,7 @@ export function ExpensesShell({ expenses, categories }: ExpensesShellProps) {
                           <Badge tone={expense.source === "purchase" ? "accent" : "neutral"}>
                             {expense.source === "purchase" ? "Compra" : "Manual"}
                           </Badge>
+                          {expense.isVoided ? <Badge tone="danger">Anulado</Badge> : null}
                         </td>
                         <td className="px-4 py-4">{expense.supplierName ?? "-"}</td>
                         <td className="px-4 py-4 font-semibold text-[#934534]">

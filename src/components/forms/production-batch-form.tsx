@@ -14,6 +14,7 @@ import type { ProductRecord, ProductionBatchRecord, SupplyRecord } from "@/lib/d
 import { productionBatchFormSchema } from "@/lib/validators";
 
 type ProductionBatchValues = z.input<typeof productionBatchFormSchema>;
+type ProductionBatchSubmitValues = z.output<typeof productionBatchFormSchema>;
 
 type ProductionBatchFormProps = {
   batch?: ProductionBatchRecord | null;
@@ -92,7 +93,7 @@ function getDefaultValues(
 export function ProductionBatchForm({ batch, products, supplies, onSuccess }: ProductionBatchFormProps) {
   const [pending, startTransition] = useTransition();
   const [feedback, setFeedback] = useState<{ tone: "success" | "error"; message: string } | null>(null);
-  const form = useForm<ProductionBatchValues>({
+  const form = useForm<ProductionBatchValues, unknown, ProductionBatchSubmitValues>({
     resolver: zodResolver(productionBatchFormSchema),
     defaultValues: getDefaultValues(batch, products, supplies),
   });
@@ -220,6 +221,7 @@ export function ProductionBatchForm({ batch, products, supplies, onSuccess }: Pr
             })}
             type="number"
             step="0.01"
+            min="0"
           />
         </Field>
         <Field label="Rendimiento real" error={form.formState.errors.actualQty?.message}>
@@ -229,6 +231,7 @@ export function ProductionBatchForm({ batch, products, supplies, onSuccess }: Pr
             })}
             type="number"
             step="0.01"
+            min="0"
           />
         </Field>
       </div>

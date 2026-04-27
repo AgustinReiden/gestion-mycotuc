@@ -1,13 +1,16 @@
-import { ReceiptText } from "lucide-react";
+import { ReceiptText, RotateCcw } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Panel } from "@/components/ui/panel";
 import type { PurchaseRecord } from "@/lib/domain";
 import { formatCurrency, formatDate } from "@/lib/utils";
 
 type PurchaseHistoryPanelProps = {
   purchases: PurchaseRecord[];
+  onReversePurchase?: (purchase: PurchaseRecord) => void;
 };
 
-export function PurchaseHistoryPanel({ purchases }: PurchaseHistoryPanelProps) {
+export function PurchaseHistoryPanel({ purchases, onReversePurchase }: PurchaseHistoryPanelProps) {
   return (
     <Panel>
       <div className="flex items-start gap-3">
@@ -30,11 +33,29 @@ export function PurchaseHistoryPanel({ purchases }: PurchaseHistoryPanelProps) {
             <div key={purchase.id} className="rounded-[24px] border border-[var(--line)] bg-white/80 p-4">
               <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
                 <div>
-                  <p className="font-semibold">{purchase.supplierName ?? "Proveedor sin nombre"}</p>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <p className="font-semibold">{purchase.supplierName ?? "Proveedor sin nombre"}</p>
+                    {purchase.isVoided ? <Badge tone="danger">Anulada</Badge> : null}
+                  </div>
                   <p className="text-sm text-[var(--muted)]">{formatDate(purchase.purchaseDate)}</p>
                   {purchase.notes ? <p className="mt-1 text-sm text-[var(--muted)]">{purchase.notes}</p> : null}
                 </div>
-                <p className="text-lg font-semibold text-[#15553e]">{formatCurrency(purchase.totalAmount)}</p>
+                <div className="flex flex-col items-start gap-2 md:items-end">
+                  <p className="text-lg font-semibold text-[#15553e]">
+                    {formatCurrency(purchase.totalAmount)}
+                  </p>
+                  {onReversePurchase ? (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      disabled={purchase.isVoided}
+                      onClick={() => onReversePurchase(purchase)}
+                    >
+                      <RotateCcw className="h-4 w-4" />
+                      Anular
+                    </Button>
+                  ) : null}
+                </div>
               </div>
             </div>
           ))

@@ -38,10 +38,17 @@ export default async function DashboardPage() {
     <div className="page-grid">
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         <MetricCard
-          label="Ventas del mes"
-          value={formatCurrency(data.monthlySales)}
-          helper="Facturacion registrada en el periodo actual."
+          label="Facturado del mes"
+          value={formatCurrency(data.monthlyBilled)}
+          helper="Ventas registradas en el periodo actual."
           icon={TrendingUp}
+        />
+        <MetricCard
+          label="Cobrado del mes"
+          value={formatCurrency(data.monthlyCollected)}
+          helper="Ventas pagadas dentro del periodo actual."
+          icon={DollarSign}
+          tone="accent"
         />
         <MetricCard
           label="Gastos del mes"
@@ -51,16 +58,16 @@ export default async function DashboardPage() {
           tone="danger"
         />
         <MetricCard
-          label="Ganancia neta"
-          value={formatCurrency(data.netProfit)}
-          helper="Diferencia entre ventas y gastos."
-          icon={DollarSign}
-          tone={data.netProfit >= 0 ? "accent" : "danger"}
+          label="Margen devengado"
+          value={formatCurrency(data.accrualProfit)}
+          helper="Facturacion menos gastos, aun si hay cobros pendientes."
+          icon={BarChart3}
+          tone={data.accrualProfit >= 0 ? "accent" : "danger"}
         />
         <MetricCard
-          label="Unidades vendidas"
-          value={String(data.soldUnits)}
-          helper="Suma de cantidades vendidas este mes."
+          label="Pendiente de cobro"
+          value={formatCurrency(data.pendingReceivables)}
+          helper="Total historico facturado y no cobrado."
           icon={Package}
           tone="info"
         />

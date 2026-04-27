@@ -43,9 +43,15 @@ export function ReportsShell({ sales, expenses, products, supplies, batches }: R
   const hasInvalidRange = range.from > range.to;
   const effectiveRange = normalizeRange(range);
 
-  const filteredSales = sales.filter((sale) => inRange(sale.saleDate, effectiveRange));
-  const filteredExpenses = expenses.filter((expense) => inRange(expense.expenseDate, effectiveRange));
-  const filteredBatches = batches.filter((batch) => inRange(batch.startedAt, effectiveRange));
+  const filteredSales = sales.filter(
+    (sale) => !sale.isVoided && inRange(sale.saleDate, effectiveRange),
+  );
+  const filteredExpenses = expenses.filter(
+    (expense) => !expense.isVoided && inRange(expense.expenseDate, effectiveRange),
+  );
+  const filteredBatches = batches.filter(
+    (batch) => !batch.isVoided && inRange(batch.startedAt, effectiveRange),
+  );
 
   const salesByProduct = new Map<string, number>();
   filteredSales.forEach((sale) => {
@@ -65,7 +71,12 @@ export function ReportsShell({ sales, expenses, products, supplies, batches }: R
   });
 
   const totalSales = sumBy(filteredSales, (sale) => sale.totalAmount);
+  const totalCollected = sumBy(
+    filteredSales.filter((sale) => sale.paymentStatus === "paid"),
+    (sale) => sale.totalAmount,
+  );
   const totalExpenses = sumBy(filteredExpenses, (expense) => expense.amount);
+  const pendingReceivables = totalSales - totalCollected;
 
   const criticalStock = [...products, ...supplies].filter(
     (item) => item.isActive && item.currentStock <= item.minStock,
@@ -122,20 +133,28 @@ export function ReportsShell({ sales, expenses, products, supplies, batches }: R
 
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         <Panel>
-          <p className="text-sm text-[var(--muted)]">Ventas</p>
+          <p className="text-sm text-[var(--muted)]">Facturado</p>
           <p className="mt-2 text-3xl font-semibold">{formatCurrency(totalSales)}</p>
+        </Panel>
+        <Panel>
+          <p className="text-sm text-[var(--muted)]">Cobrado</p>
+          <p className="mt-2 text-3xl font-semibold text-[#15553e]">
+            {formatCurrency(totalCollected)}
+          </p>
         </Panel>
         <Panel>
           <p className="text-sm text-[var(--muted)]">Gastos</p>
           <p className="mt-2 text-3xl font-semibold text-[#934534]">{formatCurrency(totalExpenses)}</p>
         </Panel>
         <Panel>
-          <p className="text-sm text-[var(--muted)]">Margen</p>
+          <p className="text-sm text-[var(--muted)]">Margen devengado</p>
           <p className="mt-2 text-3xl font-semibold">{formatCurrency(totalSales - totalExpenses)}</p>
         </Panel>
         <Panel>
-          <p className="text-sm text-[var(--muted)]">Lotes activos</p>
-          <p className="mt-2 text-3xl font-semibold">{filteredBatches.filter((batch) => batch.status === "active").length}</p>
+          <p className="text-sm text-[var(--muted)]">Pendiente de cobro</p>
+          <p className="mt-2 text-3xl font-semibold text-[#8c5b17]">
+            {formatCurrency(pendingReceivables)}
+          </p>
         </Panel>
       </div>
 

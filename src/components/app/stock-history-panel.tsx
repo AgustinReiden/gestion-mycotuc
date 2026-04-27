@@ -10,20 +10,36 @@ type StockHistoryPanelProps = {
   movements: InventoryMovementRecord[];
 };
 
-function getMovementTone(movementType: InventoryMovementRecord["movementType"]) {
-  if (movementType === "purchase_in" || movementType === "production_in") {
+function getMovementTone(movement: InventoryMovementRecord) {
+  if (movement.referenceType.includes("reversal")) {
+    return "danger";
+  }
+
+  if (movement.movementType === "purchase_in" || movement.movementType === "production_in") {
     return "success";
   }
 
-  if (movementType === "sale_out" || movementType === "production_out") {
+  if (movement.movementType === "sale_out" || movement.movementType === "production_out") {
     return "warning";
   }
 
   return "neutral";
 }
 
-function getMovementLabel(movementType: InventoryMovementRecord["movementType"]) {
-  switch (movementType) {
+function getMovementLabel(movement: InventoryMovementRecord) {
+  if (movement.referenceType === "sale_order_reversal") {
+    return "Reversa venta";
+  }
+
+  if (movement.referenceType === "purchase_reversal") {
+    return "Reversa compra";
+  }
+
+  if (movement.referenceType === "production_batch_reversal") {
+    return "Reversa lote";
+  }
+
+  switch (movement.movementType) {
     case "purchase_in":
       return "Compra";
     case "sale_out":
@@ -79,8 +95,8 @@ export function StockHistoryPanel({ title, description, movements }: StockHistor
                 </div>
 
                 <div className="flex flex-col items-start gap-2 text-left md:items-end md:text-right">
-                  <Badge tone={getMovementTone(movement.movementType)}>
-                    {getMovementLabel(movement.movementType)}
+                  <Badge tone={getMovementTone(movement)}>
+                    {getMovementLabel(movement)}
                   </Badge>
                   <p className="text-lg font-semibold">
                     {movement.quantity > 0 ? "+" : ""}

@@ -1,8 +1,10 @@
 "use client";
 
-import { useDeferredValue, useEffect, useState } from "react";
-import { Plus, Sprout, Warehouse } from "lucide-react";
+import { useDeferredValue, useEffect, useState, useTransition } from "react";
+import { Plus, RotateCcw, Sprout, Warehouse } from "lucide-react";
+import { reverseProductionBatchAction } from "@/actions/core";
 import { ProductionBatchForm } from "@/components/forms/production-batch-form";
+import { ActionNotice } from "@/components/forms/action-notice";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -107,14 +109,85 @@ function EditBatchModal({
   );
 }
 
+function ReverseBatchModal({
+  batch,
+  onClose,
+  onBatchReversed,
+}: {
+  batch: ProductionBatchRecord;
+  onClose: () => void;
+  onBatchReversed: (batch: ProductionBatchRecord) => void;
+}) {
+  const [reason, setReason] = useState("");
+  const [feedback, setFeedback] = useState<string | null>(null);
+  const [pending, startTransition] = useTransition();
+
+  return (
+    <Modal
+      open
+      onClose={onClose}
+      title="Anular lote"
+      description="Cancela el lote y revierte inventario si ya habia sido completado."
+    >
+      <div className="space-y-4">
+        <div className="rounded-2xl border border-[var(--line)] bg-[#f7f5ef] px-4 py-3 text-sm text-[var(--muted)]">
+          Si el lote ya impacto inventario, se devolveran insumos y se descontaran salidas. La base
+          rechazara la anulacion si los productos quedarian con stock negativo.
+        </div>
+        <label className="space-y-2 text-sm font-semibold">
+          Motivo
+          <textarea
+            value={reason}
+            onChange={(event) => setReason(event.target.value)}
+            className="w-full rounded-2xl border border-[var(--line)] bg-white/90 px-4 py-3 text-sm font-normal"
+            rows={4}
+            placeholder="Error de carga, lote descartado o control de calidad."
+          />
+        </label>
+        {feedback ? <ActionNotice tone="error" message={feedback} /> : null}
+        <div className="flex justify-end gap-2">
+          <Button type="button" variant="ghost" onClick={onClose}>
+            Cancelar
+          </Button>
+          <Button
+            type="button"
+            variant="danger"
+            busy={pending}
+            onClick={() => {
+              setFeedback(null);
+              startTransition(async () => {
+                const result = await reverseProductionBatchAction({ id: batch.id, reason });
+                if (result.success && result.data) {
+                  onBatchReversed(result.data.batch);
+                  onClose();
+                  return;
+                }
+
+                setFeedback(result.error ?? result.message);
+              });
+            }}
+          >
+            <RotateCcw className="h-4 w-4" />
+            Anular lote
+          </Button>
+        </div>
+      </div>
+    </Modal>
+  );
+}
+
 export function ProductionShell({ batches, products, supplies }: ProductionShellProps) {
   const [search, setSearch] = useState("");
   const [batchRecords, setBatchRecords] = useState(() => sortBatches(batches));
   const [selectedBatchId, setSelectedBatchId] = useState<string | null>(null);
+  const [reverseBatchId, setReverseBatchId] = useState<string | null>(null);
   const deferredSearch = useDeferredValue(search);
   const hasSearchQuery = deferredSearch.trim().length > 0;
   const selectedBatch = selectedBatchId
     ? batchRecords.find((batch) => batch.id === selectedBatchId) ?? null
+    : null;
+  const reverseBatch = reverseBatchId
+    ? batchRecords.find((batch) => batch.id === reverseBatchId) ?? null
     : null;
 
   useEffect(() => {
@@ -184,7 +257,10 @@ export function ProductionShell({ batches, products, supplies }: ProductionShell
                   <p className="text-sm font-semibold uppercase tracking-[0.18em] text-[#6b7b6c]">Lote / Cepa</p>
                   <h3 className="mt-2 text-2xl font-semibold text-[#2d3329]">{batch.productName}</h3>
                 </div>
-                <Badge tone={getStatusTone(batch.status)}>{getStatusLabel(batch.status)}</Badge>
+                <div className="flex flex-wrap justify-end gap-2">
+                  <Badge tone={getStatusTone(batch.status)}>{getStatusLabel(batch.status)}</Badge>
+                  {batch.isVoided ? <Badge tone="danger">Anulado</Badge> : null}
+                </div>
               </div>
 
               {batch.status !== "cancelled" ? (
@@ -250,9 +326,23 @@ export function ProductionShell({ batches, products, supplies }: ProductionShell
 
               {batch.notes ? <p className="text-sm text-[var(--muted)]">{batch.notes}</p> : null}
 
-              <div className="mt-auto flex justify-end">
-                <Button type="button" variant="secondary" onClick={() => setSelectedBatchId(batch.id)}>
+              <div className="mt-auto flex flex-wrap justify-end gap-2">
+                <Button
+                  type="button"
+                  variant="secondary"
+                  disabled={batch.isVoided || batch.inventoryPostedAt !== null}
+                  onClick={() => setSelectedBatchId(batch.id)}
+                >
                   Editar lote
+                </Button>
+                <Button
+                  type="button"
+                  variant="danger"
+                  disabled={batch.isVoided || batch.status === "cancelled"}
+                  onClick={() => setReverseBatchId(batch.id)}
+                >
+                  <RotateCcw className="h-4 w-4" />
+                  Anular lote
                 </Button>
               </div>
             </Panel>
@@ -267,6 +357,15 @@ export function ProductionShell({ batches, products, supplies }: ProductionShell
           supplies={supplies}
           onClose={() => setSelectedBatchId(null)}
           onBatchSaved={(batch) => {
+            setBatchRecords((current) => upsertBatch(current, batch));
+          }}
+        />
+      ) : null}
+      {reverseBatch ? (
+        <ReverseBatchModal
+          batch={reverseBatch}
+          onClose={() => setReverseBatchId(null)}
+          onBatchReversed={(batch) => {
             setBatchRecords((current) => upsertBatch(current, batch));
           }}
         />

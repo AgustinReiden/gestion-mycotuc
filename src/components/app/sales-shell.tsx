@@ -1,7 +1,9 @@
 "use client";
 
-import { useDeferredValue, useEffect, useState } from "react";
-import { CircleDollarSign, Filter, Plus, Search } from "lucide-react";
+import { useDeferredValue, useEffect, useState, useTransition } from "react";
+import { CircleDollarSign, Filter, Plus, RotateCcw, Search } from "lucide-react";
+import { reverseSaleOrderAction } from "@/actions/core";
+import { ActionNotice } from "@/components/forms/action-notice";
 import { PaymentStatusForm } from "@/components/forms/payment-status-form";
 import { SaleOrderForm } from "@/components/forms/sale-order-form";
 import { Badge } from "@/components/ui/badge";
@@ -133,17 +135,88 @@ function PaymentModal({
   );
 }
 
+function ReverseSaleModal({
+  sale,
+  onClose,
+  onSaleReversed,
+}: {
+  sale: SaleOrderRecord;
+  onClose: () => void;
+  onSaleReversed: (sale: SaleOrderRecord) => void;
+}) {
+  const [reason, setReason] = useState("");
+  const [feedback, setFeedback] = useState<string | null>(null);
+  const [pending, startTransition] = useTransition();
+
+  return (
+    <Modal
+      open
+      onClose={onClose}
+      title="Anular venta"
+      description="Genera movimientos de reversa y conserva la venta como registro historico."
+    >
+      <div className="space-y-4">
+        <div className="rounded-2xl border border-[var(--line)] bg-[#f7f5ef] px-4 py-3 text-sm text-[var(--muted)]">
+          Se reintegrara stock por {sale.contactName ?? "cliente sin nombre"} y la venta dejara de
+          contar en dashboard y reportes.
+        </div>
+        <label className="space-y-2 text-sm font-semibold">
+          Motivo
+          <textarea
+            value={reason}
+            onChange={(event) => setReason(event.target.value)}
+            className="w-full rounded-2xl border border-[var(--line)] bg-white/90 px-4 py-3 text-sm font-normal"
+            rows={4}
+            placeholder="Error de carga, devolucion o cancelacion."
+          />
+        </label>
+        {feedback ? <ActionNotice tone="error" message={feedback} /> : null}
+        <div className="flex justify-end gap-2">
+          <Button type="button" variant="ghost" onClick={onClose}>
+            Cancelar
+          </Button>
+          <Button
+            type="button"
+            variant="danger"
+            busy={pending}
+            onClick={() => {
+              setFeedback(null);
+              startTransition(async () => {
+                const result = await reverseSaleOrderAction({ id: sale.id, reason });
+                if (result.success && result.data) {
+                  onSaleReversed(result.data.sale);
+                  onClose();
+                  return;
+                }
+
+                setFeedback(result.error ?? result.message);
+              });
+            }}
+          >
+            <RotateCcw className="h-4 w-4" />
+            Anular venta
+          </Button>
+        </div>
+      </div>
+    </Modal>
+  );
+}
+
 export function SalesShell({ sales, contacts, products, channels }: SalesShellProps) {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<"all" | SaleOrderRecord["paymentStatus"]>("all");
   const [saleRecords, setSaleRecords] = useState(() => sortSales(sales));
   const [contactRecords, setContactRecords] = useState(contacts);
   const [selectedSaleId, setSelectedSaleId] = useState<string | null>(null);
+  const [reverseSaleId, setReverseSaleId] = useState<string | null>(null);
   const deferredSearch = useDeferredValue(search);
   const hasSearchQuery = deferredSearch.trim().length > 0;
   const hasStatusFilter = statusFilter !== "all";
   const selectedSale = selectedSaleId
     ? saleRecords.find((sale) => sale.id === selectedSaleId) ?? null
+    : null;
+  const reverseSale = reverseSaleId
+    ? saleRecords.find((sale) => sale.id === reverseSaleId) ?? null
     : null;
 
   useEffect(() => {
@@ -166,9 +239,10 @@ export function SalesShell({ sales, contacts, products, channels }: SalesShellPr
     return matchesSearch && matchesStatus;
   });
 
-  const paidCount = saleRecords.filter((sale) => sale.paymentStatus === "paid").length;
+  const activeSales = saleRecords.filter((sale) => !sale.isVoided);
+  const paidCount = activeSales.filter((sale) => sale.paymentStatus === "paid").length;
   const pendingAmount = sumBy(
-    saleRecords.filter((sale) => sale.paymentStatus !== "paid"),
+    activeSales.filter((sale) => sale.paymentStatus !== "paid"),
     (sale) => sale.totalAmount,
   );
 
@@ -201,7 +275,7 @@ export function SalesShell({ sales, contacts, products, channels }: SalesShellPr
           <div>
             <p className="text-sm text-[var(--muted)]">Facturacion acumulada</p>
             <p className="mt-2 text-3xl font-semibold">
-              {formatCurrency(sumBy(saleRecords, (sale) => sale.totalAmount))}
+              {formatCurrency(sumBy(activeSales, (sale) => sale.totalAmount))}
             </p>
           </div>
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-1">
@@ -287,6 +361,7 @@ export function SalesShell({ sales, contacts, products, channels }: SalesShellPr
                       <Badge tone={getPaymentTone(sale.paymentStatus)}>
                         {getPaymentLabel(sale.paymentStatus)}
                       </Badge>
+                      {sale.isVoided ? <Badge tone="danger">Anulada</Badge> : null}
                     </div>
 
                     <div className="space-y-2 rounded-[22px] border border-[var(--line)] bg-[#f8f6ef] p-4 text-sm">
@@ -302,14 +377,27 @@ export function SalesShell({ sales, contacts, products, channels }: SalesShellPr
                       ) : null}
                     </div>
 
-                    <Button
-                      type="button"
-                      variant="secondary"
-                      className="w-full justify-center"
-                      onClick={() => setSelectedSaleId(sale.id)}
-                    >
-                      Editar cobro
-                    </Button>
+                    <div className="grid gap-2 sm:grid-cols-2">
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        className="w-full justify-center"
+                        disabled={sale.isVoided}
+                        onClick={() => setSelectedSaleId(sale.id)}
+                      >
+                        Editar cobro
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="danger"
+                        className="w-full justify-center"
+                        disabled={sale.isVoided}
+                        onClick={() => setReverseSaleId(sale.id)}
+                      >
+                        <RotateCcw className="h-4 w-4" />
+                        Anular
+                      </Button>
+                    </div>
                   </article>
                 ))}
               </div>
@@ -356,11 +444,26 @@ export function SalesShell({ sales, contacts, products, channels }: SalesShellPr
                           <Badge tone={getPaymentTone(sale.paymentStatus)}>
                             {getPaymentLabel(sale.paymentStatus)}
                           </Badge>
+                          {sale.isVoided ? <Badge tone="danger">Anulada</Badge> : null}
                         </td>
                         <td className="px-4 py-4 font-semibold">{formatCurrency(sale.totalAmount)}</td>
                         <td className="px-4 py-4 text-right">
-                          <Button type="button" variant="ghost" onClick={() => setSelectedSaleId(sale.id)}>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            disabled={sale.isVoided}
+                            onClick={() => setSelectedSaleId(sale.id)}
+                          >
                             Editar cobro
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            disabled={sale.isVoided}
+                            onClick={() => setReverseSaleId(sale.id)}
+                          >
+                            <RotateCcw className="h-4 w-4" />
+                            Anular
                           </Button>
                         </td>
                       </tr>
@@ -378,6 +481,15 @@ export function SalesShell({ sales, contacts, products, channels }: SalesShellPr
           sale={selectedSale}
           onClose={() => setSelectedSaleId(null)}
           onSaleUpdated={(updatedSale) => {
+            setSaleRecords((current) => upsertSale(current, updatedSale));
+          }}
+        />
+      ) : null}
+      {reverseSale ? (
+        <ReverseSaleModal
+          sale={reverseSale}
+          onClose={() => setReverseSaleId(null)}
+          onSaleReversed={(updatedSale) => {
             setSaleRecords((current) => upsertSale(current, updatedSale));
           }}
         />

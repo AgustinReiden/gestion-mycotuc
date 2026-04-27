@@ -1,0 +1,17 @@
+-- Regression checklist for strict business processes.
+-- Run against a disposable Supabase database after applying migrations and seed data.
+--
+-- Expected outcomes:
+-- 1. create_sale_order rejects zero/negative unit prices and inactive products.
+-- 2. create_sale_order rejects quantities above current product stock.
+-- 3. register_supply_purchase rejects zero/negative unit costs and inactive supplies.
+-- 4. create_production_batch rejects completed batches without completedAt, inputs,
+--    outputs, or an output for the target product.
+-- 5. apply_stock_adjustment rejects adjustments that would leave stock below zero.
+-- 6. reverse_sale_order, reverse_supply_purchase, and reverse_production_batch create
+--    compensating inventory movements and mark the source record as voided.
+-- 7. reverse_supply_purchase and reverse_production_batch reject reversals that would
+--    make supply or product stock negative.
+--
+-- These cases intentionally live as SQL so the database contract is visible beside
+-- migrations even when the local Supabase test harness is not installed.

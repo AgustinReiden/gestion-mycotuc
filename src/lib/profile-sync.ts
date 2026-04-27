@@ -14,5 +14,5 @@ export async function ensureProfileForUser(supabase: SupabaseClient<Database>): 
     return null;
   }
 
-  return data ?? null;
+  return (data as ProfileRow | null) ?? null;
 }

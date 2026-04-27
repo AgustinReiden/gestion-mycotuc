@@ -1,9 +1,11 @@
 "use client";
 
-import { useDeferredValue, useEffect, useState } from "react";
-import { Archive, Edit3, Plus, Search, Settings2, ShoppingBasket } from "lucide-react";
+import { useDeferredValue, useEffect, useState, useTransition } from "react";
+import { Archive, Edit3, Plus, RotateCcw, Search, Settings2, ShoppingBasket } from "lucide-react";
+import { reverseSupplyPurchaseAction } from "@/actions/core";
 import { PurchaseHistoryPanel } from "@/components/app/purchase-history-panel";
 import { StockHistoryPanel } from "@/components/app/stock-history-panel";
+import { ActionNotice } from "@/components/forms/action-notice";
 import { PurchaseForm } from "@/components/forms/purchase-form";
 import { StockAdjustmentForm } from "@/components/forms/stock-adjustment-form";
 import { SupplyForm } from "@/components/forms/supply-form";
@@ -226,6 +228,73 @@ function AdjustSupplyStockModal({
   );
 }
 
+function ReversePurchaseModal({
+  purchase,
+  onClose,
+  onPurchaseReversed,
+}: {
+  purchase: PurchaseRecord;
+  onClose: () => void;
+  onPurchaseReversed: (result: PurchaseSuccessResult) => void;
+}) {
+  const [reason, setReason] = useState("");
+  const [feedback, setFeedback] = useState<string | null>(null);
+  const [pending, startTransition] = useTransition();
+
+  return (
+    <Modal
+      open
+      onClose={onClose}
+      title="Anular compra"
+      description="Registra movimientos de reversa y anula el gasto asociado."
+    >
+      <div className="space-y-4">
+        <div className="rounded-2xl border border-[var(--line)] bg-[#f7f5ef] px-4 py-3 text-sm text-[var(--muted)]">
+          La anulacion descontara los insumos comprados. Si ya fueron consumidos y el stock quedaria
+          negativo, la base rechazara la operacion.
+        </div>
+        <label className="space-y-2 text-sm font-semibold">
+          Motivo
+          <textarea
+            value={reason}
+            onChange={(event) => setReason(event.target.value)}
+            className="w-full rounded-2xl border border-[var(--line)] bg-white/90 px-4 py-3 text-sm font-normal"
+            rows={4}
+            placeholder="Error de carga, devolucion al proveedor o factura anulada."
+          />
+        </label>
+        {feedback ? <ActionNotice tone="error" message={feedback} /> : null}
+        <div className="flex justify-end gap-2">
+          <Button type="button" variant="ghost" onClick={onClose}>
+            Cancelar
+          </Button>
+          <Button
+            type="button"
+            variant="danger"
+            busy={pending}
+            onClick={() => {
+              setFeedback(null);
+              startTransition(async () => {
+                const result = await reverseSupplyPurchaseAction({ id: purchase.id, reason });
+                if (result.success && result.data) {
+                  onPurchaseReversed(result.data);
+                  onClose();
+                  return;
+                }
+
+                setFeedback(result.error ?? result.message);
+              });
+            }}
+          >
+            <RotateCcw className="h-4 w-4" />
+            Anular compra
+          </Button>
+        </div>
+      </div>
+    </Modal>
+  );
+}
+
 export function SuppliesShell({
   supplies,
   suppliers,
@@ -238,6 +307,7 @@ export function SuppliesShell({
   const [movementRecords, setMovementRecords] = useState(() => sortMovements(movements));
   const [selectedSupplyId, setSelectedSupplyId] = useState<string | null>(null);
   const [adjustmentSupplyId, setAdjustmentSupplyId] = useState<string | null>(null);
+  const [reversePurchaseId, setReversePurchaseId] = useState<string | null>(null);
   const deferredSearch = useDeferredValue(search);
   const hasSearchQuery = deferredSearch.trim().length > 0;
   const purchaseHistoryLimit = Math.max(purchases.length, 8);
@@ -247,6 +317,9 @@ export function SuppliesShell({
     : null;
   const adjustmentSupply = adjustmentSupplyId
     ? supplyRecords.find((supply) => supply.id === adjustmentSupplyId) ?? null
+    : null;
+  const reversePurchase = reversePurchaseId
+    ? purchaseRecords.find((purchase) => purchase.id === reversePurchaseId) ?? null
     : null;
 
   useEffect(() => {
@@ -425,7 +498,10 @@ export function SuppliesShell({
       )}
 
       <div className="grid gap-4 xl:grid-cols-[1fr_1.2fr]">
-        <PurchaseHistoryPanel purchases={purchaseRecords} />
+        <PurchaseHistoryPanel
+          purchases={purchaseRecords}
+          onReversePurchase={(purchase) => setReversePurchaseId(purchase.id)}
+        />
         <StockHistoryPanel
           title="Historial de stock de insumos"
           description="Entradas por compra, salidas por produccion y ajustes manuales."
@@ -452,6 +528,21 @@ export function SuppliesShell({
             }
             setMovementRecords((current) =>
               mergeMovements(current, [result.movement], movementHistoryLimit),
+            );
+          }}
+        />
+      ) : null}
+      {reversePurchase ? (
+        <ReversePurchaseModal
+          purchase={reversePurchase}
+          onClose={() => setReversePurchaseId(null)}
+          onPurchaseReversed={(result) => {
+            setPurchaseRecords((current) =>
+              mergePurchases(current, [result.purchase], purchaseHistoryLimit),
+            );
+            setSupplyRecords((current) => mergeSupplies(current, result.supplies));
+            setMovementRecords((current) =>
+              mergeMovements(current, result.movements, movementHistoryLimit),
             );
           }}
         />

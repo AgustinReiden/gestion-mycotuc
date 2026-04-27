@@ -23,6 +23,7 @@ import {
   productFormSchema,
   productionBatchFormSchema,
   purchaseFormSchema,
+  reversalSchema,
   saleOrderFormSchema,
   stockAdjustmentSchema,
   supplyFormSchema,
@@ -41,6 +42,18 @@ type RegisterPurchaseResult = {
   supplies: SupplyRecord[];
   movements: InventoryMovementRecord[];
 };
+type ReversePurchaseResult = RegisterPurchaseResult;
+type ReverseSaleOrderResult = {
+  sale: SaleOrderRecord;
+  movements: InventoryMovementRecord[];
+  products: ProductRecord[];
+};
+type ReverseProductionBatchResult = {
+  batch: ProductionBatchRecord;
+  movements: InventoryMovementRecord[];
+  products: ProductRecord[];
+  supplies: SupplyRecord[];
+};
 type StockAdjustmentResult = {
   movement: InventoryMovementRecord;
   product: ProductRecord | null;
@@ -48,12 +61,13 @@ type StockAdjustmentResult = {
 };
 
 const SALE_ORDER_SELECT =
-  "id, sale_date, total_amount, payment_status, payment_method, paid_at, notes, created_at, contacts(name), sales_channels(name), sales_order_items(id, product_id, quantity, unit_price, line_total, products(name))";
+  "id, sale_date, total_amount, payment_status, payment_method, paid_at, notes, voided_at, void_reason, created_at, contacts(name), sales_channels(name), sales_order_items(id, product_id, quantity, unit_price, line_total, products(name))";
 const EXPENSE_SELECT =
-  "id, expense_date, concept, amount, source, notes, linked_purchase_id, created_at, expense_categories(name), purchases(contacts(name))";
-const PURCHASE_SELECT = "id, purchase_date, total_amount, notes, created_at, contacts(name)";
+  "id, expense_date, concept, amount, source, notes, linked_purchase_id, voided_at, void_reason, created_at, expense_categories(name), purchases(contacts(name))";
+const PURCHASE_SELECT =
+  "id, purchase_date, total_amount, notes, voided_at, void_reason, created_at, contacts(name)";
 const PRODUCTION_BATCH_SELECT =
-  "id, product_id, status, started_at, completed_at, expected_qty, actual_qty, notes, inventory_posted_at, created_at, products(name), production_batch_inputs(id, supply_id, quantity, supplies(name)), production_batch_outputs(id, product_id, quantity, products(name))";
+  "id, product_id, status, started_at, completed_at, expected_qty, actual_qty, notes, inventory_posted_at, voided_at, void_reason, created_at, products(name), production_batch_inputs(id, supply_id, quantity, supplies(name)), production_batch_outputs(id, product_id, quantity, products(name))";
 
 async function getAuthenticatedClient() {
   const supabase = await createSupabaseServerClient();
@@ -82,6 +96,11 @@ function asRecord(value: unknown): RawRecord {
 
 function asArray(value: unknown): RawRecord[] {
   return Array.isArray(value) ? value.map(asRecord) : [];
+}
+
+function getReturnedId(value: unknown) {
+  const record = asRecord(value);
+  return record.id ? String(record.id) : null;
 }
 
 function toNumber(value: unknown) {
@@ -165,6 +184,9 @@ function mapSale(record: RawRecord): SaleOrderRecord {
     paymentMethod: (record.payment_method as string | null | undefined) ?? null,
     paidAt: (record.paid_at as string | null | undefined) ?? null,
     notes: (record.notes as string | null | undefined) ?? null,
+    isVoided: Boolean(record.voided_at),
+    voidedAt: (record.voided_at as string | null | undefined) ?? null,
+    voidReason: (record.void_reason as string | null | undefined) ?? null,
     totalUnits: items.reduce((sum, item) => sum + item.quantity, 0),
     createdAt: String(record.created_at ?? ""),
     items,
@@ -186,6 +208,9 @@ function mapExpense(record: RawRecord): ExpenseRecord {
     notes: (record.notes as string | null | undefined) ?? null,
     supplierName: (supplier.name as string | null | undefined) ?? null,
     linkedPurchaseId: (record.linked_purchase_id as string | null | undefined) ?? null,
+    isVoided: Boolean(record.voided_at),
+    voidedAt: (record.voided_at as string | null | undefined) ?? null,
+    voidReason: (record.void_reason as string | null | undefined) ?? null,
     createdAt: String(record.created_at ?? ""),
   };
 }
@@ -199,6 +224,9 @@ function mapPurchase(record: RawRecord): PurchaseRecord {
     supplierName: (contact.name as string | null | undefined) ?? null,
     totalAmount: toNumber(record.total_amount),
     notes: (record.notes as string | null | undefined) ?? null,
+    isVoided: Boolean(record.voided_at),
+    voidedAt: (record.voided_at as string | null | undefined) ?? null,
+    voidReason: (record.void_reason as string | null | undefined) ?? null,
     createdAt: String(record.created_at ?? ""),
   };
 }
@@ -236,6 +264,9 @@ function mapBatch(record: RawRecord): ProductionBatchRecord {
     actualQty: record.actual_qty === null ? null : toNumber(record.actual_qty),
     notes: (record.notes as string | null | undefined) ?? null,
     inventoryPostedAt: (record.inventory_posted_at as string | null | undefined) ?? null,
+    isVoided: Boolean(record.voided_at),
+    voidedAt: (record.voided_at as string | null | undefined) ?? null,
+    voidReason: (record.void_reason as string | null | undefined) ?? null,
     createdAt: String(record.created_at ?? ""),
     inputs: asArray(record.production_batch_inputs).map((input) => {
       const supply = asRecord(input.supplies);
@@ -329,6 +360,25 @@ async function getSupplyRecords(supabase: SupabaseServerClient, supplyIds: strin
   }
 
   return (data ?? []).map((record) => mapSupply(asRecord(record)));
+}
+
+async function getProductRecords(supabase: SupabaseServerClient, productIds: string[]) {
+  const uniqueProductIds = Array.from(new Set(productIds.filter(Boolean)));
+
+  if (uniqueProductIds.length === 0) {
+    return [];
+  }
+
+  const { data, error } = await supabase
+    .from("product_inventory_overview")
+    .select("*")
+    .in("id", uniqueProductIds);
+
+  if (error) {
+    throw error;
+  }
+
+  return (data ?? []).map((record) => mapProduct(asRecord(record)));
 }
 
 async function getSaleOrderRecord(supabase: SupabaseServerClient, saleOrderId: string) {
@@ -434,16 +484,17 @@ async function updateContactRecord(
     return contact;
   }
 
-  const { data, error } = await supabase
-    .from("contacts")
-    .update({
+  const { data, error } = await supabase.rpc("upsert_contact", {
+    payload: {
+      id: contact.id,
+      type: contact.type,
       name: nextValues.name,
       phone: nextValues.phone,
       email: nextValues.email,
-    })
-    .eq("id", contact.id)
-    .select("*")
-    .single();
+      notes: contact.notes,
+      isActive: contact.isActive,
+    },
+  });
 
   if (error) {
     throw error;
@@ -471,15 +522,13 @@ async function ensureAnonymousCustomer(supabase: SupabaseServerClient) {
     return mapContact(asRecord(data));
   }
 
-  const { data: created, error: createError } = await supabase
-    .from("contacts")
-    .insert({
+  const { data: created, error: createError } = await supabase.rpc("upsert_contact", {
+    payload: {
       type: "client",
       name: ANONYMOUS_CUSTOMER_NAME,
-      is_active: true,
-    })
-    .select("*")
-    .single();
+      isActive: true,
+    },
+  });
 
   if (createError) {
     throw createError;
@@ -499,7 +548,7 @@ async function resolveSaleContact(
   if (input.customerMode === "existing" && input.contactId) {
     const existingContact = await getContactRecord(supabase, input.contactId);
 
-    if (!existingContact || existingContact.type !== "client") {
+    if (!existingContact || existingContact.type !== "client" || !existingContact.isActive) {
       throw new Error("No encontramos el cliente seleccionado.");
     }
 
@@ -538,17 +587,15 @@ async function resolveSaleContact(
     });
   }
 
-  const { data: created, error: createError } = await supabase
-    .from("contacts")
-    .insert({
+  const { data: created, error: createError } = await supabase.rpc("upsert_contact", {
+    payload: {
       type: "client",
       name: customerName,
       phone: input.customerPhone,
       email: input.customerEmail,
-      is_active: true,
-    })
-    .select("*")
-    .single();
+      isActive: true,
+    },
+  });
 
   if (createError) {
     throw createError;
@@ -580,35 +627,21 @@ export async function saveContactAction(input: unknown): Promise<ActionResponse<
     const { supabase } = await getAuthenticatedClient();
     const { id, ...data } = parsed.data;
 
-    const payload = {
-      type: data.type,
-      name: data.name,
-      phone: data.phone,
-      email: data.email,
-      notes: data.notes,
-      is_active: data.isActive,
-    };
+    const { data: savedContact, error } = await supabase.rpc("upsert_contact", {
+      payload: {
+        id,
+        type: data.type,
+        name: data.name,
+        phone: data.phone,
+        email: data.email,
+        notes: data.notes,
+        isActive: data.isActive,
+      },
+    });
 
-    let contactId = id ?? null;
+    if (error) throw error;
 
-    if (id) {
-      const { data: updatedContact, error } = await supabase
-        .from("contacts")
-        .update(payload)
-        .eq("id", id)
-        .select("id")
-        .single();
-      if (error) throw error;
-      contactId = String(updatedContact.id);
-    } else {
-      const { data: createdContact, error } = await supabase
-        .from("contacts")
-        .insert(payload)
-        .select("id")
-        .single();
-      if (error) throw error;
-      contactId = String(createdContact.id);
-    }
+    const contactId = getReturnedId(savedContact);
 
     if (!contactId) {
       throw new Error("No pudimos recuperar el contacto guardado.");
@@ -641,36 +674,22 @@ export async function saveProductAction(input: unknown): Promise<ActionResponse<
     const { supabase } = await getAuthenticatedClient();
     const { id, ...data } = parsed.data;
 
-    const payload = {
-      name: data.name,
-      category: data.category,
-      unit: data.unit,
-      sale_price: data.salePrice,
-      min_stock: data.minStock,
-      notes: data.notes,
-      is_active: data.isActive,
-    };
+    const { data: savedProduct, error } = await supabase.rpc("upsert_product", {
+      payload: {
+        id,
+        name: data.name,
+        category: data.category,
+        unit: data.unit,
+        salePrice: data.salePrice,
+        minStock: data.minStock,
+        notes: data.notes,
+        isActive: data.isActive,
+      },
+    });
 
-    let productId = id ?? null;
+    if (error) throw error;
 
-    if (id) {
-      const { data: updatedProduct, error } = await supabase
-        .from("products")
-        .update(payload)
-        .eq("id", id)
-        .select("id")
-        .single();
-      if (error) throw error;
-      productId = String(updatedProduct.id);
-    } else {
-      const { data: createdProduct, error } = await supabase
-        .from("products")
-        .insert(payload)
-        .select("id")
-        .single();
-      if (error) throw error;
-      productId = String(createdProduct.id);
-    }
+    const productId = getReturnedId(savedProduct);
 
     if (!productId) {
       throw new Error("No pudimos recuperar el producto guardado.");
@@ -704,34 +723,20 @@ export async function saveSupplyAction(input: unknown): Promise<ActionResponse<S
     const { supabase } = await getAuthenticatedClient();
     const { id, ...data } = parsed.data;
 
-    const payload = {
-      name: data.name,
-      unit: data.unit,
-      min_stock: data.minStock,
-      notes: data.notes,
-      is_active: data.isActive,
-    };
+    const { data: savedSupply, error } = await supabase.rpc("upsert_supply", {
+      payload: {
+        id,
+        name: data.name,
+        unit: data.unit,
+        minStock: data.minStock,
+        notes: data.notes,
+        isActive: data.isActive,
+      },
+    });
 
-    let supplyId = id ?? null;
+    if (error) throw error;
 
-    if (id) {
-      const { data: updatedSupply, error } = await supabase
-        .from("supplies")
-        .update(payload)
-        .eq("id", id)
-        .select("id")
-        .single();
-      if (error) throw error;
-      supplyId = String(updatedSupply.id);
-    } else {
-      const { data: createdSupply, error } = await supabase
-        .from("supplies")
-        .insert(payload)
-        .select("id")
-        .single();
-      if (error) throw error;
-      supplyId = String(createdSupply.id);
-    }
+    const supplyId = getReturnedId(savedSupply);
 
     if (!supplyId) {
       throw new Error("No pudimos recuperar el insumo guardado.");
@@ -761,24 +766,26 @@ export async function createExpenseAction(input: unknown): Promise<ActionRespons
   }
 
   try {
-    const { supabase, user } = await getAuthenticatedClient();
-    const { data, error } = await supabase
-      .from("expenses")
-      .insert({
+    const { supabase } = await getAuthenticatedClient();
+    const { data, error } = await supabase.rpc("create_manual_expense", {
+      payload: {
         concept: parsed.data.concept,
-        expense_date: parsed.data.expenseDate,
-        category_id: parsed.data.categoryId,
+        expenseDate: parsed.data.expenseDate,
+        categoryId: parsed.data.categoryId,
         amount: parsed.data.amount,
         notes: parsed.data.notes,
-        source: "manual",
-        created_by: user.id,
-      })
-      .select("id")
-      .single();
+      },
+    });
 
     if (error) throw error;
 
-    const expense = await getExpenseRecord(supabase, String(data.id));
+    const expenseId = getReturnedId(data);
+
+    if (!expenseId) {
+      throw new Error("No pudimos recuperar el gasto registrado.");
+    }
+
+    const expense = await getExpenseRecord(supabase, expenseId);
 
     if (!expense) {
       throw new Error("No pudimos recuperar el gasto actualizado.");
@@ -821,7 +828,8 @@ export async function createSaleOrderAction(
 
     if (error) throw error;
 
-    const sale = data?.id ? await getSaleOrderRecord(supabase, String(data.id)) : null;
+    const saleId = getReturnedId(data);
+    const sale = saleId ? await getSaleOrderRecord(supabase, saleId) : null;
 
     if (!sale) {
       throw new Error("La venta se guardo, pero no pudimos recuperar el detalle actualizado.");
@@ -855,18 +863,20 @@ export async function updateSalePaymentStatusAction(
 
   try {
     const { supabase } = await getAuthenticatedClient();
-    const { error } = await supabase
-      .from("sales_orders")
-      .update({
+    const { data, error } = await supabase.rpc("update_sale_payment_status", {
+      payload: {
+        saleOrderId: parsed.data.saleOrderId,
         payment_status: parsed.data.paymentStatus,
-        payment_method: parsed.data.paymentMethod,
-        paid_at: parsed.data.paidAt,
-      })
-      .eq("id", parsed.data.saleOrderId);
+        paymentStatus: parsed.data.paymentStatus,
+        paymentMethod: parsed.data.paymentMethod,
+        paidAt: parsed.data.paidAt,
+      },
+    });
 
     if (error) throw error;
 
-    const sale = await getSaleOrderRecord(supabase, parsed.data.saleOrderId);
+    const saleId = getReturnedId(data) ?? parsed.data.saleOrderId;
+    const sale = await getSaleOrderRecord(supabase, saleId);
 
     if (!sale) {
       throw new Error("No pudimos recuperar la venta actualizada.");
@@ -875,6 +885,7 @@ export async function updateSalePaymentStatusAction(
     refreshTags(CACHE_TAGS.sales);
     revalidatePath("/ventas");
     revalidatePath("/dashboard");
+    revalidatePath("/reportes");
     return success("Estado de cobro actualizado.", sale);
   } catch (error) {
     return failure("No pudimos actualizar el cobro.", error);
@@ -903,7 +914,7 @@ export async function registerSupplyPurchaseAction(
 
     if (error) throw error;
 
-    const purchaseId = data?.id ? String(data.id) : null;
+    const purchaseId = getReturnedId(data);
 
     if (!purchaseId) {
       throw new Error("No pudimos recuperar la compra registrada.");
@@ -972,7 +983,7 @@ export async function saveProductionBatchAction(
 
     if (error) throw error;
 
-    const batchId = data?.id ? String(data.id) : parsed.data.id ?? null;
+    const batchId = getReturnedId(data) ?? parsed.data.id ?? null;
 
     if (!batchId) {
       throw new Error("No pudimos recuperar el lote guardado.");
@@ -1025,7 +1036,7 @@ export async function applyStockAdjustmentAction(
 
     if (error) throw error;
 
-    const movementId = data?.id ? String(data.id) : null;
+    const movementId = getReturnedId(data);
 
     if (!movementId) {
       throw new Error("No pudimos recuperar el movimiento de ajuste.");
@@ -1062,5 +1073,170 @@ export async function applyStockAdjustmentAction(
     });
   } catch (error) {
     return failure("No pudimos ajustar el stock.", error);
+  }
+}
+
+export async function reverseSaleOrderAction(
+  input: unknown,
+): Promise<ActionResponse<ReverseSaleOrderResult>> {
+  const parsed = reversalSchema.safeParse(input);
+
+  if (!parsed.success) {
+    return failure("No pudimos anular la venta.", parsed.error);
+  }
+
+  try {
+    const { supabase } = await getAuthenticatedClient();
+    const { data, error } = await supabase.rpc("reverse_sale_order", {
+      payload: {
+        saleOrderId: parsed.data.id,
+        reason: parsed.data.reason,
+      },
+    });
+
+    if (error) throw error;
+
+    const saleId = getReturnedId(data) ?? parsed.data.id;
+    const sale = await getSaleOrderRecord(supabase, saleId);
+
+    if (!sale) {
+      throw new Error("No pudimos recuperar la venta anulada.");
+    }
+
+    const [movements, products] = await Promise.all([
+      getMovementRecordsByReference(supabase, "sale_order_reversal", saleId),
+      getProductRecords(
+        supabase,
+        sale.items.map((item) => item.productId),
+      ),
+    ]);
+
+    refreshTags(CACHE_TAGS.sales, CACHE_TAGS.products, CACHE_TAGS.inventoryProduct);
+    revalidatePath("/ventas");
+    revalidatePath("/productos");
+    revalidatePath("/dashboard");
+    revalidatePath("/reportes");
+    return success("Venta anulada.", { sale, movements, products });
+  } catch (error) {
+    return failure("No pudimos anular la venta.", error);
+  }
+}
+
+export async function reverseSupplyPurchaseAction(
+  input: unknown,
+): Promise<ActionResponse<ReversePurchaseResult>> {
+  const parsed = reversalSchema.safeParse(input);
+
+  if (!parsed.success) {
+    return failure("No pudimos anular la compra.", parsed.error);
+  }
+
+  try {
+    const { supabase } = await getAuthenticatedClient();
+    const { data, error } = await supabase.rpc("reverse_supply_purchase", {
+      payload: {
+        purchaseId: parsed.data.id,
+        reason: parsed.data.reason,
+      },
+    });
+
+    if (error) throw error;
+
+    const purchaseId = getReturnedId(data) ?? parsed.data.id;
+    const [purchase, expense, movements] = await Promise.all([
+      getPurchaseRecord(supabase, purchaseId),
+      getExpenseRecordByPurchaseId(supabase, purchaseId),
+      getMovementRecordsByReference(supabase, "purchase_reversal", purchaseId),
+    ]);
+
+    if (!purchase) {
+      throw new Error("No pudimos recuperar la compra anulada.");
+    }
+
+    const supplies = await getSupplyRecords(
+      supabase,
+      movements.map((movement) => movement.entityId),
+    );
+
+    refreshTags(
+      CACHE_TAGS.supplies,
+      CACHE_TAGS.purchases,
+      CACHE_TAGS.inventorySupply,
+      CACHE_TAGS.expenses,
+    );
+    revalidatePath("/insumos");
+    revalidatePath("/gastos");
+    revalidatePath("/dashboard");
+    revalidatePath("/reportes");
+    return success("Compra anulada.", {
+      purchase,
+      expense,
+      supplies,
+      movements,
+    });
+  } catch (error) {
+    return failure("No pudimos anular la compra.", error);
+  }
+}
+
+export async function reverseProductionBatchAction(
+  input: unknown,
+): Promise<ActionResponse<ReverseProductionBatchResult>> {
+  const parsed = reversalSchema.safeParse(input);
+
+  if (!parsed.success) {
+    return failure("No pudimos anular el lote.", parsed.error);
+  }
+
+  try {
+    const { supabase } = await getAuthenticatedClient();
+    const { data, error } = await supabase.rpc("reverse_production_batch", {
+      payload: {
+        batchId: parsed.data.id,
+        reason: parsed.data.reason,
+      },
+    });
+
+    if (error) throw error;
+
+    const batchId = getReturnedId(data) ?? parsed.data.id;
+    const batch = await getProductionBatchRecord(supabase, batchId);
+
+    if (!batch) {
+      throw new Error("No pudimos recuperar el lote anulado.");
+    }
+
+    const [movements, products, supplies] = await Promise.all([
+      getMovementRecordsByReference(supabase, "production_batch_reversal", batchId),
+      getProductRecords(
+        supabase,
+        batch.outputs.map((output) => output.productId),
+      ),
+      getSupplyRecords(
+        supabase,
+        batch.inputs.map((input) => input.supplyId),
+      ),
+    ]);
+
+    refreshTags(
+      CACHE_TAGS.production,
+      CACHE_TAGS.products,
+      CACHE_TAGS.supplies,
+      CACHE_TAGS.inventoryProduct,
+      CACHE_TAGS.inventorySupply,
+    );
+    revalidatePath("/produccion");
+    revalidatePath("/dashboard");
+    revalidatePath("/insumos");
+    revalidatePath("/productos");
+    revalidatePath("/reportes");
+    return success("Lote anulado.", {
+      batch,
+      movements,
+      products,
+      supplies,
+    });
+  } catch (error) {
+    return failure("No pudimos anular el lote.", error);
   }
 }

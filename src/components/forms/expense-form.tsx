@@ -93,7 +93,7 @@ export function ExpenseForm({ categories, onSuccess }: ExpenseFormProps) {
 
       <div className="grid gap-4 md:grid-cols-3">
         <Field label="Monto" error={form.formState.errors.amount?.message}>
-          <TextInput {...form.register("amount", { valueAsNumber: true })} type="number" min="0" step="0.01" />
+          <TextInput {...form.register("amount", { valueAsNumber: true })} type="number" min="0.01" step="0.01" />
         </Field>
         <Field label="Categoria" error={form.formState.errors.categoryId?.message}>
           <SelectInput {...form.register("categoryId")} disabled={!hasCategories}>

@@ -183,7 +183,7 @@ export function PurchaseForm({ suppliers, supplies, onSuccess }: PurchaseFormPro
                   <TextInput
                     {...form.register(`items.${index}.unitCost`, { valueAsNumber: true })}
                     type="number"
-                    min="0"
+                    min="0.01"
                     step="0.01"
                   />
                 </Field>
