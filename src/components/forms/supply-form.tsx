@@ -8,7 +8,7 @@ import { saveSupplyAction } from "@/actions/core";
 import { ActionNotice } from "@/components/forms/action-notice";
 import { Button } from "@/components/ui/button";
 import { Field, TextInput, TextareaInput } from "@/components/ui/fields";
-import { toInputValue, toNumberValue } from "@/components/forms/value-helpers";
+import { getFirstFormError, toInputValue, toNumberValue } from "@/components/forms/value-helpers";
 import type { SupplyRecord } from "@/lib/domain";
 import { supplyFormSchema } from "@/lib/validators";
 
@@ -48,25 +48,30 @@ export function SupplyForm({ supply, onSuccess }: SupplyFormProps) {
   return (
     <form
       className="space-y-4"
-      onSubmit={form.handleSubmit((values) => {
-        setFeedback(null);
-        startTransition(async () => {
-          const result = await saveSupplyAction(values);
-          if (result.success && result.data) {
-            onSuccess(result.data);
-            form.reset({
-              name: "",
-              unit: "kg",
-              minStock: 0,
-              notes: "",
-              isActive: true,
-            });
-            return;
-          }
+      onSubmit={form.handleSubmit(
+        (values) => {
+          setFeedback(null);
+          startTransition(async () => {
+            const result = await saveSupplyAction(values);
+            if (result.success && result.data) {
+              onSuccess(result.data);
+              form.reset({
+                name: "",
+                unit: "kg",
+                minStock: 0,
+                notes: "",
+                isActive: true,
+              });
+              return;
+            }
 
-          setFeedback({ tone: "error", message: result.error ?? result.message });
-        });
-      })}
+            setFeedback({ tone: "error", message: result.error ?? result.message });
+          });
+        },
+        (errors) => {
+          setFeedback({ tone: "error", message: getFirstFormError(errors) });
+        },
+      )}
     >
       <div className="grid gap-4 md:grid-cols-2">
         <Field label="Nombre" error={form.formState.errors.name?.message}>

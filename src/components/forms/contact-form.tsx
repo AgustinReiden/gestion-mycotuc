@@ -10,7 +10,7 @@ import { contactFormSchema } from "@/lib/validators";
 import { ActionNotice } from "@/components/forms/action-notice";
 import { Button } from "@/components/ui/button";
 import { Field, SelectInput, TextInput, TextareaInput } from "@/components/ui/fields";
-import { toInputValue } from "@/components/forms/value-helpers";
+import { getFirstFormError, toInputValue } from "@/components/forms/value-helpers";
 import type { z } from "zod";
 
 type ContactFormValues = z.input<typeof contactFormSchema>;
@@ -52,27 +52,32 @@ export function ContactForm({ contact, onSuccess }: ContactFormProps) {
   return (
     <form
       className="space-y-4"
-      onSubmit={form.handleSubmit((values) => {
-        setFeedback(null);
-        startTransition(async () => {
-          const result = await saveContactAction(values);
-          if (result.success && result.data) {
-            setFeedback({ tone: "success", message: result.message });
-            onSuccess(result.data);
-            form.reset({
-              type: "client",
-              name: "",
-              phone: "",
-              email: "",
-              notes: "",
-              isActive: true,
-            });
-            return;
-          }
+      onSubmit={form.handleSubmit(
+        (values) => {
+          setFeedback(null);
+          startTransition(async () => {
+            const result = await saveContactAction(values);
+            if (result.success && result.data) {
+              setFeedback({ tone: "success", message: result.message });
+              onSuccess(result.data);
+              form.reset({
+                type: "client",
+                name: "",
+                phone: "",
+                email: "",
+                notes: "",
+                isActive: true,
+              });
+              return;
+            }
 
-          setFeedback({ tone: "error", message: result.error ?? result.message });
-        });
-      })}
+            setFeedback({ tone: "error", message: result.error ?? result.message });
+          });
+        },
+        (errors) => {
+          setFeedback({ tone: "error", message: getFirstFormError(errors) });
+        },
+      )}
     >
       <div className="grid gap-4 md:grid-cols-2">
         <Field label="Tipo" error={form.formState.errors.type?.message}>

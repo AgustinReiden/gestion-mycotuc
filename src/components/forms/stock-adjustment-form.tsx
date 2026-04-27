@@ -8,7 +8,7 @@ import { applyStockAdjustmentAction } from "@/actions/core";
 import { ActionNotice } from "@/components/forms/action-notice";
 import { Button } from "@/components/ui/button";
 import { Field, TextInput, TextareaInput } from "@/components/ui/fields";
-import { toInputValue, toNumberValue } from "@/components/forms/value-helpers";
+import { getFirstFormError, toInputValue, toNumberValue } from "@/components/forms/value-helpers";
 import type { EntityType, InventoryMovementRecord, ProductRecord, SupplyRecord } from "@/lib/domain";
 import { stockAdjustmentSchema } from "@/lib/validators";
 
@@ -57,25 +57,30 @@ export function StockAdjustmentForm({
   return (
     <form
       className="space-y-4"
-      onSubmit={form.handleSubmit((values) => {
-        setFeedback(null);
-        startTransition(async () => {
-          const result = await applyStockAdjustmentAction(values);
-          if (result.success && result.data) {
-            onSuccess(result.data);
-            form.reset({
-              entityType,
-              entityId,
-              quantity: 0,
-              notes: "",
-              movementDate: new Date().toISOString().slice(0, 10),
-            });
-            return;
-          }
+      onSubmit={form.handleSubmit(
+        (values) => {
+          setFeedback(null);
+          startTransition(async () => {
+            const result = await applyStockAdjustmentAction(values);
+            if (result.success && result.data) {
+              onSuccess(result.data);
+              form.reset({
+                entityType,
+                entityId,
+                quantity: 0,
+                notes: "",
+                movementDate: new Date().toISOString().slice(0, 10),
+              });
+              return;
+            }
 
-          setFeedback({ tone: "error", message: result.error ?? result.message });
-        });
-      })}
+            setFeedback({ tone: "error", message: result.error ?? result.message });
+          });
+        },
+        (errors) => {
+          setFeedback({ tone: "error", message: getFirstFormError(errors) });
+        },
+      )}
     >
       <div className="rounded-2xl border border-[var(--line)] bg-[#f7f5ef] px-4 py-3 text-sm text-[var(--muted)]">
         Ajuste manual para <span className="font-semibold text-[var(--foreground)]">{entityLabel}</span>. Usa

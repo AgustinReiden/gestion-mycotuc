@@ -11,7 +11,7 @@ import { paymentStatusUpdateSchema } from "@/lib/validators";
 import { ActionNotice } from "@/components/forms/action-notice";
 import { Button } from "@/components/ui/button";
 import { Field, SelectInput, TextInput } from "@/components/ui/fields";
-import { toInputValue } from "@/components/forms/value-helpers";
+import { getFirstFormError, toInputValue } from "@/components/forms/value-helpers";
 
 type PaymentStatusValues = z.input<typeof paymentStatusUpdateSchema>;
 
@@ -65,19 +65,24 @@ export function PaymentStatusForm({
   return (
     <form
       className="space-y-4"
-      onSubmit={form.handleSubmit((values) => {
-        setFeedback(null);
-        startTransition(async () => {
-          const result = await updateSalePaymentStatusAction(values);
-          if (result.success && result.data) {
-            setFeedback({ tone: "success", message: result.message });
-            onSuccess(result.data);
-            return;
-          }
+      onSubmit={form.handleSubmit(
+        (values) => {
+          setFeedback(null);
+          startTransition(async () => {
+            const result = await updateSalePaymentStatusAction(values);
+            if (result.success && result.data) {
+              setFeedback({ tone: "success", message: result.message });
+              onSuccess(result.data);
+              return;
+            }
 
-          setFeedback({ tone: "error", message: result.error ?? result.message });
-        });
-      })}
+            setFeedback({ tone: "error", message: result.error ?? result.message });
+          });
+        },
+        (errors) => {
+          setFeedback({ tone: "error", message: getFirstFormError(errors) });
+        },
+      )}
     >
       <Field label="Estado">
         <Controller

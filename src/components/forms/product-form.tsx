@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Field, TextInput, TextareaInput } from "@/components/ui/fields";
 import type { ProductRecord } from "@/lib/domain";
 import { productFormSchema } from "@/lib/validators";
-import { toInputValue, toNumberValue } from "@/components/forms/value-helpers";
+import { getFirstFormError, toInputValue, toNumberValue } from "@/components/forms/value-helpers";
 
 type ProductFormValues = z.input<typeof productFormSchema>;
 
@@ -52,28 +52,33 @@ export function ProductForm({ product, onSuccess }: ProductFormProps) {
   return (
     <form
       className="space-y-4"
-      onSubmit={form.handleSubmit((values) => {
-        setFeedback(null);
-        startTransition(async () => {
-          const result = await saveProductAction(values);
-          if (result.success && result.data) {
-            setFeedback({ tone: "success", message: result.message });
-            onSuccess(result.data);
-            form.reset({
-              name: "",
-              category: "",
-              unit: "frasco",
-              salePrice: 0,
-              minStock: 0,
-              notes: "",
-              isActive: true,
-            });
-            return;
-          }
+      onSubmit={form.handleSubmit(
+        (values) => {
+          setFeedback(null);
+          startTransition(async () => {
+            const result = await saveProductAction(values);
+            if (result.success && result.data) {
+              setFeedback({ tone: "success", message: result.message });
+              onSuccess(result.data);
+              form.reset({
+                name: "",
+                category: "",
+                unit: "frasco",
+                salePrice: 0,
+                minStock: 0,
+                notes: "",
+                isActive: true,
+              });
+              return;
+            }
 
-          setFeedback({ tone: "error", message: result.error ?? result.message });
-        });
-      })}
+            setFeedback({ tone: "error", message: result.error ?? result.message });
+          });
+        },
+        (errors) => {
+          setFeedback({ tone: "error", message: getFirstFormError(errors) });
+        },
+      )}
     >
       <div className="grid gap-4 md:grid-cols-2">
         <Field label="Nombre" error={form.formState.errors.name?.message}>

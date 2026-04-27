@@ -18,7 +18,7 @@ import { saleOrderFormSchema } from "@/lib/validators";
 import { ActionNotice } from "@/components/forms/action-notice";
 import { Button } from "@/components/ui/button";
 import { Field, SelectInput, TextInput, TextareaInput } from "@/components/ui/fields";
-import { toInputValue, toNumberValue } from "@/components/forms/value-helpers";
+import { getFirstFormError, toInputValue, toNumberValue } from "@/components/forms/value-helpers";
 import { formatCurrency } from "@/lib/utils";
 
 type SaleOrderValues = z.input<typeof saleOrderFormSchema>;
@@ -204,27 +204,32 @@ export function SaleOrderForm({ contacts, products, channels, onSuccess }: SaleO
   return (
     <form
       className="space-y-5"
-      onSubmit={form.handleSubmit((values) => {
-        if (!canSubmitSale) {
-          setFeedback({
-            tone: "error",
-            message: `No podemos guardar la venta todavia: falta ${missingDependencies.join(" y ")}.`,
-          });
-          return;
-        }
-
-        setFeedback(null);
-        startTransition(async () => {
-          const result = await createSaleOrderAction(values);
-          if (result.success && result.data) {
-            onSuccess(result.data);
-            resetForm();
+      onSubmit={form.handleSubmit(
+        (values) => {
+          if (!canSubmitSale) {
+            setFeedback({
+              tone: "error",
+              message: `No podemos guardar la venta todavia: falta ${missingDependencies.join(" y ")}.`,
+            });
             return;
           }
 
-          setFeedback({ tone: "error", message: result.error ?? result.message });
-        });
-      })}
+          setFeedback(null);
+          startTransition(async () => {
+            const result = await createSaleOrderAction(values);
+            if (result.success && result.data) {
+              onSuccess(result.data);
+              resetForm();
+              return;
+            }
+
+            setFeedback({ tone: "error", message: result.error ?? result.message });
+          });
+        },
+        (errors) => {
+          setFeedback({ tone: "error", message: getFirstFormError(errors) });
+        },
+      )}
     >
       {!canSubmitSale ? (
         <ActionNotice

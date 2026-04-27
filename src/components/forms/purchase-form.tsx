@@ -9,7 +9,7 @@ import { registerSupplyPurchaseAction } from "@/actions/core";
 import { ActionNotice } from "@/components/forms/action-notice";
 import { Button } from "@/components/ui/button";
 import { Field, SelectInput, TextInput, TextareaInput } from "@/components/ui/fields";
-import { toInputValue, toNumberValue } from "@/components/forms/value-helpers";
+import { getFirstFormError, toInputValue, toNumberValue } from "@/components/forms/value-helpers";
 import type {
   ContactRecord,
   ExpenseRecord,
@@ -84,32 +84,37 @@ export function PurchaseForm({ suppliers, supplies, onSuccess }: PurchaseFormPro
   return (
     <form
       className="space-y-5"
-      onSubmit={form.handleSubmit((values) => {
-        if (!canSubmitPurchase) {
-          setFeedback({
-            tone: "error",
-            message: `No podemos registrar la compra todavia: falta ${missingDependencies.join(" y ")}.`,
-          });
-          return;
-        }
-
-        setFeedback(null);
-        startTransition(async () => {
-          const result = await registerSupplyPurchaseAction(values);
-          if (result.success && result.data) {
-            onSuccess(result.data);
-            form.reset({
-              supplierId: suppliers[0]?.id ?? "",
-              purchaseDate: new Date().toISOString().slice(0, 10),
-              notes: "",
-              items: [getInitialItem(supplies)],
+      onSubmit={form.handleSubmit(
+        (values) => {
+          if (!canSubmitPurchase) {
+            setFeedback({
+              tone: "error",
+              message: `No podemos registrar la compra todavia: falta ${missingDependencies.join(" y ")}.`,
             });
             return;
           }
 
-          setFeedback({ tone: "error", message: result.error ?? result.message });
-        });
-      })}
+          setFeedback(null);
+          startTransition(async () => {
+            const result = await registerSupplyPurchaseAction(values);
+            if (result.success && result.data) {
+              onSuccess(result.data);
+              form.reset({
+                supplierId: suppliers[0]?.id ?? "",
+                purchaseDate: new Date().toISOString().slice(0, 10),
+                notes: "",
+                items: [getInitialItem(supplies)],
+              });
+              return;
+            }
+
+            setFeedback({ tone: "error", message: result.error ?? result.message });
+          });
+        },
+        (errors) => {
+          setFeedback({ tone: "error", message: getFirstFormError(errors) });
+        },
+      )}
     >
       {!canSubmitPurchase ? (
         <ActionNotice
