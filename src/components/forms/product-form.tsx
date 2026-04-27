@@ -2,7 +2,7 @@
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useEffect, useState, useTransition } from "react";
-import { useForm } from "react-hook-form";
+import { Controller, useForm } from "react-hook-form";
 import type { z } from "zod";
 import { saveProductAction } from "@/actions/core";
 import { ActionNotice } from "@/components/forms/action-notice";
@@ -17,6 +17,14 @@ type ProductFormProps = {
   product?: ProductRecord | null;
   onSuccess: (product: ProductRecord) => void;
 };
+
+function toInputValue(value: unknown) {
+  return value === null || value === undefined ? "" : String(value);
+}
+
+function toNumberValue(value: string) {
+  return value === "" ? "" : Number(value);
+}
 
 export function ProductForm({ product, onSuccess }: ProductFormProps) {
   const [pending, startTransition] = useTransition();
@@ -76,31 +84,104 @@ export function ProductForm({ product, onSuccess }: ProductFormProps) {
     >
       <div className="grid gap-4 md:grid-cols-2">
         <Field label="Nombre" error={form.formState.errors.name?.message}>
-          <TextInput {...form.register("name")} placeholder="Extracto Reishi" />
+          <Controller
+            control={form.control}
+            name="name"
+            render={({ field }) => (
+              <TextInput {...field} value={toInputValue(field.value)} placeholder="Extracto Reishi" />
+            )}
+          />
         </Field>
         <Field label="Categoria" error={form.formState.errors.category?.message}>
-          <TextInput {...form.register("category")} placeholder="Extractos" />
+          <Controller
+            control={form.control}
+            name="category"
+            render={({ field }) => (
+              <TextInput {...field} value={toInputValue(field.value)} placeholder="Extractos" />
+            )}
+          />
         </Field>
       </div>
 
       <div className="grid gap-4 md:grid-cols-3">
         <Field label="Unidad" error={form.formState.errors.unit?.message}>
-          <TextInput {...form.register("unit")} placeholder="frasco" />
+          <Controller
+            control={form.control}
+            name="unit"
+            render={({ field }) => (
+              <TextInput {...field} value={toInputValue(field.value)} placeholder="frasco" />
+            )}
+          />
         </Field>
         <Field label="Precio de venta" error={form.formState.errors.salePrice?.message}>
-          <TextInput {...form.register("salePrice", { valueAsNumber: true })} type="number" min="0" step="0.01" />
+          <Controller
+            control={form.control}
+            name="salePrice"
+            render={({ field }) => (
+              <TextInput
+                name={field.name}
+                ref={field.ref}
+                value={toInputValue(field.value)}
+                onBlur={field.onBlur}
+                onChange={(event) => field.onChange(toNumberValue(event.target.value))}
+                type="number"
+                min="0"
+                step="0.01"
+              />
+            )}
+          />
         </Field>
         <Field label="Stock minimo" error={form.formState.errors.minStock?.message}>
-          <TextInput {...form.register("minStock", { valueAsNumber: true })} type="number" min="0" step="0.01" />
+          <Controller
+            control={form.control}
+            name="minStock"
+            render={({ field }) => (
+              <TextInput
+                name={field.name}
+                ref={field.ref}
+                value={toInputValue(field.value)}
+                onBlur={field.onBlur}
+                onChange={(event) => field.onChange(toNumberValue(event.target.value))}
+                type="number"
+                min="0"
+                step="0.01"
+              />
+            )}
+          />
         </Field>
       </div>
 
       <Field label="Notas" error={form.formState.errors.notes?.message}>
-        <TextareaInput {...form.register("notes")} rows={4} placeholder="Formato, presentacion o datos utiles." />
+        <Controller
+          control={form.control}
+          name="notes"
+          render={({ field }) => (
+            <TextareaInput
+              {...field}
+              value={toInputValue(field.value)}
+              rows={4}
+              placeholder="Formato, presentacion o datos utiles."
+            />
+          )}
+        />
       </Field>
 
       <label className="flex items-center gap-3 rounded-2xl border border-[var(--line)] bg-white/70 px-4 py-3 text-sm">
-        <input type="checkbox" className="h-4 w-4 accent-[var(--accent)]" {...form.register("isActive")} />
+        <Controller
+          control={form.control}
+          name="isActive"
+          render={({ field }) => (
+            <input
+              name={field.name}
+              ref={field.ref}
+              type="checkbox"
+              checked={Boolean(field.value)}
+              onBlur={field.onBlur}
+              onChange={(event) => field.onChange(event.target.checked)}
+              className="h-4 w-4 accent-[var(--accent)]"
+            />
+          )}
+        />
         Producto activo
       </label>
 
