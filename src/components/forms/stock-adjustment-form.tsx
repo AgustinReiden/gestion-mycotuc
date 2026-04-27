@@ -2,12 +2,13 @@
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useEffect, useState, useTransition } from "react";
-import { useForm } from "react-hook-form";
+import { Controller, useForm } from "react-hook-form";
 import type { z } from "zod";
 import { applyStockAdjustmentAction } from "@/actions/core";
 import { ActionNotice } from "@/components/forms/action-notice";
 import { Button } from "@/components/ui/button";
 import { Field, TextInput, TextareaInput } from "@/components/ui/fields";
+import { toInputValue, toNumberValue } from "@/components/forms/value-helpers";
 import type { EntityType, InventoryMovementRecord, ProductRecord, SupplyRecord } from "@/lib/domain";
 import { stockAdjustmentSchema } from "@/lib/validators";
 
@@ -83,15 +84,41 @@ export function StockAdjustmentForm({
 
       <div className="grid gap-4 md:grid-cols-2">
         <Field label="Variacion" error={form.formState.errors.quantity?.message}>
-          <TextInput {...form.register("quantity", { valueAsNumber: true })} type="number" step="0.01" />
+          <Controller
+            control={form.control}
+            name="quantity"
+            render={({ field }) => (
+              <TextInput
+                name={field.name}
+                ref={field.ref}
+                value={toInputValue(field.value)}
+                onBlur={field.onBlur}
+                onChange={(event) => field.onChange(toNumberValue(event.target.value))}
+                type="number"
+                step="0.01"
+              />
+            )}
+          />
         </Field>
         <Field label="Fecha" error={form.formState.errors.movementDate?.message}>
-          <TextInput {...form.register("movementDate")} type="date" />
+          <Controller
+            control={form.control}
+            name="movementDate"
+            render={({ field }) => (
+              <TextInput {...field} value={toInputValue(field.value)} type="date" />
+            )}
+          />
         </Field>
       </div>
 
       <Field label="Notas" error={form.formState.errors.notes?.message}>
-        <TextareaInput {...form.register("notes")} rows={4} placeholder="Motivo del ajuste." />
+        <Controller
+          control={form.control}
+          name="notes"
+          render={({ field }) => (
+            <TextareaInput {...field} value={toInputValue(field.value)} rows={4} placeholder="Motivo del ajuste." />
+          )}
+        />
       </Field>
 
       {feedback ? <ActionNotice tone={feedback.tone} message={feedback.message} /> : null}

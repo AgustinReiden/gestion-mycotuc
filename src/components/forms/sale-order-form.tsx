@@ -3,7 +3,7 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Plus, Trash2 } from "lucide-react";
 import { useEffect, useState, useTransition } from "react";
-import { useFieldArray, useForm, useWatch } from "react-hook-form";
+import { Controller, useFieldArray, useForm, useWatch } from "react-hook-form";
 import type { z } from "zod";
 import { createSaleOrderAction } from "@/actions/core";
 import { ANONYMOUS_CUSTOMER_NAME, PAYMENT_STATUSES } from "@/lib/constants";
@@ -18,6 +18,7 @@ import { saleOrderFormSchema } from "@/lib/validators";
 import { ActionNotice } from "@/components/forms/action-notice";
 import { Button } from "@/components/ui/button";
 import { Field, SelectInput, TextInput, TextareaInput } from "@/components/ui/fields";
+import { toInputValue, toNumberValue } from "@/components/forms/value-helpers";
 import { formatCurrency } from "@/lib/utils";
 
 type SaleOrderValues = z.input<typeof saleOrderFormSchema>;
@@ -150,8 +151,6 @@ export function SaleOrderForm({ contacts, products, channels, onSuccess }: SaleO
           })
           .slice(0, 6);
 
-  const customerNameField = form.register("customerName");
-
   function resetForm() {
     form.reset(getDefaultValues(products, channels));
     setShowSuggestions(false);
@@ -242,25 +241,33 @@ export function SaleOrderForm({ contacts, products, channels, onSuccess }: SaleO
         >
           <div className="space-y-3">
             <div className="relative">
-              <TextInput
-                {...customerNameField}
-                value={customerName}
-                placeholder="Nombre, telefono o mail del cliente"
-                autoComplete="off"
-                onFocus={() => {
-                  if (customerMode !== "anonymous") {
-                    setShowSuggestions(true);
-                  }
-                }}
-                onBlur={() => {
-                  setTimeout(() => setShowSuggestions(false), 120);
-                }}
-                onChange={(event) => {
-                  customerNameField.onChange(event);
-                  setCustomerMode("inline");
-                  form.setValue("contactId", undefined, { shouldDirty: true, shouldValidate: true });
-                  setShowSuggestions(true);
-                }}
+              <Controller
+                control={form.control}
+                name="customerName"
+                render={({ field }) => (
+                  <TextInput
+                    name={field.name}
+                    ref={field.ref}
+                    value={toInputValue(field.value)}
+                    placeholder="Nombre, telefono o mail del cliente"
+                    autoComplete="off"
+                    onFocus={() => {
+                      if (customerMode !== "anonymous") {
+                        setShowSuggestions(true);
+                      }
+                    }}
+                    onBlur={() => {
+                      field.onBlur();
+                      setTimeout(() => setShowSuggestions(false), 120);
+                    }}
+                    onChange={(event) => {
+                      field.onChange(event.target.value);
+                      setCustomerMode("inline");
+                      form.setValue("contactId", undefined, { shouldDirty: true, shouldValidate: true });
+                      setShowSuggestions(true);
+                    }}
+                  />
+                )}
               />
 
               {showSuggestions && suggestedContacts.length > 0 ? (
@@ -317,29 +324,48 @@ export function SaleOrderForm({ contacts, products, channels, onSuccess }: SaleO
         </Field>
 
         <Field label="Canal" error={form.formState.errors.channelId?.message}>
-          <SelectInput {...form.register("channelId")} disabled={!hasChannels}>
-            {!hasChannels ? (
-              <option value="">No hay canales activos disponibles</option>
-            ) : null}
-            {channels.map((channel) => (
-              <option key={channel.id} value={channel.id}>
-                {channel.name}
-              </option>
-            ))}
-          </SelectInput>
+          <Controller
+            control={form.control}
+            name="channelId"
+            render={({ field }) => (
+              <SelectInput {...field} value={toInputValue(field.value)} disabled={!hasChannels}>
+                {!hasChannels ? (
+                  <option value="">No hay canales activos disponibles</option>
+                ) : null}
+                {channels.map((channel) => (
+                  <option key={channel.id} value={channel.id}>
+                    {channel.name}
+                  </option>
+                ))}
+              </SelectInput>
+            )}
+          />
         </Field>
       </div>
 
       {customerMode !== "anonymous" ? (
         <div className="grid gap-4 md:grid-cols-2">
           <Field label="Telefono" error={form.formState.errors.customerPhone?.message}>
-            <TextInput {...form.register("customerPhone")} placeholder="+54 381..." />
+            <Controller
+              control={form.control}
+              name="customerPhone"
+              render={({ field }) => (
+                <TextInput {...field} value={toInputValue(field.value)} placeholder="+54 381..." />
+              )}
+            />
           </Field>
           <Field label="Email" error={form.formState.errors.customerEmail?.message}>
-            <TextInput
-              {...form.register("customerEmail")}
-              type="email"
-              placeholder="cliente@ejemplo.com"
+            <Controller
+              control={form.control}
+              name="customerEmail"
+              render={({ field }) => (
+                <TextInput
+                  {...field}
+                  value={toInputValue(field.value)}
+                  type="email"
+                  placeholder="cliente@ejemplo.com"
+                />
+              )}
             />
           </Field>
         </div>
@@ -347,29 +373,55 @@ export function SaleOrderForm({ contacts, products, channels, onSuccess }: SaleO
 
       <div className="grid gap-4 md:grid-cols-4">
         <Field label="Fecha" error={form.formState.errors.saleDate?.message}>
-          <TextInput {...form.register("saleDate")} type="date" />
+          <Controller
+            control={form.control}
+            name="saleDate"
+            render={({ field }) => (
+              <TextInput {...field} value={toInputValue(field.value)} type="date" />
+            )}
+          />
         </Field>
         <Field label="Estado de cobro" error={form.formState.errors.paymentStatus?.message}>
-          <SelectInput {...form.register("paymentStatus")}>
-            {PAYMENT_STATUSES.map((status) => (
-              <option key={status.value} value={status.value}>
-                {status.label}
-              </option>
-            ))}
-          </SelectInput>
+          <Controller
+            control={form.control}
+            name="paymentStatus"
+            render={({ field }) => (
+              <SelectInput {...field} value={toInputValue(field.value)}>
+                {PAYMENT_STATUSES.map((status) => (
+                  <option key={status.value} value={status.value}>
+                    {status.label}
+                  </option>
+                ))}
+              </SelectInput>
+            )}
+          />
         </Field>
         <Field label="Metodo de pago" error={form.formState.errors.paymentMethod?.message}>
-          <TextInput
-            {...form.register("paymentMethod")}
-            disabled={paymentStatus === "pending"}
-            placeholder="Transferencia"
+          <Controller
+            control={form.control}
+            name="paymentMethod"
+            render={({ field }) => (
+              <TextInput
+                {...field}
+                value={toInputValue(field.value)}
+                disabled={paymentStatus === "pending"}
+                placeholder="Transferencia"
+              />
+            )}
           />
         </Field>
         <Field label="Fecha de cobro" error={form.formState.errors.paidAt?.message}>
-          <TextInput
-            {...form.register("paidAt")}
-            disabled={paymentStatus === "pending"}
-            type="date"
+          <Controller
+            control={form.control}
+            name="paidAt"
+            render={({ field }) => (
+              <TextInput
+                {...field}
+                value={toInputValue(field.value)}
+                disabled={paymentStatus === "pending"}
+                type="date"
+              />
+            )}
           />
         </Field>
       </div>
@@ -402,41 +454,73 @@ export function SaleOrderForm({ contacts, products, channels, onSuccess }: SaleO
                 className="grid gap-3 rounded-[24px] border border-[var(--line)] bg-white/90 p-4 md:grid-cols-[1.6fr_0.7fr_0.8fr_auto]"
               >
                 <Field label="Producto" error={form.formState.errors.items?.[index]?.productId?.message}>
-                  <SelectInput
-                    {...form.register(`items.${index}.productId`)}
-                    disabled={!hasProducts}
-                    onChange={(event) => {
-                      form.register(`items.${index}.productId`).onChange(event);
-                      const product = products.find((entry) => entry.id === event.target.value);
-                      form.setValue(`items.${index}.unitPrice`, product?.salePrice ?? 0);
-                    }}
-                  >
-                    {!hasProducts ? (
-                      <option value="">No hay productos activos disponibles</option>
-                    ) : null}
-                    {products.map((product) => (
-                      <option key={product.id} value={product.id}>
-                        {product.name}
-                      </option>
-                    ))}
-                  </SelectInput>
+                  <Controller
+                    control={form.control}
+                    name={`items.${index}.productId`}
+                    render={({ field: itemField }) => (
+                      <SelectInput
+                        name={itemField.name}
+                        ref={itemField.ref}
+                        value={toInputValue(itemField.value)}
+                        onBlur={itemField.onBlur}
+                        disabled={!hasProducts}
+                        onChange={(event) => {
+                          itemField.onChange(event.target.value);
+                          const product = products.find((entry) => entry.id === event.target.value);
+                          form.setValue(`items.${index}.unitPrice`, product?.salePrice ?? 0, {
+                            shouldDirty: true,
+                            shouldValidate: true,
+                          });
+                        }}
+                      >
+                        {!hasProducts ? (
+                          <option value="">No hay productos activos disponibles</option>
+                        ) : null}
+                        {products.map((product) => (
+                          <option key={product.id} value={product.id}>
+                            {product.name}
+                          </option>
+                        ))}
+                      </SelectInput>
+                    )}
+                  />
                 </Field>
 
                 <Field label="Cantidad" error={form.formState.errors.items?.[index]?.quantity?.message}>
-                  <TextInput
-                    {...form.register(`items.${index}.quantity`, { valueAsNumber: true })}
-                    type="number"
-                    min="0"
-                    step="0.01"
+                  <Controller
+                    control={form.control}
+                    name={`items.${index}.quantity`}
+                    render={({ field: itemField }) => (
+                      <TextInput
+                        name={itemField.name}
+                        ref={itemField.ref}
+                        value={toInputValue(itemField.value)}
+                        onBlur={itemField.onBlur}
+                        onChange={(event) => itemField.onChange(toNumberValue(event.target.value))}
+                        type="number"
+                        min="0"
+                        step="0.01"
+                      />
+                    )}
                   />
                 </Field>
 
                 <Field label="Precio unitario" error={form.formState.errors.items?.[index]?.unitPrice?.message}>
-                  <TextInput
-                    {...form.register(`items.${index}.unitPrice`, { valueAsNumber: true })}
-                    type="number"
-                    min="0.01"
-                    step="0.01"
+                  <Controller
+                    control={form.control}
+                    name={`items.${index}.unitPrice`}
+                    render={({ field: itemField }) => (
+                      <TextInput
+                        name={itemField.name}
+                        ref={itemField.ref}
+                        value={toInputValue(itemField.value)}
+                        onBlur={itemField.onBlur}
+                        onChange={(event) => itemField.onChange(toNumberValue(event.target.value))}
+                        type="number"
+                        min="0.01"
+                        step="0.01"
+                      />
+                    )}
                   />
                 </Field>
 
@@ -467,7 +551,18 @@ export function SaleOrderForm({ contacts, products, channels, onSuccess }: SaleO
       </div>
 
       <Field label="Notas" error={form.formState.errors.notes?.message}>
-        <TextareaInput {...form.register("notes")} rows={3} placeholder="Observaciones del pedido." />
+        <Controller
+          control={form.control}
+          name="notes"
+          render={({ field }) => (
+            <TextareaInput
+              {...field}
+              value={toInputValue(field.value)}
+              rows={3}
+              placeholder="Observaciones del pedido."
+            />
+          )}
+        />
       </Field>
 
       {feedback ? <ActionNotice tone={feedback.tone} message={feedback.message} /> : null}

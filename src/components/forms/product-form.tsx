@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Field, TextInput, TextareaInput } from "@/components/ui/fields";
 import type { ProductRecord } from "@/lib/domain";
 import { productFormSchema } from "@/lib/validators";
+import { toInputValue, toNumberValue } from "@/components/forms/value-helpers";
 
 type ProductFormValues = z.input<typeof productFormSchema>;
 
@@ -17,14 +18,6 @@ type ProductFormProps = {
   product?: ProductRecord | null;
   onSuccess: (product: ProductRecord) => void;
 };
-
-function toInputValue(value: unknown) {
-  return value === null || value === undefined ? "" : String(value);
-}
-
-function toNumberValue(value: string) {
-  return value === "" ? "" : Number(value);
-}
 
 export function ProductForm({ product, onSuccess }: ProductFormProps) {
   const [pending, startTransition] = useTransition();

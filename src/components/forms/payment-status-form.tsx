@@ -2,7 +2,7 @@
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useEffect, useState, useTransition } from "react";
-import { useForm, useWatch } from "react-hook-form";
+import { Controller, useForm, useWatch } from "react-hook-form";
 import type { z } from "zod";
 import { updateSalePaymentStatusAction } from "@/actions/core";
 import { PAYMENT_STATUSES } from "@/lib/constants";
@@ -11,6 +11,7 @@ import { paymentStatusUpdateSchema } from "@/lib/validators";
 import { ActionNotice } from "@/components/forms/action-notice";
 import { Button } from "@/components/ui/button";
 import { Field, SelectInput, TextInput } from "@/components/ui/fields";
+import { toInputValue } from "@/components/forms/value-helpers";
 
 type PaymentStatusValues = z.input<typeof paymentStatusUpdateSchema>;
 
@@ -79,28 +80,48 @@ export function PaymentStatusForm({
       })}
     >
       <Field label="Estado">
-        <SelectInput {...form.register("paymentStatus")}>
-          {PAYMENT_STATUSES.map((status) => (
-            <option key={status.value} value={status.value}>
-              {status.label}
-            </option>
-          ))}
-        </SelectInput>
+        <Controller
+          control={form.control}
+          name="paymentStatus"
+          render={({ field }) => (
+            <SelectInput {...field} value={toInputValue(field.value)}>
+              {PAYMENT_STATUSES.map((status) => (
+                <option key={status.value} value={status.value}>
+                  {status.label}
+                </option>
+              ))}
+            </SelectInput>
+          )}
+        />
       </Field>
 
       <div className="grid gap-4 md:grid-cols-2">
         <Field label="Metodo">
-          <TextInput
-            {...form.register("paymentMethod")}
-            disabled={currentPaymentStatus === "pending"}
-            placeholder="Transferencia"
+          <Controller
+            control={form.control}
+            name="paymentMethod"
+            render={({ field }) => (
+              <TextInput
+                {...field}
+                value={toInputValue(field.value)}
+                disabled={currentPaymentStatus === "pending"}
+                placeholder="Transferencia"
+              />
+            )}
           />
         </Field>
         <Field label="Fecha de cobro">
-          <TextInput
-            {...form.register("paidAt")}
-            disabled={currentPaymentStatus === "pending"}
-            type="date"
+          <Controller
+            control={form.control}
+            name="paidAt"
+            render={({ field }) => (
+              <TextInput
+                {...field}
+                value={toInputValue(field.value)}
+                disabled={currentPaymentStatus === "pending"}
+                type="date"
+              />
+            )}
           />
         </Field>
       </div>

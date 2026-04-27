@@ -3,12 +3,13 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Plus, Trash2 } from "lucide-react";
 import { useEffect, useState, useTransition } from "react";
-import { useFieldArray, useForm, useWatch } from "react-hook-form";
+import { Controller, useFieldArray, useForm, useWatch } from "react-hook-form";
 import type { z } from "zod";
 import { registerSupplyPurchaseAction } from "@/actions/core";
 import { ActionNotice } from "@/components/forms/action-notice";
 import { Button } from "@/components/ui/button";
 import { Field, SelectInput, TextInput, TextareaInput } from "@/components/ui/fields";
+import { toInputValue, toNumberValue } from "@/components/forms/value-helpers";
 import type {
   ContactRecord,
   ExpenseRecord,
@@ -119,19 +120,31 @@ export function PurchaseForm({ suppliers, supplies, onSuccess }: PurchaseFormPro
 
       <div className="grid gap-4 md:grid-cols-2">
         <Field label="Proveedor" error={form.formState.errors.supplierId?.message}>
-          <SelectInput {...form.register("supplierId")} disabled={!hasSuppliers}>
-            {!hasSuppliers ? (
-              <option value="">No hay proveedores activos disponibles</option>
-            ) : null}
-            {suppliers.map((supplier) => (
-              <option key={supplier.id} value={supplier.id}>
-                {supplier.name}
-              </option>
-            ))}
-          </SelectInput>
+          <Controller
+            control={form.control}
+            name="supplierId"
+            render={({ field }) => (
+              <SelectInput {...field} value={toInputValue(field.value)} disabled={!hasSuppliers}>
+                {!hasSuppliers ? (
+                  <option value="">No hay proveedores activos disponibles</option>
+                ) : null}
+                {suppliers.map((supplier) => (
+                  <option key={supplier.id} value={supplier.id}>
+                    {supplier.name}
+                  </option>
+                ))}
+              </SelectInput>
+            )}
+          />
         </Field>
         <Field label="Fecha de compra" error={form.formState.errors.purchaseDate?.message}>
-          <TextInput {...form.register("purchaseDate")} type="date" />
+          <Controller
+            control={form.control}
+            name="purchaseDate"
+            render={({ field }) => (
+              <TextInput {...field} value={toInputValue(field.value)} type="date" />
+            )}
+          />
         </Field>
       </div>
 
@@ -160,31 +173,61 @@ export function PurchaseForm({ suppliers, supplies, onSuccess }: PurchaseFormPro
             return (
               <div key={field.id} className="grid gap-3 rounded-[24px] border border-[var(--line)] bg-white/90 p-4 md:grid-cols-[1.7fr_0.7fr_0.8fr_auto]">
                 <Field label="Insumo" error={form.formState.errors.items?.[index]?.supplyId?.message}>
-                  <SelectInput {...form.register(`items.${index}.supplyId`)} disabled={!hasSupplies}>
-                    {!hasSupplies ? (
-                      <option value="">No hay insumos activos disponibles</option>
-                    ) : null}
-                    {supplies.map((supply) => (
-                      <option key={supply.id} value={supply.id}>
-                        {supply.name}
-                      </option>
-                    ))}
-                  </SelectInput>
+                  <Controller
+                    control={form.control}
+                    name={`items.${index}.supplyId`}
+                    render={({ field: itemField }) => (
+                      <SelectInput
+                        {...itemField}
+                        value={toInputValue(itemField.value)}
+                        disabled={!hasSupplies}
+                      >
+                        {!hasSupplies ? (
+                          <option value="">No hay insumos activos disponibles</option>
+                        ) : null}
+                        {supplies.map((supply) => (
+                          <option key={supply.id} value={supply.id}>
+                            {supply.name}
+                          </option>
+                        ))}
+                      </SelectInput>
+                    )}
+                  />
                 </Field>
                 <Field label="Cantidad" error={form.formState.errors.items?.[index]?.quantity?.message}>
-                  <TextInput
-                    {...form.register(`items.${index}.quantity`, { valueAsNumber: true })}
-                    type="number"
-                    min="0"
-                    step="0.01"
+                  <Controller
+                    control={form.control}
+                    name={`items.${index}.quantity`}
+                    render={({ field: itemField }) => (
+                      <TextInput
+                        name={itemField.name}
+                        ref={itemField.ref}
+                        value={toInputValue(itemField.value)}
+                        onBlur={itemField.onBlur}
+                        onChange={(event) => itemField.onChange(toNumberValue(event.target.value))}
+                        type="number"
+                        min="0"
+                        step="0.01"
+                      />
+                    )}
                   />
                 </Field>
                 <Field label="Costo unitario" error={form.formState.errors.items?.[index]?.unitCost?.message}>
-                  <TextInput
-                    {...form.register(`items.${index}.unitCost`, { valueAsNumber: true })}
-                    type="number"
-                    min="0.01"
-                    step="0.01"
+                  <Controller
+                    control={form.control}
+                    name={`items.${index}.unitCost`}
+                    render={({ field: itemField }) => (
+                      <TextInput
+                        name={itemField.name}
+                        ref={itemField.ref}
+                        value={toInputValue(itemField.value)}
+                        onBlur={itemField.onBlur}
+                        onChange={(event) => itemField.onChange(toNumberValue(event.target.value))}
+                        type="number"
+                        min="0.01"
+                        step="0.01"
+                      />
+                    )}
                   />
                 </Field>
 
@@ -210,7 +253,18 @@ export function PurchaseForm({ suppliers, supplies, onSuccess }: PurchaseFormPro
       </div>
 
       <Field label="Notas" error={form.formState.errors.notes?.message}>
-        <TextareaInput {...form.register("notes")} rows={3} placeholder="Datos del proveedor, factura o entrega." />
+        <Controller
+          control={form.control}
+          name="notes"
+          render={({ field }) => (
+            <TextareaInput
+              {...field}
+              value={toInputValue(field.value)}
+              rows={3}
+              placeholder="Datos del proveedor, factura o entrega."
+            />
+          )}
+        />
       </Field>
 
       {feedback ? <ActionNotice tone={feedback.tone} message={feedback.message} /> : null}

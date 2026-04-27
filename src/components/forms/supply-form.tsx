@@ -2,12 +2,13 @@
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useEffect, useState, useTransition } from "react";
-import { useForm } from "react-hook-form";
+import { Controller, useForm } from "react-hook-form";
 import type { z } from "zod";
 import { saveSupplyAction } from "@/actions/core";
 import { ActionNotice } from "@/components/forms/action-notice";
 import { Button } from "@/components/ui/button";
 import { Field, TextInput, TextareaInput } from "@/components/ui/fields";
+import { toInputValue, toNumberValue } from "@/components/forms/value-helpers";
 import type { SupplyRecord } from "@/lib/domain";
 import { supplyFormSchema } from "@/lib/validators";
 
@@ -69,23 +70,75 @@ export function SupplyForm({ supply, onSuccess }: SupplyFormProps) {
     >
       <div className="grid gap-4 md:grid-cols-2">
         <Field label="Nombre" error={form.formState.errors.name?.message}>
-          <TextInput {...form.register("name")} placeholder="Aserrin" />
+          <Controller
+            control={form.control}
+            name="name"
+            render={({ field }) => (
+              <TextInput {...field} value={toInputValue(field.value)} placeholder="Aserrin" />
+            )}
+          />
         </Field>
         <Field label="Unidad" error={form.formState.errors.unit?.message}>
-          <TextInput {...form.register("unit")} placeholder="kg" />
+          <Controller
+            control={form.control}
+            name="unit"
+            render={({ field }) => (
+              <TextInput {...field} value={toInputValue(field.value)} placeholder="kg" />
+            )}
+          />
         </Field>
       </div>
 
       <Field label="Stock minimo" error={form.formState.errors.minStock?.message}>
-        <TextInput {...form.register("minStock", { valueAsNumber: true })} type="number" min="0" step="0.01" />
+        <Controller
+          control={form.control}
+          name="minStock"
+          render={({ field }) => (
+            <TextInput
+              name={field.name}
+              ref={field.ref}
+              value={toInputValue(field.value)}
+              onBlur={field.onBlur}
+              onChange={(event) => field.onChange(toNumberValue(event.target.value))}
+              type="number"
+              min="0"
+              step="0.01"
+            />
+          )}
+        />
       </Field>
 
       <Field label="Notas" error={form.formState.errors.notes?.message}>
-        <TextareaInput {...form.register("notes")} rows={4} placeholder="Proveedor sugerido o calidad esperada." />
+        <Controller
+          control={form.control}
+          name="notes"
+          render={({ field }) => (
+            <TextareaInput
+              {...field}
+              value={toInputValue(field.value)}
+              rows={4}
+              placeholder="Proveedor sugerido o calidad esperada."
+            />
+          )}
+        />
       </Field>
 
       <label className="flex items-center gap-3 rounded-2xl border border-[var(--line)] bg-white/70 px-4 py-3 text-sm">
-        <input type="checkbox" className="h-4 w-4 accent-[var(--accent)]" {...form.register("isActive")} />
+        <Controller
+          control={form.control}
+          name="isActive"
+          render={({ field }) => (
+            <input
+              name={field.name}
+              ref={field.ref}
+              type="checkbox"
+              checked={Boolean(field.value)}
+              onBlur={field.onBlur}
+              onChange={(event) => field.onChange(event.target.checked)}
+              className="h-4 w-4 accent-[var(--accent)]"
+            />
+          )}
+        />
         Insumo activo
       </label>
 

@@ -2,7 +2,7 @@
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useEffect, useState, useTransition } from "react";
-import { useForm } from "react-hook-form";
+import { Controller, useForm } from "react-hook-form";
 import { saveContactAction } from "@/actions/core";
 import { CONTACT_TYPES } from "@/lib/constants";
 import type { ContactRecord } from "@/lib/domain";
@@ -10,6 +10,7 @@ import { contactFormSchema } from "@/lib/validators";
 import { ActionNotice } from "@/components/forms/action-notice";
 import { Button } from "@/components/ui/button";
 import { Field, SelectInput, TextInput, TextareaInput } from "@/components/ui/fields";
+import { toInputValue } from "@/components/forms/value-helpers";
 import type { z } from "zod";
 
 type ContactFormValues = z.input<typeof contactFormSchema>;
@@ -75,36 +76,90 @@ export function ContactForm({ contact, onSuccess }: ContactFormProps) {
     >
       <div className="grid gap-4 md:grid-cols-2">
         <Field label="Tipo" error={form.formState.errors.type?.message}>
-          <SelectInput {...form.register("type")}>
-            {CONTACT_TYPES.map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
-          </SelectInput>
+          <Controller
+            control={form.control}
+            name="type"
+            render={({ field }) => (
+              <SelectInput {...field} value={toInputValue(field.value)}>
+                {CONTACT_TYPES.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </SelectInput>
+            )}
+          />
         </Field>
 
         <Field label="Nombre" error={form.formState.errors.name?.message}>
-          <TextInput {...form.register("name")} placeholder="Maria Gonzalez" />
+          <Controller
+            control={form.control}
+            name="name"
+            render={({ field }) => (
+              <TextInput {...field} value={toInputValue(field.value)} placeholder="Maria Gonzalez" />
+            )}
+          />
         </Field>
       </div>
 
       <div className="grid gap-4 md:grid-cols-2">
         <Field label="Telefono" error={form.formState.errors.phone?.message}>
-          <TextInput {...form.register("phone")} placeholder="+54 381..." />
+          <Controller
+            control={form.control}
+            name="phone"
+            render={({ field }) => (
+              <TextInput {...field} value={toInputValue(field.value)} placeholder="+54 381..." />
+            )}
+          />
         </Field>
 
         <Field label="Email" error={form.formState.errors.email?.message}>
-          <TextInput {...form.register("email")} type="email" placeholder="contacto@ejemplo.com" />
+          <Controller
+            control={form.control}
+            name="email"
+            render={({ field }) => (
+              <TextInput
+                {...field}
+                value={toInputValue(field.value)}
+                type="email"
+                placeholder="contacto@ejemplo.com"
+              />
+            )}
+          />
         </Field>
       </div>
 
       <Field label="Notas" error={form.formState.errors.notes?.message}>
-        <TextareaInput {...form.register("notes")} rows={4} placeholder="Observaciones, acuerdos o contexto." />
+        <Controller
+          control={form.control}
+          name="notes"
+          render={({ field }) => (
+            <TextareaInput
+              {...field}
+              value={toInputValue(field.value)}
+              rows={4}
+              placeholder="Observaciones, acuerdos o contexto."
+            />
+          )}
+        />
       </Field>
 
       <label className="flex items-center gap-3 rounded-2xl border border-[var(--line)] bg-white/70 px-4 py-3 text-sm">
-        <input type="checkbox" className="h-4 w-4 accent-[var(--accent)]" {...form.register("isActive")} />
+        <Controller
+          control={form.control}
+          name="isActive"
+          render={({ field }) => (
+            <input
+              name={field.name}
+              ref={field.ref}
+              type="checkbox"
+              checked={Boolean(field.value)}
+              onBlur={field.onBlur}
+              onChange={(event) => field.onChange(event.target.checked)}
+              className="h-4 w-4 accent-[var(--accent)]"
+            />
+          )}
+        />
         Contacto activo
       </label>
 

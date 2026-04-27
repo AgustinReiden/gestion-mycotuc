@@ -3,12 +3,13 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Plus, Trash2 } from "lucide-react";
 import { useEffect, useState, useTransition } from "react";
-import { useFieldArray, useForm, useWatch } from "react-hook-form";
+import { Controller, useFieldArray, useForm, useWatch } from "react-hook-form";
 import type { z } from "zod";
 import { saveProductionBatchAction } from "@/actions/core";
 import { ActionNotice } from "@/components/forms/action-notice";
 import { Button } from "@/components/ui/button";
 import { Field, SelectInput, TextInput, TextareaInput } from "@/components/ui/fields";
+import { toInputValue, toNullableNumberValue, toNumberValue } from "@/components/forms/value-helpers";
 import { BATCH_STATUSES } from "@/lib/constants";
 import type { ProductRecord, ProductionBatchRecord, SupplyRecord } from "@/lib/domain";
 import { productionBatchFormSchema } from "@/lib/validators";
@@ -186,52 +187,92 @@ export function ProductionBatchForm({ batch, products, supplies, onSuccess }: Pr
 
       <div className="grid gap-4 md:grid-cols-2">
         <Field label="Producto objetivo" error={form.formState.errors.productId?.message}>
-          <SelectInput {...form.register("productId")} disabled={!hasProductOptions}>
-            {!hasProductOptions ? <option value="">No hay productos disponibles</option> : null}
-            {productOptions.map((product) => (
-              <option key={product.id} value={product.id}>
-                {product.name}
-              </option>
-            ))}
-          </SelectInput>
+          <Controller
+            control={form.control}
+            name="productId"
+            render={({ field }) => (
+              <SelectInput {...field} value={toInputValue(field.value)} disabled={!hasProductOptions}>
+                {!hasProductOptions ? <option value="">No hay productos disponibles</option> : null}
+                {productOptions.map((product) => (
+                  <option key={product.id} value={product.id}>
+                    {product.name}
+                  </option>
+                ))}
+              </SelectInput>
+            )}
+          />
         </Field>
 
         <Field label="Estado" error={form.formState.errors.status?.message}>
-          <SelectInput {...form.register("status")}>
-            {BATCH_STATUSES.map((status) => (
-              <option key={status.value} value={status.value}>
-                {status.label}
-              </option>
-            ))}
-          </SelectInput>
+          <Controller
+            control={form.control}
+            name="status"
+            render={({ field }) => (
+              <SelectInput {...field} value={toInputValue(field.value)}>
+                {BATCH_STATUSES.map((status) => (
+                  <option key={status.value} value={status.value}>
+                    {status.label}
+                  </option>
+                ))}
+              </SelectInput>
+            )}
+          />
         </Field>
       </div>
 
       <div className="grid gap-4 md:grid-cols-4">
         <Field label="Inicio" error={form.formState.errors.startedAt?.message}>
-          <TextInput {...form.register("startedAt")} type="date" />
+          <Controller
+            control={form.control}
+            name="startedAt"
+            render={({ field }) => (
+              <TextInput {...field} value={toInputValue(field.value)} type="date" />
+            )}
+          />
         </Field>
         <Field label="Cierre" error={form.formState.errors.completedAt?.message}>
-          <TextInput {...form.register("completedAt")} type="date" />
+          <Controller
+            control={form.control}
+            name="completedAt"
+            render={({ field }) => (
+              <TextInput {...field} value={toInputValue(field.value)} type="date" />
+            )}
+          />
         </Field>
         <Field label="Rendimiento esperado" error={form.formState.errors.expectedQty?.message}>
-          <TextInput
-            {...form.register("expectedQty", {
-              setValueAs: (value) => (value === "" ? null : Number(value)),
-            })}
-            type="number"
-            step="0.01"
-            min="0"
+          <Controller
+            control={form.control}
+            name="expectedQty"
+            render={({ field }) => (
+              <TextInput
+                name={field.name}
+                ref={field.ref}
+                value={toInputValue(field.value)}
+                onBlur={field.onBlur}
+                onChange={(event) => field.onChange(toNullableNumberValue(event.target.value))}
+                type="number"
+                step="0.01"
+                min="0"
+              />
+            )}
           />
         </Field>
         <Field label="Rendimiento real" error={form.formState.errors.actualQty?.message}>
-          <TextInput
-            {...form.register("actualQty", {
-              setValueAs: (value) => (value === "" ? null : Number(value)),
-            })}
-            type="number"
-            step="0.01"
-            min="0"
+          <Controller
+            control={form.control}
+            name="actualQty"
+            render={({ field }) => (
+              <TextInput
+                name={field.name}
+                ref={field.ref}
+                value={toInputValue(field.value)}
+                onBlur={field.onBlur}
+                onChange={(event) => field.onChange(toNullableNumberValue(event.target.value))}
+                type="number"
+                step="0.01"
+                min="0"
+              />
+            )}
           />
         </Field>
       </div>
@@ -265,25 +306,45 @@ export function ProductionBatchForm({ batch, products, supplies, onSuccess }: Pr
             {inputs.fields.map((field, index) => (
               <div key={field.id} className="grid gap-3 rounded-[24px] border border-[var(--line)] bg-white/90 p-4 md:grid-cols-[1.6fr_0.8fr_auto]">
                 <Field label="Insumo" error={form.formState.errors.inputs?.[index]?.supplyId?.message}>
-                  <SelectInput {...form.register(`inputs.${index}.supplyId`)} disabled={!hasSupplyOptions}>
-                    {!hasSupplyOptions ? <option value="">No hay insumos disponibles</option> : null}
-                    {!supplyOptions.some((option) => option.id === watchedInputs[index]?.supplyId) &&
-                    watchedInputs[index]?.supplyId ? (
-                      <option value={watchedInputs[index]?.supplyId}>Insumo no disponible</option>
-                    ) : null}
-                    {supplyOptions.map((supply) => (
-                      <option key={supply.id} value={supply.id}>
-                        {supply.name}
-                      </option>
-                    ))}
-                  </SelectInput>
+                  <Controller
+                    control={form.control}
+                    name={`inputs.${index}.supplyId`}
+                    render={({ field: inputField }) => (
+                      <SelectInput
+                        {...inputField}
+                        value={toInputValue(inputField.value)}
+                        disabled={!hasSupplyOptions}
+                      >
+                        {!hasSupplyOptions ? <option value="">No hay insumos disponibles</option> : null}
+                        {!supplyOptions.some((option) => option.id === watchedInputs[index]?.supplyId) &&
+                        watchedInputs[index]?.supplyId ? (
+                          <option value={watchedInputs[index]?.supplyId}>Insumo no disponible</option>
+                        ) : null}
+                        {supplyOptions.map((supply) => (
+                          <option key={supply.id} value={supply.id}>
+                            {supply.name}
+                          </option>
+                        ))}
+                      </SelectInput>
+                    )}
+                  />
                 </Field>
                 <Field label="Cantidad" error={form.formState.errors.inputs?.[index]?.quantity?.message}>
-                  <TextInput
-                    {...form.register(`inputs.${index}.quantity`, { valueAsNumber: true })}
-                    type="number"
-                    step="0.01"
-                    min="0"
+                  <Controller
+                    control={form.control}
+                    name={`inputs.${index}.quantity`}
+                    render={({ field: inputField }) => (
+                      <TextInput
+                        name={inputField.name}
+                        ref={inputField.ref}
+                        value={toInputValue(inputField.value)}
+                        onBlur={inputField.onBlur}
+                        onChange={(event) => inputField.onChange(toNumberValue(event.target.value))}
+                        type="number"
+                        step="0.01"
+                        min="0"
+                      />
+                    )}
                   />
                 </Field>
                 <div className="flex items-end">
@@ -322,25 +383,45 @@ export function ProductionBatchForm({ batch, products, supplies, onSuccess }: Pr
             {outputs.fields.map((field, index) => (
               <div key={field.id} className="grid gap-3 rounded-[24px] border border-[var(--line)] bg-white/90 p-4 md:grid-cols-[1.6fr_0.8fr_auto]">
                 <Field label="Producto" error={form.formState.errors.outputs?.[index]?.productId?.message}>
-                  <SelectInput {...form.register(`outputs.${index}.productId`)} disabled={!hasProductOptions}>
-                    {!hasProductOptions ? <option value="">No hay productos disponibles</option> : null}
-                    {!productOptions.some((option) => option.id === watchedOutputs[index]?.productId) &&
-                    watchedOutputs[index]?.productId ? (
-                      <option value={watchedOutputs[index]?.productId}>Producto no disponible</option>
-                    ) : null}
-                    {productOptions.map((product) => (
-                      <option key={product.id} value={product.id}>
-                        {product.name}
-                      </option>
-                    ))}
-                  </SelectInput>
+                  <Controller
+                    control={form.control}
+                    name={`outputs.${index}.productId`}
+                    render={({ field: outputField }) => (
+                      <SelectInput
+                        {...outputField}
+                        value={toInputValue(outputField.value)}
+                        disabled={!hasProductOptions}
+                      >
+                        {!hasProductOptions ? <option value="">No hay productos disponibles</option> : null}
+                        {!productOptions.some((option) => option.id === watchedOutputs[index]?.productId) &&
+                        watchedOutputs[index]?.productId ? (
+                          <option value={watchedOutputs[index]?.productId}>Producto no disponible</option>
+                        ) : null}
+                        {productOptions.map((product) => (
+                          <option key={product.id} value={product.id}>
+                            {product.name}
+                          </option>
+                        ))}
+                      </SelectInput>
+                    )}
+                  />
                 </Field>
                 <Field label="Cantidad" error={form.formState.errors.outputs?.[index]?.quantity?.message}>
-                  <TextInput
-                    {...form.register(`outputs.${index}.quantity`, { valueAsNumber: true })}
-                    type="number"
-                    step="0.01"
-                    min="0"
+                  <Controller
+                    control={form.control}
+                    name={`outputs.${index}.quantity`}
+                    render={({ field: outputField }) => (
+                      <TextInput
+                        name={outputField.name}
+                        ref={outputField.ref}
+                        value={toInputValue(outputField.value)}
+                        onBlur={outputField.onBlur}
+                        onChange={(event) => outputField.onChange(toNumberValue(event.target.value))}
+                        type="number"
+                        step="0.01"
+                        min="0"
+                      />
+                    )}
                   />
                 </Field>
                 <div className="flex items-end">
@@ -361,7 +442,18 @@ export function ProductionBatchForm({ batch, products, supplies, onSuccess }: Pr
       </div>
 
       <Field label="Notas" error={form.formState.errors.notes?.message}>
-        <TextareaInput {...form.register("notes")} rows={4} placeholder="Observaciones del lote y control de calidad." />
+        <Controller
+          control={form.control}
+          name="notes"
+          render={({ field }) => (
+            <TextareaInput
+              {...field}
+              value={toInputValue(field.value)}
+              rows={4}
+              placeholder="Observaciones del lote y control de calidad."
+            />
+          )}
+        />
       </Field>
 
       {feedback ? <ActionNotice tone={feedback.tone} message={feedback.message} /> : null}

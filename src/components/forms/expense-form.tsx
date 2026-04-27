@@ -2,12 +2,13 @@
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useEffect, useState, useTransition } from "react";
-import { useForm, useWatch } from "react-hook-form";
+import { Controller, useForm, useWatch } from "react-hook-form";
 import type { z } from "zod";
 import { createExpenseAction } from "@/actions/core";
 import { ActionNotice } from "@/components/forms/action-notice";
 import { Button } from "@/components/ui/button";
 import { Field, SelectInput, TextInput, TextareaInput } from "@/components/ui/fields";
+import { toInputValue, toNumberValue } from "@/components/forms/value-helpers";
 import type { ExpenseRecord, LookupOption } from "@/lib/domain";
 import { expenseFormSchema } from "@/lib/validators";
 
@@ -88,30 +89,74 @@ export function ExpenseForm({ categories, onSuccess }: ExpenseFormProps) {
       ) : null}
 
       <Field label="Concepto" error={form.formState.errors.concept?.message}>
-        <TextInput {...form.register("concept")} placeholder="Factura de luz" />
+        <Controller
+          control={form.control}
+          name="concept"
+          render={({ field }) => (
+            <TextInput {...field} value={toInputValue(field.value)} placeholder="Factura de luz" />
+          )}
+        />
       </Field>
 
       <div className="grid gap-4 md:grid-cols-3">
         <Field label="Monto" error={form.formState.errors.amount?.message}>
-          <TextInput {...form.register("amount", { valueAsNumber: true })} type="number" min="0.01" step="0.01" />
+          <Controller
+            control={form.control}
+            name="amount"
+            render={({ field }) => (
+              <TextInput
+                name={field.name}
+                ref={field.ref}
+                value={toInputValue(field.value)}
+                onBlur={field.onBlur}
+                onChange={(event) => field.onChange(toNumberValue(event.target.value))}
+                type="number"
+                min="0.01"
+                step="0.01"
+              />
+            )}
+          />
         </Field>
         <Field label="Categoria" error={form.formState.errors.categoryId?.message}>
-          <SelectInput {...form.register("categoryId")} disabled={!hasCategories}>
-            {!hasCategories ? <option value="">No hay categorias activas disponibles</option> : null}
-            {categories.map((category) => (
-              <option key={category.id} value={category.id}>
-                {category.name}
-              </option>
-            ))}
-          </SelectInput>
+          <Controller
+            control={form.control}
+            name="categoryId"
+            render={({ field }) => (
+              <SelectInput {...field} value={toInputValue(field.value)} disabled={!hasCategories}>
+                {!hasCategories ? <option value="">No hay categorias activas disponibles</option> : null}
+                {categories.map((category) => (
+                  <option key={category.id} value={category.id}>
+                    {category.name}
+                  </option>
+                ))}
+              </SelectInput>
+            )}
+          />
         </Field>
         <Field label="Fecha" error={form.formState.errors.expenseDate?.message}>
-          <TextInput {...form.register("expenseDate")} type="date" />
+          <Controller
+            control={form.control}
+            name="expenseDate"
+            render={({ field }) => (
+              <TextInput {...field} value={toInputValue(field.value)} type="date" />
+            )}
+          />
         </Field>
       </div>
 
       <Field label="Notas" error={form.formState.errors.notes?.message}>
-        <TextareaInput {...form.register("notes")} rows={4} placeholder="Detalle adicional del gasto." />
+        <Controller
+          control={form.control}
+          name="notes"
+          render={({ field }) => (
+            <TextareaInput
+              {...field}
+              value={toInputValue(field.value)}
+              rows={4}
+              placeholder="Detalle adicional del gasto."
+            />
+          )}
+        />
       </Field>
 
       {feedback ? <ActionNotice tone={feedback.tone} message={feedback.message} /> : null}
