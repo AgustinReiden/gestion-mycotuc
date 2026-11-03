@@ -79,7 +79,7 @@ export function ContactForm({ contact, onSuccess }: ContactFormProps) {
         },
       )}
     >
-      <div className="grid gap-4 md:grid-cols-2">
+      <div className="grid gap-3 sm:grid-cols-2">
         <Field label="Tipo" error={form.formState.errors.type?.message}>
           <Controller
             control={form.control}
@@ -107,13 +107,19 @@ export function ContactForm({ contact, onSuccess }: ContactFormProps) {
         </Field>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2">
+      <div className="grid gap-3 sm:grid-cols-2">
         <Field label="Teléfono" error={form.formState.errors.phone?.message}>
           <Controller
             control={form.control}
             name="phone"
             render={({ field }) => (
-              <TextInput {...field} value={toInputValue(field.value)} placeholder="+54 381..." />
+              <TextInput
+                {...field}
+                value={toInputValue(field.value)}
+                type="tel"
+                inputMode="tel"
+                placeholder="+54 381..."
+              />
             )}
           />
         </Field>
@@ -127,6 +133,7 @@ export function ContactForm({ contact, onSuccess }: ContactFormProps) {
                 {...field}
                 value={toInputValue(field.value)}
                 type="email"
+                inputMode="email"
                 placeholder="contacto@ejemplo.com"
               />
             )}
@@ -149,7 +156,7 @@ export function ContactForm({ contact, onSuccess }: ContactFormProps) {
         />
       </Field>
 
-      <label className="flex items-center gap-3 rounded-2xl border border-[var(--line)] bg-white/70 px-4 py-3 text-sm">
+      <label className="flex items-center gap-3 min-h-12 rounded-[var(--radius-control)] border border-[var(--line)] bg-[var(--surface)] px-3.5 py-3 text-[15px]">
         <Controller
           control={form.control}
           name="isActive"
@@ -161,7 +168,7 @@ export function ContactForm({ contact, onSuccess }: ContactFormProps) {
               checked={Boolean(field.value)}
               onBlur={field.onBlur}
               onChange={(event) => field.onChange(event.target.checked)}
-              className="h-4 w-4 accent-[var(--accent)]"
+              className="h-5 w-5 accent-[var(--accent)]"
             />
           )}
         />
@@ -170,8 +177,8 @@ export function ContactForm({ contact, onSuccess }: ContactFormProps) {
 
       {feedback ? <ActionNotice tone={feedback.tone} message={feedback.message} /> : null}
 
-      <div className="flex justify-end">
-        <Button type="submit" busy={pending}>
+      <div className="sheet-actions flex items-center justify-end gap-2">
+        <Button type="submit" size="lg" busy={pending}>
           {contact ? "Guardar cambios" : "Crear contacto"}
         </Button>
       </div>

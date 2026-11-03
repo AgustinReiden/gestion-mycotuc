@@ -1,7 +1,7 @@
 "use client";
 
-import { useDeferredValue, useEffect, useState } from "react";
-import { ClipboardList, Filter, Plus, Search } from "lucide-react";
+import { useDeferredValue, useState } from "react";
+import { ClipboardList, Plus, Search } from "lucide-react";
 import { ContactForm } from "@/components/forms/contact-form";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -9,6 +9,8 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { Modal } from "@/components/ui/modal";
 import { Panel } from "@/components/ui/panel";
 import type { ContactRecord } from "@/lib/domain";
+import { useQuickCreate } from "@/lib/hooks/use-quick-create";
+import { cn } from "@/lib/utils";
 
 type ContactsShellProps = {
   contacts: ContactRecord[];
@@ -23,12 +25,12 @@ function upsertContact(list: ContactRecord[], contact: ContactRecord) {
 }
 
 function NewContactModal({ onContactSaved }: { onContactSaved: (contact: ContactRecord) => void }) {
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useQuickCreate("contacto");
 
   return (
     <>
-      <Button type="button" className="w-full sm:w-auto" onClick={() => setOpen(true)}>
-        <Plus className="h-4 w-4" />
+      <Button type="button" size="lg" className="w-full sm:w-auto" onClick={() => setOpen(true)}>
+        <Plus className="h-5 w-5" />
         Nuevo contacto
       </Button>
       <Modal open={open} onClose={() => setOpen(false)} title="Nuevo contacto" description="Los contactos pueden reutilizarse en ventas o compras.">
@@ -62,9 +64,12 @@ export function ContactsShell({ contacts }: ContactsShellProps) {
   const deferredSearch = useDeferredValue(search);
   const hasActiveFilters = deferredSearch.trim().length > 0 || typeFilter !== "all";
 
-  useEffect(() => {
+  // Cuando el servidor manda datos nuevos (router.refresh), reemplazan a los locales.
+  const [syncedContacts, setSyncedContacts] = useState(contacts);
+  if (syncedContacts !== contacts) {
+    setSyncedContacts(contacts);
     setContactRecords(sortContacts(contacts));
-  }, [contacts]);
+  }
 
   const filteredContacts = contactRecords.filter((contact) => {
     const query = deferredSearch.toLowerCase();
@@ -76,49 +81,50 @@ export function ContactsShell({ contacts }: ContactsShellProps) {
     return matchesSearch && matchesType;
   });
 
+  const typeFilters: { value: typeof typeFilter; label: string }[] = [
+    { value: "all", label: "Todos" },
+    { value: "client", label: "Clientes" },
+    { value: "supplier", label: "Proveedores" },
+  ];
+
   return (
     <div className="page-grid">
-      <Panel>
-        <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
-          <div>
-            <p className="text-sm font-semibold uppercase tracking-[0.18em] text-[#55755e]">Contactos</p>
-            <h2 className="mt-2 text-3xl font-semibold">Clientes y proveedores</h2>
-            <p className="mt-2 text-sm text-[var(--muted)]">
-              Usa una agenda compartida para ventas, compras y trazabilidad comercial.
-            </p>
-          </div>
-          <div className="flex flex-col gap-3 md:flex-row">
-            <label className="flex w-full items-center gap-3 rounded-2xl border border-[var(--line)] bg-white/80 px-4 py-3 sm:min-w-[240px] sm:flex-1">
-              <Search className="h-4 w-4 text-[var(--muted)]" />
-              <input
-                value={search}
-                onChange={(event) => setSearch(event.target.value)}
-                placeholder="Buscar contacto..."
-                aria-label="Buscar contactos"
-                className="flex-1 bg-transparent text-sm placeholder:text-[#7e867e]"
-              />
-            </label>
-            <div className="flex w-full items-center gap-2 rounded-2xl border border-[var(--line)] bg-white/80 px-4 py-3 sm:w-auto">
-              <Filter className="h-4 w-4 text-[var(--muted)]" />
-              <select
-                value={typeFilter}
-                onChange={(event) => setTypeFilter(event.target.value as typeof typeFilter)}
-                aria-label="Filtrar contactos por tipo"
-                className="min-w-0 flex-1 bg-transparent text-sm sm:min-w-[160px]"
-              >
-                <option value="all">Todos</option>
-                <option value="client">Clientes</option>
-                <option value="supplier">Proveedores</option>
-              </select>
-            </div>
-            <NewContactModal
-              onContactSaved={(contact) => {
-                setContactRecords((current) => upsertContact(current, contact));
-              }}
-            />
-          </div>
+      <div className="grid gap-3">
+        <NewContactModal
+          onContactSaved={(contact) => {
+            setContactRecords((current) => upsertContact(current, contact));
+          }}
+        />
+        <label className="flex min-h-12 items-center gap-2 rounded-[var(--radius-control)] border border-[var(--line-strong)] bg-[var(--surface)] px-3.5 focus-within:border-[var(--foreground)]">
+          <Search className="h-4 w-4 shrink-0 text-[var(--muted)]" aria-hidden />
+          <input
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+            placeholder="Buscar nombre, teléfono o email"
+            aria-label="Buscar contactos"
+            className="min-w-0 flex-1 bg-transparent text-base placeholder:text-[#958d84]"
+          />
+        </label>
+        <div className="chip-row" role="radiogroup" aria-label="Filtrar contactos por tipo">
+          {typeFilters.map((filter) => (
+            <button
+              key={filter.value}
+              type="button"
+              role="radio"
+              aria-checked={typeFilter === filter.value}
+              onClick={() => setTypeFilter(filter.value)}
+              className={cn(
+                "min-h-10 rounded-full border px-3.5 text-sm font-semibold",
+                typeFilter === filter.value
+                  ? "border-[var(--foreground)] bg-[var(--foreground)] text-white"
+                  : "border-[var(--line-strong)] bg-[var(--surface)] text-[var(--ink-2)]",
+              )}
+            >
+              {filter.label}
+            </button>
+          ))}
         </div>
-      </Panel>
+      </div>
 
       {filteredContacts.length === 0 ? (
         <Panel>
@@ -126,22 +132,22 @@ export function ContactsShell({ contacts }: ContactsShellProps) {
             title={hasActiveFilters ? "No encontramos contactos" : "Todavía no hay contactos"}
             description={
               hasActiveFilters
-                ? "Prueba otro filtro o crea un contacto nuevo."
-                : "Crea la agenda inicial para reutilizar clientes y proveedores en toda la app."
+                ? "Probá con otro filtro o creá un contacto nuevo."
+                : "Creá la agenda inicial para reutilizar clientes y proveedores en toda la app."
             }
             icon={ClipboardList}
           />
         </Panel>
       ) : (
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
           {filteredContacts.map((contact) => (
-            <Panel key={contact.id} className="flex flex-col gap-4">
-              <div className="flex items-start justify-between">
+            <Panel key={contact.id} className="flex flex-col gap-3">
+              <div className="flex items-start justify-between gap-3">
                 <div>
-                  <p className="text-2xl font-semibold">{contact.name}</p>
+                  <p className="text-lg font-semibold">{contact.name}</p>
                   <p className="mt-1 text-sm text-[var(--muted)]">{contact.email ?? "Sin email"}</p>
                 </div>
-                <div className="flex gap-2">
+                <div className="flex shrink-0 gap-2">
                   <Badge tone={contact.type === "client" ? "accent" : "warning"}>
                     {contact.type === "client" ? "Cliente" : "Proveedor"}
                   </Badge>
@@ -149,13 +155,13 @@ export function ContactsShell({ contacts }: ContactsShellProps) {
                 </div>
               </div>
 
-              <div className="rounded-[24px] border border-[var(--line)] bg-[#f7f5ef] p-4 text-sm text-[var(--muted)]">
+              <div className="rounded-[var(--radius-control)] border border-[var(--line)] bg-[var(--surface-2)] p-3.5 text-sm text-[var(--muted)]">
                 <p>Teléfono: {contact.phone ?? "-"}</p>
-                <p className="mt-2">Notas: {contact.notes ?? "-"}</p>
+                <p className="mt-1.5">Notas: {contact.notes ?? "-"}</p>
               </div>
 
-              <div className="mt-auto flex justify-end">
-                <Button type="button" variant="secondary" onClick={() => setSelectedContact(contact)}>
+              <div className="mt-auto flex">
+                <Button type="button" variant="secondary" className="w-full sm:w-auto" onClick={() => setSelectedContact(contact)}>
                   Editar contacto
                 </Button>
               </div>

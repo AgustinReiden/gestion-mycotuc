@@ -8,12 +8,10 @@ type EmptyStateProps = {
 
 export function EmptyState({ title, description, icon: Icon }: EmptyStateProps) {
   return (
-    <div className="flex min-h-56 flex-col items-center justify-center rounded-[24px] border border-dashed border-[var(--line)] bg-white/60 px-6 py-10 text-center">
-      <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-[#dce8db] text-[#15553e]">
-        <Icon className="h-7 w-7" />
-      </div>
-      <h3 className="text-xl font-semibold text-[var(--foreground)]">{title}</h3>
-      <p className="mt-2 max-w-md text-sm text-[var(--muted)]">{description}</p>
+    <div className="flex flex-col items-center justify-center rounded-[var(--radius-card)] border border-dashed border-[var(--line-strong)] px-6 py-10 text-center">
+      <Icon aria-hidden className="mb-3 h-8 w-8 text-[var(--muted)]" />
+      <h3 className="text-lg font-semibold text-[var(--foreground)]">{title}</h3>
+      <p className="mt-1 max-w-sm text-sm text-[var(--muted)]">{description}</p>
     </div>
   );
 }

@@ -13,7 +13,7 @@ export type MarginSummary = {
   cost: number;
   margin: number;
   marginPercent: number | null;
-  /** Lineas sin costo congelado (ventas previas al registro de costos): no entran al margen. */
+  /** Lineas sin costo (null o 0: producto sin costo promedio al vender): no entran al margen. */
   missingCostLines: number;
 };
 
@@ -54,14 +54,23 @@ export function getPartialAmountError(amount: number | null | undefined, limit: 
   return null;
 }
 
-/** Costo de una linea: cantidad por costo unitario congelado; null si no hay costo. */
-export function getLineCost(quantity: number, unitCost: number | null) {
-  return unitCost === null ? null : roundMoney(quantity * unitCost);
+/**
+ * true si la linea tiene costo conocido. Un costo 0 o null es "sin costo": la base guarda NULL
+ * cuando el producto no tenia costo promedio, y las ventas viejas pueden tener 0. Contarlas con
+ * costo 0 daria un margen falso de 100%.
+ */
+export function hasKnownCost(unitCost: number | null | undefined): unitCost is number {
+  return typeof unitCost === "number" && Number.isFinite(unitCost) && unitCost > 0;
 }
 
-/** Valor del stock a costo promedio (stock negativo no suma valor); null si no hay costo. */
+/** Costo de una linea: cantidad por costo unitario congelado; null si no hay costo. */
+export function getLineCost(quantity: number, unitCost: number | null) {
+  return hasKnownCost(unitCost) ? roundMoney(quantity * unitCost) : null;
+}
+
+/** Valor del stock a costo promedio (stock negativo no suma valor); null si no hay costo (null o 0). */
 export function getStockValue(currentStock: number, avgCost: number | null) {
-  return avgCost === null ? null : roundMoney(Math.max(currentStock, 0) * avgCost);
+  return hasKnownCost(avgCost) ? roundMoney(Math.max(currentStock, 0) * avgCost) : null;
 }
 
 /** Margen porcentual sobre el precio de venta; null si no hay ingresos. */

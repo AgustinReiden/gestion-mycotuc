@@ -41,5 +41,5 @@ function findErrorMessage(error: unknown): string | null {
 }
 
 export function getFirstFormError(errors: FieldErrors) {
-  return findErrorMessage(errors) ?? "Revisa los campos marcados antes de guardar.";
+  return findErrorMessage(errors) ?? "Revisá los campos marcados antes de guardar.";
 }

@@ -132,7 +132,7 @@ async function resolveSaleContact(
   const customerName = input.customerName?.trim();
 
   if (!customerName) {
-    throw new Error("Ingresa el nombre del cliente.");
+    throw new Error("Ingresá el nombre del cliente.");
   }
 
   const { data, error } = await supabase

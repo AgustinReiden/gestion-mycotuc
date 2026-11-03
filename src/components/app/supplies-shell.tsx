@@ -1,6 +1,6 @@
 "use client";
 
-import { useDeferredValue, useEffect, useState, useTransition } from "react";
+import { useDeferredValue, useState, useTransition } from "react";
 import { Archive, Edit3, Plus, RotateCcw, Search, Settings2, ShoppingBasket } from "lucide-react";
 import { reverseSupplyPurchaseAction } from "@/actions/supplies";
 import { PurchaseHistoryPanel } from "@/components/app/purchase-history-panel";
@@ -22,6 +22,7 @@ import type {
   SupplyRecord,
 } from "@/lib/domain";
 import { getStockValue as getCostValue } from "@/lib/finance";
+import { useQuickCreate } from "@/lib/hooks/use-quick-create";
 import { formatCurrency, formatDate, sumBy } from "@/lib/utils";
 
 type SuppliesShellProps = {
@@ -124,8 +125,8 @@ function NewSupplyModal({ onSupplySaved }: { onSupplySaved: (supply: SupplyRecor
 
   return (
     <>
-      <Button type="button" className="w-full sm:w-auto" onClick={() => setOpen(true)}>
-        <Plus className="h-4 w-4" />
+      <Button type="button" variant="secondary" size="lg" className="w-full sm:w-auto" onClick={() => setOpen(true)}>
+        <Plus className="h-5 w-5" />
         Nuevo insumo
       </Button>
       <Modal
@@ -155,17 +156,17 @@ function NewPurchaseModal({
   supplies: SupplyRecord[];
   onPurchaseSaved: (result: PurchaseSuccessResult) => void;
 }) {
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useQuickCreate("compra");
 
   return (
     <>
       <Button
         type="button"
-        variant="secondary"
+        size="lg"
         className="w-full sm:w-auto"
         onClick={() => setOpen(true)}
       >
-        <ShoppingBasket className="h-4 w-4" />
+        <ShoppingBasket className="h-5 w-5" />
         Registrar compra
       </Button>
       <Modal
@@ -262,25 +263,25 @@ function ReversePurchaseModal({
       open
       onClose={onClose}
       title="Anular compra"
-      description="Registra movimientos de reversa y anula el gasto asociado."
+      description="Registrá movimientos de reversa y anulá el gasto asociado."
     >
       <div className="space-y-4">
-        <div className="rounded-2xl border border-[var(--line)] bg-[#f7f5ef] px-4 py-3 text-sm text-[var(--muted)]">
+        <div className="rounded-[var(--radius-control)] bg-[var(--surface-2)] px-3.5 py-3 text-[15px] text-[var(--ink-2)]">
           La anulación descontará los insumos comprados. Si ya fueron consumidos y el stock quedaría
           negativo, la base rechazará la operación.
         </div>
-        <label className="space-y-2 text-sm font-semibold">
+        <label className="grid gap-1.5 text-sm font-semibold text-[var(--ink-2)]">
           Motivo
           <textarea
             value={reason}
             onChange={(event) => setReason(event.target.value)}
-            className="w-full rounded-2xl border border-[var(--line)] bg-white/90 px-4 py-3 text-sm font-normal"
+            className="min-h-24 w-full rounded-[var(--radius-control)] border border-[var(--line-strong)] bg-[var(--surface)] px-3.5 py-2.5 text-base font-normal focus:border-[var(--foreground)]"
             rows={4}
             placeholder="Error de carga, devolución al proveedor o factura anulada."
           />
         </label>
         {feedback ? <ActionNotice tone="error" message={feedback} /> : null}
-        <div className="flex justify-end gap-2">
+        <div className="sheet-actions flex items-center justify-end gap-2">
           <Button type="button" variant="ghost" onClick={onClose}>
             Cancelar
           </Button>
@@ -340,17 +341,26 @@ export function SuppliesShell({
     ? purchaseRecords.find((purchase) => purchase.id === reversePurchaseId) ?? null
     : null;
 
-  useEffect(() => {
+  // Cuando el servidor manda datos nuevos (router.refresh), reemplazan a los locales.
+  const [syncedSupplies, setSyncedSupplies] = useState(supplies);
+  if (syncedSupplies !== supplies) {
+    setSyncedSupplies(supplies);
     setSupplyRecords(sortSupplies(supplies));
-  }, [supplies]);
+  }
 
-  useEffect(() => {
+  // Cuando el servidor manda datos nuevos (router.refresh), reemplazan a los locales.
+  const [syncedPurchases, setSyncedPurchases] = useState(purchases);
+  if (syncedPurchases !== purchases) {
+    setSyncedPurchases(purchases);
     setPurchaseRecords(sortPurchases(purchases));
-  }, [purchases]);
+  }
 
-  useEffect(() => {
+  // Cuando el servidor manda datos nuevos (router.refresh), reemplazan a los locales.
+  const [syncedMovements, setSyncedMovements] = useState(movements);
+  if (syncedMovements !== movements) {
+    setSyncedMovements(movements);
     setMovementRecords(sortMovements(movements));
-  }, [movements]);
+  }
 
   const filteredSupplies = supplyRecords.filter((supply) =>
     supply.name.toLowerCase().includes(deferredSearch.toLowerCase()),
@@ -359,54 +369,46 @@ export function SuppliesShell({
 
   return (
     <div className="page-grid">
-      <Panel>
-        <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
-          <div>
-            <p className="text-sm font-semibold uppercase tracking-[0.18em] text-[#55755e]">Insumos</p>
-            <h2 className="mt-2 text-3xl font-semibold">Reposición y stock de fábrica</h2>
-            <p className="mt-2 text-sm text-[var(--muted)]">
-              Controla existencias, compras ligadas a gastos y ajustes manuales de inventario.
+      <div className="grid gap-3">
+        {isAdmin ? (
+          <Panel className="p-3.5 sm:p-4">
+            <p className="text-[13px] font-medium text-[var(--ink-2)]">Valor del stock (costo promedio)</p>
+            <p className="font-[family-name:var(--font-heading)] text-2xl font-semibold tabular-nums">
+              {formatCurrency(totalStockValue)}
             </p>
-            {isAdmin ? (
-              <p className="mt-2 text-sm">
-                Valor del stock (costo promedio):{" "}
-                <span className="font-semibold">{formatCurrency(totalStockValue)}</span>
-              </p>
-            ) : null}
-          </div>
-
-          <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
-            <label className="flex w-full items-center gap-3 rounded-2xl border border-[var(--line)] bg-white/80 px-4 py-3 sm:min-w-[260px] sm:flex-1">
-              <Search className="h-4 w-4 text-[var(--muted)]" />
-              <input
-                value={search}
-                onChange={(event) => setSearch(event.target.value)}
-                placeholder="Buscar insumo..."
-                aria-label="Buscar insumos"
-                className="flex-1 bg-transparent text-sm placeholder:text-[#7e867e]"
-              />
-            </label>
-            <NewPurchaseModal
-              suppliers={suppliers}
-              supplies={supplyRecords}
-              onPurchaseSaved={(result) => {
-                setPurchaseRecords((current) =>
-                  mergePurchases(current, [result.purchase], purchaseHistoryLimit),
-                );
-                setSupplyRecords((current) => mergeSupplies(current, result.supplies));
-                setMovementRecords((current) =>
-                  mergeMovements(current, result.movements, movementHistoryLimit),
-                );
-              }}
-            />
-            <NewSupplyModal
-              onSupplySaved={(supply) => {
-                setSupplyRecords((current) => upsertSupply(current, supply));
-              }}
-            />
-          </div>
+          </Panel>
+        ) : null}
+        <div className="grid gap-2 sm:grid-cols-2 md:flex md:flex-wrap md:items-center">
+          <NewPurchaseModal
+            suppliers={suppliers}
+            supplies={supplyRecords}
+            onPurchaseSaved={(result) => {
+              setPurchaseRecords((current) =>
+                mergePurchases(current, [result.purchase], purchaseHistoryLimit),
+              );
+              setSupplyRecords((current) => mergeSupplies(current, result.supplies));
+              setMovementRecords((current) =>
+                mergeMovements(current, result.movements, movementHistoryLimit),
+              );
+            }}
+          />
+          <NewSupplyModal
+            onSupplySaved={(supply) => {
+              setSupplyRecords((current) => upsertSupply(current, supply));
+            }}
+          />
         </div>
-      </Panel>
+        <label className="flex min-h-12 items-center gap-2 rounded-[var(--radius-control)] border border-[var(--line-strong)] bg-[var(--surface)] px-3.5 focus-within:border-[var(--foreground)]">
+          <Search className="h-4 w-4 shrink-0 text-[var(--muted)]" aria-hidden />
+          <input
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+            placeholder="Buscar insumo"
+            aria-label="Buscar insumos"
+            className="min-w-0 flex-1 bg-transparent text-base placeholder:text-[#958d84]"
+          />
+        </label>
+      </div>
 
       {filteredSupplies.length === 0 ? (
         <Panel>
@@ -414,8 +416,8 @@ export function SuppliesShell({
             title={hasSearchQuery ? "No encontramos insumos" : "Todavía no hay insumos"}
             description={
               hasSearchQuery
-                ? "Prueba otro término de búsqueda o crea un insumo nuevo."
-                : "Crea insumos base para empezar a registrar compras y movimientos."
+                ? "Probá con otro término de búsqueda o creá un insumo nuevo."
+                : "Creá insumos base para empezar a registrar compras y movimientos."
             }
             icon={Archive}
           />
@@ -424,7 +426,7 @@ export function SuppliesShell({
         <Panel className="overflow-hidden p-0">
           <div className="divide-y divide-[var(--line)] md:hidden">
             {filteredSupplies.map((supply) => (
-              <article key={supply.id} className="space-y-4 bg-white/80 p-4">
+              <article key={supply.id} className="space-y-3 bg-[var(--surface)] p-3.5">
                 <div className="flex items-start justify-between gap-3">
                   <div>
                     <h3 className="font-semibold">{supply.name}</h3>
@@ -437,7 +439,7 @@ export function SuppliesShell({
                   </Badge>
                 </div>
 
-                <div className="grid gap-3 rounded-[22px] border border-[var(--line)] bg-[#f8f6ef] p-4 text-sm sm:grid-cols-3">
+                <div className="grid gap-3 rounded-[var(--radius-control)] border border-[var(--line)] bg-[var(--surface-2)] p-3.5 text-sm sm:grid-cols-3">
                   <p>
                     Stock: {supply.currentStock} {supply.unit}
                   </p>
@@ -447,17 +449,17 @@ export function SuppliesShell({
                   <p>Última compra: {formatDate(supply.lastPurchaseAt)}</p>
                   {isAdmin && supply.avgCost !== null ? (
                     <>
-                      <p>Costo promedio: {formatCurrency(supply.avgCost)}</p>
-                      <p>Valor stock: {formatCurrency(getStockValue(supply) ?? 0)}</p>
+                      <p>Costo promedio: {supply.avgCost > 0 ? formatCurrency(supply.avgCost) : "sin costo"}</p>
+                      {supply.avgCost > 0 ? <p>Valor stock: {formatCurrency(getStockValue(supply) ?? 0)}</p> : null}
                     </>
                   ) : null}
                 </div>
 
-                <div className="flex flex-col gap-2 sm:flex-row">
+                <div className="flex gap-2">
                   <Button
                     type="button"
                     variant="secondary"
-                    className="w-full"
+                    className="flex-1"
                     onClick={() => setSelectedSupplyId(supply.id)}
                   >
                     <Edit3 className="h-4 w-4" />
@@ -466,7 +468,7 @@ export function SuppliesShell({
                   <Button
                     type="button"
                     variant="ghost"
-                    className="w-full"
+                    className="flex-1"
                     onClick={() => setAdjustmentSupplyId(supply.id)}
                   >
                     <Settings2 className="h-4 w-4" />
@@ -479,7 +481,7 @@ export function SuppliesShell({
 
           <div className="hidden overflow-x-auto md:block">
             <table className="min-w-full text-left text-sm">
-              <thead className="bg-[#f4f1e8] text-[var(--muted)]">
+              <thead className="bg-[var(--surface-2)] text-[var(--muted)]">
                 <tr>
                   <th className="px-4 py-3 font-medium">Insumo</th>
                   <th className="px-4 py-3 font-medium">Stock actual</th>
@@ -497,7 +499,7 @@ export function SuppliesShell({
               </thead>
               <tbody>
                 {filteredSupplies.map((supply) => (
-                  <tr key={supply.id} className="border-t border-[var(--line)] bg-white/80">
+                  <tr key={supply.id} className="border-t border-[var(--line)] bg-[var(--surface)]">
                     <td className="px-4 py-4">
                       <p className="font-semibold">{supply.name}</p>
                       {supply.notes ? <p className="text-xs text-[var(--muted)]">{supply.notes}</p> : null}
@@ -512,10 +514,10 @@ export function SuppliesShell({
                     {isAdmin ? (
                       <>
                         <td className="px-4 py-4">
-                          {supply.avgCost === null ? "-" : formatCurrency(supply.avgCost)}
+                          {supply.avgCost === null ? "—" : supply.avgCost > 0 ? formatCurrency(supply.avgCost) : "Sin costo"}
                         </td>
                         <td className="px-4 py-4">
-                          {supply.avgCost === null ? "-" : formatCurrency(getStockValue(supply) ?? 0)}
+                          {supply.avgCost === null || supply.avgCost === 0 ? "—" : formatCurrency(getStockValue(supply) ?? 0)}
                         </td>
                       </>
                     ) : null}
@@ -544,7 +546,7 @@ export function SuppliesShell({
         </Panel>
       )}
 
-      <div className="grid gap-4 xl:grid-cols-[1fr_1.2fr]">
+      <div className="grid gap-3 xl:grid-cols-[1fr_1.2fr]">
         <PurchaseHistoryPanel
           purchases={purchaseRecords}
           onReversePurchase={(purchase) => setReversePurchaseId(purchase.id)}

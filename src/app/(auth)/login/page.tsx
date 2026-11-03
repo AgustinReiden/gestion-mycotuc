@@ -6,11 +6,11 @@ export const dynamic = "force-dynamic";
 
 function getLoginNotice(reason: string | string[] | undefined) {
   if (reason === "session-expired") {
-    return "Tu sesión expiró. Vuelve a iniciar sesión para seguir usando la app.";
+    return "Tu sesión expiró. Volvé a iniciar sesión para seguir usando la app.";
   }
 
   if (reason === "profile-missing") {
-    return "No pudimos recuperar tu perfil. Inicia sesión de nuevo para reintentar.";
+    return "No pudimos recuperar tu perfil. Iniciá sesión de nuevo para reintentar.";
   }
 
   if (reason === "signed-out") {
@@ -37,30 +37,29 @@ export default async function LoginPage({
   const notice = getLoginNotice((await searchParams).reason);
 
   return (
-    <main className="relative flex min-h-screen items-center justify-center overflow-hidden px-4 py-10">
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(66,138,96,0.24),transparent_26%),radial-gradient(circle_at_bottom_right,rgba(216,155,57,0.16),transparent_24%)]" />
-      <div className="relative grid w-full max-w-6xl gap-6 lg:grid-cols-[1.15fr_0.85fr]">
-        <section className="glass-panel shadow-soft hidden rounded-[34px] border border-white/70 p-10 lg:flex lg:flex-col lg:justify-between">
+    <main className="flex min-h-dvh items-center justify-center px-4 py-10">
+      <div className="grid w-full max-w-5xl gap-4 lg:grid-cols-[1.15fr_0.85fr]">
+        <section className="hidden rounded-[var(--radius-card)] border border-[var(--line)] bg-[var(--surface)] p-10 lg:flex lg:flex-col lg:justify-between">
           <div className="max-w-xl">
-            <p className="inline-flex rounded-full bg-[#dce8db] px-3 py-1 text-sm font-semibold text-[#15553e]">
+            <p className="inline-flex rounded-full bg-[var(--moss-soft)] px-3 py-1 text-sm font-semibold text-[var(--moss)]">
               Mycotuc Gestión
             </p>
-            <h1 className="mt-6 text-5xl font-semibold leading-tight text-[var(--foreground)]">
+            <h1 className="mt-6 text-4xl font-semibold leading-tight text-[var(--foreground)]">
               Tu operación completa en un solo tablero.
             </h1>
-            <p className="mt-5 text-lg leading-8 text-[var(--muted)]">
-              Controla ventas, gastos, producción, inventario y contactos desde una app pensada para
+            <p className="mt-4 text-lg leading-8 text-[var(--muted)]">
+              Controlá ventas, gastos, producción, inventario y contactos desde una app pensada para
               el ritmo real de tu emprendimiento de hongos adaptógenos.
             </p>
           </div>
 
-          <div className="grid gap-4 md:grid-cols-3">
+          <div className="grid gap-3 md:grid-cols-3">
             {[
               ["Ventas", "Pedidos multi-ítem y estados de cobro."],
               ["Producción", "Lotes simples con consumo y rendimiento."],
               ["Inventario", "Stock centralizado por movimientos auditables."],
             ].map(([title, copy]) => (
-              <article key={title} className="rounded-[26px] border border-white/70 bg-white/80 p-5">
+              <article key={title} className="rounded-[var(--radius-card)] border border-[var(--line)] bg-[var(--surface-2)] p-4">
                 <h2 className="text-xl font-semibold">{title}</h2>
                 <p className="mt-2 text-sm leading-6 text-[var(--muted)]">{copy}</p>
               </article>
@@ -68,12 +67,12 @@ export default async function LoginPage({
           </div>
         </section>
 
-        <section className="glass-panel shadow-soft rounded-[34px] border border-white/70 p-6 sm:p-8 lg:p-10">
-          <div className="mb-8">
-            <p className="text-sm font-semibold uppercase tracking-[0.24em] text-[#55755e]">Acceso</p>
-            <h2 className="mt-3 text-4xl font-semibold">Iniciar sesión</h2>
-            <p className="mt-3 text-sm leading-6 text-[var(--muted)]">
-              Usa una cuenta creada manualmente en Supabase Auth para entrar al panel interno.
+        <section className="rounded-[var(--radius-card)] border border-[var(--line)] bg-[var(--surface)] p-5 sm:p-8 lg:p-10">
+          <div className="mb-6">
+            <p className="text-[13px] font-medium text-[var(--muted)]">Acceso</p>
+            <h2 className="mt-1 text-3xl font-semibold">Iniciar sesión</h2>
+            <p className="mt-2 text-sm leading-6 text-[var(--muted)]">
+              Usá una cuenta creada manualmente en Supabase Auth para entrar al panel interno.
             </p>
           </div>
           <LoginForm notice={notice} />

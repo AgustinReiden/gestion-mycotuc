@@ -10,6 +10,12 @@
  * - Funciones: pg_proc (todas las RPC de negocio reciben `payload jsonb`).
  * - Las vistas se marcan con todas las columnas nullable (Postgres no infiere nulabilidad en vistas).
  * Para regenerar tras un cambio de esquema, correr el comando oficial de arriba y reemplazar este archivo.
+ *
+ * Agregado a mano (migracion 20261104120000_admin_costs_and_initial_stock_cost): tabla
+ * average_cost_changes y funciones get_*_costs, set_average_cost, upsert_product_core y
+ * upsert_supply_core. Ojo: authenticated ya no tiene SELECT de las columnas de costo
+ * (avg_cost, unit_cost, total_cost, purchase_items.line_total); siguen en Row porque existen,
+ * pero solo se leen con las funciones get_*_costs (admin).
  */
 
 export type Json = string | number | boolean | null | { [key: string]: Json | undefined } | Json[];
@@ -17,6 +23,59 @@ export type Json = string | number | boolean | null | { [key: string]: Json | un
 export type Database = {
   public: {
     Tables: {
+      average_cost_changes: {
+        Row: {
+          id: string;
+          entity_type: Database["public"]["Enums"]["entity_type"];
+          entity_id: string;
+          source: "stock_adjustment" | "manual_correction";
+          previous_avg_cost: number;
+          new_avg_cost: number;
+          quantity: number | null;
+          unit_cost: number | null;
+          inventory_movement_id: string | null;
+          reason: string;
+          created_by: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          entity_type: Database["public"]["Enums"]["entity_type"];
+          entity_id: string;
+          source: "stock_adjustment" | "manual_correction";
+          previous_avg_cost: number;
+          new_avg_cost: number;
+          quantity?: number | null;
+          unit_cost?: number | null;
+          inventory_movement_id?: string | null;
+          reason: string;
+          created_by?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          entity_type?: Database["public"]["Enums"]["entity_type"];
+          entity_id?: string;
+          source?: "stock_adjustment" | "manual_correction";
+          previous_avg_cost?: number;
+          new_avg_cost?: number;
+          quantity?: number | null;
+          unit_cost?: number | null;
+          inventory_movement_id?: string | null;
+          reason?: string;
+          created_by?: string | null;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "average_cost_changes_inventory_movement_id_fkey";
+            columns: ["inventory_movement_id"];
+            isOneToOne: false;
+            referencedRelation: "inventory_movements";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       contacts: {
         Row: {
           id: string;
@@ -964,6 +1023,30 @@ export type Database = {
         Args: never;
         Returns: Database["public"]["Tables"]["profiles"]["Row"];
       };
+      get_batch_costs: {
+        Args: never;
+        Returns: { id: string; total_cost: number | null; unit_cost: number | null }[];
+      };
+      get_batch_input_costs: {
+        Args: never;
+        Returns: { id: string; batch_id: string; unit_cost: number | null }[];
+      };
+      get_product_costs: {
+        Args: never;
+        Returns: { id: string; avg_cost: number }[];
+      };
+      get_purchase_item_costs: {
+        Args: never;
+        Returns: { id: string; purchase_id: string; unit_cost: number; line_total: number }[];
+      };
+      get_sale_item_costs: {
+        Args: never;
+        Returns: { id: string; unit_cost: number | null }[];
+      };
+      get_supply_costs: {
+        Args: never;
+        Returns: { id: string; avg_cost: number }[];
+      };
       is_admin: {
         Args: never;
         Returns: boolean;
@@ -1028,6 +1111,10 @@ export type Database = {
         Args: { payload: Json };
         Returns: Database["public"]["Tables"]["product_price_tiers"]["Row"][];
       };
+      set_average_cost: {
+        Args: { payload: Json };
+        Returns: Database["public"]["Tables"]["average_cost_changes"]["Row"];
+      };
       set_row_updated_at: {
         Args: never;
         Returns: never;
@@ -1048,11 +1135,21 @@ export type Database = {
         Args: { payload: Json };
         Returns: Database["public"]["Tables"]["contacts"]["Row"];
       };
+      /** Para quien no es admin, avg_cost viene en null. */
       upsert_product: {
         Args: { payload: Json };
         Returns: Database["public"]["Tables"]["products"]["Row"];
       };
+      upsert_product_core: {
+        Args: { payload: Json };
+        Returns: Database["public"]["Tables"]["products"]["Row"];
+      };
+      /** Para quien no es admin, avg_cost viene en null. */
       upsert_supply: {
+        Args: { payload: Json };
+        Returns: Database["public"]["Tables"]["supplies"]["Row"];
+      };
+      upsert_supply_core: {
         Args: { payload: Json };
         Returns: Database["public"]["Tables"]["supplies"]["Row"];
       };

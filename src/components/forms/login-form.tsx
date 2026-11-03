@@ -18,7 +18,7 @@ export function LoginForm({ notice = null }: LoginFormProps) {
 
   return (
     <form
-      className="space-y-5"
+      className="space-y-4"
       onSubmit={(event) => {
         event.preventDefault();
         setFeedback(null);
@@ -34,6 +34,7 @@ export function LoginForm({ notice = null }: LoginFormProps) {
       <Field label="Email">
         <TextInput
           type="email"
+          inputMode="email"
           value={email}
           onChange={(event) => setEmail(event.target.value)}
           placeholder="admin@mycotuc.com"
@@ -54,12 +55,10 @@ export function LoginForm({ notice = null }: LoginFormProps) {
       {notice ? <ActionNotice tone="warning" message={notice} /> : null}
 
       {feedback ? (
-        <div className="rounded-2xl border border-[#ebc7bf] bg-[#fff1ed] px-4 py-3 text-sm text-[#9a4635]">
-          {feedback}
-        </div>
+        <ActionNotice tone="error" message={feedback} />
       ) : null}
 
-      <Button type="submit" className="w-full" busy={pending}>
+      <Button type="submit" size="lg" className="w-full" busy={pending}>
         Entrar al sistema
       </Button>
     </form>

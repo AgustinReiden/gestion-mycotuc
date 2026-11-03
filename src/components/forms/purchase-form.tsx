@@ -42,6 +42,8 @@ function getInitialItem(supplies: SupplyRecord[]) {
 }
 
 export function PurchaseForm({ suppliers, supplies, onSuccess }: PurchaseFormProps) {
+  "use no memo";
+
   const [pending, startTransition] = useTransition();
   const [feedback, setFeedback] = useState<{ tone: "success" | "error"; message: string } | null>(null);
   const form = useForm<PurchaseFormValues>({
@@ -83,7 +85,7 @@ export function PurchaseForm({ suppliers, supplies, onSuccess }: PurchaseFormPro
 
   return (
     <form
-      className="space-y-5"
+      className="space-y-4"
       onSubmit={form.handleSubmit(
         (values) => {
           if (!canSubmitPurchase) {
@@ -119,11 +121,11 @@ export function PurchaseForm({ suppliers, supplies, onSuccess }: PurchaseFormPro
       {!canSubmitPurchase ? (
         <ActionNotice
           tone="warning"
-          message={`Antes de registrar una compra, crea ${missingDependencies.join(" y ")}.`}
+          message={`Antes de registrar una compra, creá ${missingDependencies.join(" y ")}.`}
         />
       ) : null}
 
-      <div className="grid gap-4 md:grid-cols-2">
+      <div className="grid gap-3 sm:grid-cols-2">
         <Field label="Proveedor" error={form.formState.errors.supplierId?.message}>
           <Controller
             control={form.control}
@@ -153,10 +155,10 @@ export function PurchaseForm({ suppliers, supplies, onSuccess }: PurchaseFormPro
         </Field>
       </div>
 
-      <div className="rounded-[26px] border border-[var(--line)] bg-[#f7f5ef] p-4">
-        <div className="mb-4 flex items-center justify-between">
+      <div className="rounded-[var(--radius-card)] border border-[var(--line)] bg-[var(--surface-2)] p-3.5">
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
           <div>
-            <h4 className="text-lg font-semibold">Items comprados</h4>
+            <h4 className="text-lg font-semibold">Ítems comprados</h4>
             <p className="text-sm text-[var(--muted)]">Cada línea aumenta stock y genera el gasto asociado.</p>
           </div>
           <Button
@@ -176,7 +178,7 @@ export function PurchaseForm({ suppliers, supplies, onSuccess }: PurchaseFormPro
             const selectedSupply = supplies.find((supply) => supply.id === selectedSupplyId);
 
             return (
-              <div key={field.id} className="grid gap-3 rounded-[24px] border border-[var(--line)] bg-white/90 p-4 md:grid-cols-[1.7fr_0.7fr_0.8fr_auto]">
+              <div key={field.id} className="grid gap-3 rounded-[var(--radius-card)] border border-[var(--line)] bg-[var(--surface)] p-3.5 sm:grid-cols-[1.7fr_0.7fr_0.8fr_auto]">
                 <Field label="Insumo" error={form.formState.errors.items?.[index]?.supplyId?.message}>
                   <Controller
                     control={form.control}
@@ -211,6 +213,7 @@ export function PurchaseForm({ suppliers, supplies, onSuccess }: PurchaseFormPro
                         onBlur={itemField.onBlur}
                         onChange={(event) => itemField.onChange(toNumberValue(event.target.value))}
                         type="number"
+                        inputMode="decimal"
                         min="0"
                         step="0.01"
                       />
@@ -229,6 +232,7 @@ export function PurchaseForm({ suppliers, supplies, onSuccess }: PurchaseFormPro
                         onBlur={itemField.onBlur}
                         onChange={(event) => itemField.onChange(toNumberValue(event.target.value))}
                         type="number"
+                        inputMode="decimal"
                         min="0.01"
                         step="0.01"
                       />
@@ -237,13 +241,14 @@ export function PurchaseForm({ suppliers, supplies, onSuccess }: PurchaseFormPro
                 </Field>
 
                 <div className="flex items-end gap-2">
-                  <div className="min-w-28 rounded-2xl bg-[#eef4ea] px-3 py-3 text-sm font-semibold text-[#1e5f44]">
+                  <div className="min-w-28 flex-1 rounded-[var(--radius-control)] bg-[var(--moss-soft)] px-3 py-2.5 text-sm font-semibold text-[var(--moss)] sm:flex-none">
                     {formatCurrency((Number(watchedItems[index]?.quantity) || 0) * (Number(watchedItems[index]?.unitCost) || 0))}
-                    <div className="mt-1 text-xs font-medium text-[#55755e]">{selectedSupply?.unit ?? "unidad"}</div>
+                    <div className="mt-1 text-xs font-medium text-[var(--ink-2)]">{selectedSupply?.unit ?? "unidad"}</div>
                   </div>
                   <Button
                     type="button"
                     variant="ghost"
+                    className="text-[var(--danger)]"
                     aria-label={`Quitar insumo ${index + 1}`}
                     disabled={items.fields.length <= 1}
                     onClick={() => (items.fields.length > 1 ? items.remove(index) : null)}
@@ -274,12 +279,12 @@ export function PurchaseForm({ suppliers, supplies, onSuccess }: PurchaseFormPro
 
       {feedback ? <ActionNotice tone={feedback.tone} message={feedback.message} /> : null}
 
-      <div className="flex items-center justify-between rounded-[24px] border border-[var(--line)] bg-[#eef4ea] px-4 py-4">
+      <div className="sheet-actions flex items-center justify-between gap-3">
         <div>
-          <p className="text-sm text-[#55755e]">Total estimado</p>
-          <p className="text-2xl font-semibold text-[#15553e]">{formatCurrency(total)}</p>
+          <p className="text-[13px] font-medium text-[var(--muted)]">Total estimado</p>
+          <p className="font-[family-name:var(--font-heading)] text-2xl font-semibold tabular-nums text-[var(--moss)]">{formatCurrency(total)}</p>
         </div>
-        <Button type="submit" busy={pending} disabled={!canSubmitPurchase}>
+        <Button type="submit" size="lg" busy={pending} disabled={!canSubmitPurchase}>
           Registrar compra
         </Button>
       </div>

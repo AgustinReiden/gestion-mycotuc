@@ -12,25 +12,24 @@ type MetricCardProps = {
 
 export function MetricCard({ label, value, helper, icon: Icon, tone = "accent" }: MetricCardProps) {
   return (
-    <Panel className="p-0">
-      <div className="flex items-start justify-between p-5">
-        <div className="space-y-2">
-          <p className="text-sm text-[var(--muted)]">{label}</p>
-          <p className="text-3xl font-semibold text-[var(--foreground)]">{value}</p>
-          <p className="text-sm text-[var(--muted)]">{helper}</p>
-        </div>
-        <div
+    <Panel className="flex flex-col gap-1 p-4">
+      <div className="flex items-center gap-2 text-sm font-medium text-[var(--ink-2)]">
+        <Icon
+          aria-hidden
           className={cn(
-            "flex h-12 w-12 items-center justify-center rounded-2xl shadow-[0_2px_10px_rgba(0,0,0,0.04)] border",
-            tone === "accent" && "bg-[#ebf2ec] text-[#2f5c43] border-[#d8e6da]",
-            tone === "danger" && "bg-[#faebe8] text-[#a54b3d] border-[#f0d4cf]",
-            tone === "info" && "bg-[#e8f0f4] text-[#35627a] border-[#d2e4ed]",
-            tone === "warning" && "bg-[#fcf0d9] text-[#b77f28] border-[#f5dfb8]",
+            "h-4 w-4 shrink-0",
+            tone === "accent" && "text-[var(--moss)]",
+            tone === "danger" && "text-[var(--danger)]",
+            tone === "info" && "text-[var(--ink-2)]",
+            tone === "warning" && "text-[var(--amber-ink)]",
           )}
-        >
-          <Icon className="h-6 w-6" />
-        </div>
+        />
+        <span className="truncate">{label}</span>
       </div>
+      <p className="font-[family-name:var(--font-heading)] text-[28px] font-semibold leading-tight tracking-tight text-[var(--foreground)] tabular-nums sm:text-3xl">
+        {value}
+      </p>
+      <p className="text-[13px] leading-snug text-[var(--muted)]">{helper}</p>
     </Panel>
   );
 }

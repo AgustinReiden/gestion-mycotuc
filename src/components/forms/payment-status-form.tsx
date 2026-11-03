@@ -125,18 +125,18 @@ export function PaymentStatusForm({
         },
       )}
     >
-      <div className="grid gap-3 rounded-[22px] border border-[var(--line)] bg-[#f7f5ef] p-4 text-sm sm:grid-cols-3">
-        <div>
-          <p className="text-xs uppercase tracking-[0.18em] text-[#55755e]">Total</p>
+      <div className="grid gap-3 rounded-[var(--radius-card)] border border-[var(--line)] bg-[var(--surface-2)] p-3.5 text-sm grid-cols-2 sm:grid-cols-3">
+        <div className="col-span-2 sm:col-span-1">
+          <p className="text-[13px] font-medium text-[var(--muted)]">Total</p>
           <p className="mt-1 font-semibold">{formatCurrency(totalAmount)}</p>
         </div>
         <div>
-          <p className="text-xs uppercase tracking-[0.18em] text-[#55755e]">Cobrado</p>
-          <p className="mt-1 font-semibold text-[#15553e]">{formatCurrency(amountPaid)}</p>
+          <p className="text-[13px] font-medium text-[var(--muted)]">Cobrado</p>
+          <p className="mt-1 font-semibold text-[var(--moss)]">{formatCurrency(amountPaid)}</p>
         </div>
         <div>
-          <p className="text-xs uppercase tracking-[0.18em] text-[#55755e]">Saldo pendiente</p>
-          <p className="mt-1 font-semibold text-[#8c5b17]">{formatCurrency(balance)}</p>
+          <p className="text-[13px] font-medium text-[var(--muted)]">Saldo pendiente</p>
+          <p className="mt-1 font-semibold text-[var(--amber-ink)]">{formatCurrency(balance)}</p>
         </div>
       </div>
 
@@ -173,6 +173,7 @@ export function PaymentStatusForm({
                 onBlur={field.onBlur}
                 onChange={(event) => field.onChange(toNumberValue(event.target.value))}
                 type="number"
+                inputMode="decimal"
                 min="0.01"
                 step="0.01"
               />
@@ -194,7 +195,7 @@ export function PaymentStatusForm({
         />
       ) : null}
 
-      <div className="grid gap-4 md:grid-cols-2">
+      <div className="grid gap-3 sm:grid-cols-2">
         <Field label="Método">
           <Controller
             control={form.control}
@@ -227,8 +228,8 @@ export function PaymentStatusForm({
 
       {feedback ? <ActionNotice tone={feedback.tone} message={feedback.message} /> : null}
 
-      <div className="flex justify-end">
-        <Button type="submit" busy={pending}>
+      <div className="sheet-actions flex items-center justify-end gap-2">
+        <Button type="submit" size="lg" busy={pending}>
           Guardar cobro
         </Button>
       </div>

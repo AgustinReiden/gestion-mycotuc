@@ -73,7 +73,7 @@ export function SupplyForm({ supply, onSuccess }: SupplyFormProps) {
         },
       )}
     >
-      <div className="grid gap-4 md:grid-cols-2">
+      <div className="grid gap-3 sm:grid-cols-2">
         <Field label="Nombre" error={form.formState.errors.name?.message}>
           <Controller
             control={form.control}
@@ -106,6 +106,7 @@ export function SupplyForm({ supply, onSuccess }: SupplyFormProps) {
               onBlur={field.onBlur}
               onChange={(event) => field.onChange(toNumberValue(event.target.value))}
               type="number"
+              inputMode="decimal"
               min="0"
               step="0.01"
             />
@@ -128,7 +129,7 @@ export function SupplyForm({ supply, onSuccess }: SupplyFormProps) {
         />
       </Field>
 
-      <label className="flex items-center gap-3 rounded-2xl border border-[var(--line)] bg-white/70 px-4 py-3 text-sm">
+      <label className="flex items-center gap-3 min-h-12 rounded-[var(--radius-control)] border border-[var(--line)] bg-[var(--surface)] px-3.5 py-3 text-[15px]">
         <Controller
           control={form.control}
           name="isActive"
@@ -140,7 +141,7 @@ export function SupplyForm({ supply, onSuccess }: SupplyFormProps) {
               checked={Boolean(field.value)}
               onBlur={field.onBlur}
               onChange={(event) => field.onChange(event.target.checked)}
-              className="h-4 w-4 accent-[var(--accent)]"
+              className="h-5 w-5 accent-[var(--accent)]"
             />
           )}
         />
@@ -149,8 +150,8 @@ export function SupplyForm({ supply, onSuccess }: SupplyFormProps) {
 
       {feedback ? <ActionNotice tone={feedback.tone} message={feedback.message} /> : null}
 
-      <div className="flex justify-end">
-        <Button type="submit" busy={pending}>
+      <div className="sheet-actions flex items-center justify-end gap-2">
+        <Button type="submit" size="lg" busy={pending}>
           {supply ? "Guardar cambios" : "Crear insumo"}
         </Button>
       </div>

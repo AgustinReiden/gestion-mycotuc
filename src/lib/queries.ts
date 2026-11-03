@@ -52,21 +52,34 @@ function toStockAlert(record: ProductRecord | SupplyRecord, type: "product" | "s
   };
 }
 
-/** Para operadores: los costos no viajan al cliente. */
-function hideSaleCosts(sales: SaleOrderRecord[]): SaleOrderRecord[] {
+/**
+ * Los costos no se leen de las tablas: "authenticated" no tiene SELECT sobre esas columnas.
+ * Las consultas base devuelven los costos en null y, solo para admin, se completan con las
+ * funciones get_*_costs() de la base (que exigen rol admin).
+ */
+type BatchCostMaps = {
+  batches: Map<string, { totalCost: number | null; unitCost: number | null }>;
+  inputs: Map<string, number | null>;
+};
+
+function withSaleCosts(sales: SaleOrderRecord[], costs: Map<string, number | null>): SaleOrderRecord[] {
   return sales.map((sale) => ({
     ...sale,
-    items: sale.items.map((item) => ({ ...item, unitCost: null })),
+    items: sale.items.map((item) => ({ ...item, unitCost: costs.get(item.id) ?? null })),
   }));
 }
 
-function hideBatchCosts(batches: ProductionBatchRecord[]): ProductionBatchRecord[] {
+function withBatchCosts(batches: ProductionBatchRecord[], costs: BatchCostMaps): ProductionBatchRecord[] {
   return batches.map((batch) => ({
     ...batch,
-    totalCost: null,
-    unitCost: null,
-    inputs: batch.inputs.map((input) => ({ ...input, unitCost: null })),
+    totalCost: costs.batches.get(batch.id)?.totalCost ?? null,
+    unitCost: costs.batches.get(batch.id)?.unitCost ?? null,
+    inputs: batch.inputs.map((input) => ({ ...input, unitCost: costs.inputs.get(input.id) ?? null })),
   }));
+}
+
+function toNullableCost(value: number | null) {
+  return value === null ? null : toNumber(value);
 }
 
 function withAvgCost<T extends { id: string; avgCost: number | null }>(
@@ -162,7 +175,7 @@ const getSalesOrdersData = cache(async () =>
       const { data, error } = await supabase
         .from("sales_orders")
         .select(
-          "id, sale_date, total_amount, amount_paid, payment_status, payment_method, paid_at, notes, voided_at, void_reason, created_at, contacts(name), sales_channels(name), sales_order_items(id, product_id, bundle_id, quantity, unit_price, list_price, line_total, unit_cost, products(name), product_bundles(name)), sale_payments(id, amount, payment_method, paid_at, created_at)",
+          "id, sale_date, total_amount, amount_paid, payment_status, payment_method, paid_at, notes, voided_at, void_reason, created_at, contacts(name), sales_channels(name), sales_order_items(id, product_id, bundle_id, quantity, unit_price, list_price, line_total, products(name), product_bundles(name)), sale_payments(id, amount, payment_method, paid_at, created_at)",
         )
         .order("sale_date", { ascending: false })
         .order("created_at", { ascending: false });
@@ -202,7 +215,7 @@ const getProductionBatchesData = cache(async () =>
       const { data, error } = await supabase
         .from("production_batches")
         .select(
-          "id, product_id, status, started_at, completed_at, expected_qty, actual_qty, notes, inventory_posted_at, total_cost, unit_cost, voided_at, void_reason, created_at, products(name), production_batch_inputs(id, supply_id, quantity, unit_cost, supplies(name)), production_batch_outputs(id, product_id, quantity, products(name))",
+          "id, product_id, status, started_at, completed_at, expected_qty, actual_qty, notes, inventory_posted_at, voided_at, void_reason, created_at, products(name), production_batch_inputs(id, supply_id, quantity, supplies(name)), production_batch_outputs(id, product_id, quantity, products(name))",
         )
         .order("started_at", { ascending: false })
         .order("created_at", { ascending: false });
@@ -383,12 +396,12 @@ export const getSuppliesData = cache(async () =>
   }),
 );
 
-/** Costos promedio (las vistas de inventario no los exponen). Solo se consulta para admin. */
+/** Costos promedio por funcion solo-admin (las tablas no exponen avg_cost). Solo se consulta para admin. */
 const getProductCostsData = cache(async () =>
   runUserCachedQuery({
-    key: ["product-costs-data"],
+    key: ["product-costs-data-v2"],
     query: async (supabase) => {
-      const { data, error } = await supabase.from("products").select("id, avg_cost");
+      const { data, error } = await supabase.rpc("get_product_costs");
       if (error) throw error;
       return (data ?? []).map((record) => [String(record.id), toNumber(record.avg_cost)] as const);
     },
@@ -399,9 +412,9 @@ const getProductCostsData = cache(async () =>
 
 const getSupplyCostsData = cache(async () =>
   runUserCachedQuery({
-    key: ["supply-costs-data"],
+    key: ["supply-costs-data-v2"],
     query: async (supabase) => {
-      const { data, error } = await supabase.from("supplies").select("id, avg_cost");
+      const { data, error } = await supabase.rpc("get_supply_costs");
       if (error) throw error;
       return (data ?? []).map((record) => [String(record.id), toNumber(record.avg_cost)] as const);
     },
@@ -409,6 +422,74 @@ const getSupplyCostsData = cache(async () =>
     tags: [CACHE_TAGS.supplies],
   }),
 );
+
+/** Costo unitario congelado de cada linea de venta (null = sin costo). Solo admin. */
+const getSaleItemCostsData = cache(async () =>
+  runUserCachedQuery({
+    key: ["sale-item-costs-data"],
+    query: async (supabase) => {
+      const { data, error } = await supabase.rpc("get_sale_item_costs");
+      if (error) throw error;
+      return (data ?? []).map((record) => [String(record.id), toNullableCost(record.unit_cost)] as const);
+    },
+    revalidate: 90,
+    tags: [CACHE_TAGS.sales],
+  }),
+);
+
+/** Costos de los lotes y de sus insumos. Solo admin. */
+const getBatchCostsData = cache(async () =>
+  runUserCachedQuery({
+    key: ["batch-costs-data"],
+    query: async (supabase) => {
+      const [batchesResult, inputsResult] = await Promise.all([
+        supabase.rpc("get_batch_costs"),
+        supabase.rpc("get_batch_input_costs"),
+      ]);
+      if (batchesResult.error) throw batchesResult.error;
+      if (inputsResult.error) throw inputsResult.error;
+
+      return {
+        batches: (batchesResult.data ?? []).map(
+          (record) =>
+            [String(record.id), toNullableCost(record.total_cost), toNullableCost(record.unit_cost)] as const,
+        ),
+        inputs: (inputsResult.data ?? []).map(
+          (record) => [String(record.id), toNullableCost(record.unit_cost)] as const,
+        ),
+      };
+    },
+    revalidate: 90,
+    tags: [CACHE_TAGS.production],
+  }),
+);
+
+async function getSalesForRole(role: AppRole) {
+  const sales = await getSalesOrdersData();
+
+  if (role !== "admin") {
+    return sales;
+  }
+
+  return withSaleCosts(sales, new Map(await getSaleItemCostsData()));
+}
+
+async function getBatchesForRole(role: AppRole) {
+  const batches = await getProductionBatchesData();
+
+  if (role !== "admin") {
+    return batches;
+  }
+
+  const costs = await getBatchCostsData();
+
+  return withBatchCosts(batches, {
+    batches: new Map(
+      costs.batches.map(([id, totalCost, unitCost]) => [id, { totalCost, unitCost }] as const),
+    ),
+    inputs: new Map(costs.inputs),
+  });
+}
 
 export const getInventoryMovementsData = cache(
   async (entityType?: "product" | "supply", limit = 12) =>
@@ -457,20 +538,20 @@ export const getPurchasesData = cache(async (limit = 8) =>
 );
 
 export async function getSalesData() {
-  const [sales, contacts, products, lookup, priceTiers, bundles, role] = await Promise.all([
-    getSalesOrdersData(),
+  const role = await getCurrentRole();
+  const [sales, contacts, products, lookup, priceTiers, bundles] = await Promise.all([
+    getSalesForRole(role),
     getContactsData(),
     getProductsData(),
     getLookupData(),
     getPriceTiersData(),
     getBundlesData(),
-    getCurrentRole(),
   ]);
   const activeProducts = products.filter((product) => product.isActive);
   const activeProductIds = new Set(activeProducts.map((product) => product.id));
 
   return {
-    sales: role === "admin" ? sales : hideSaleCosts(sales),
+    sales,
     contacts: contacts.filter((contact) => contact.type === "client" && contact.isActive),
     products: activeProducts,
     channels: lookup.channels,
@@ -536,15 +617,15 @@ export async function getProductsPageData() {
 }
 
 export async function getProductionData() {
-  const [batches, products, supplies, role] = await Promise.all([
-    getProductionBatchesData(),
+  const role = await getCurrentRole();
+  const [batches, products, supplies] = await Promise.all([
+    getBatchesForRole(role),
     getProductsData(),
     getSuppliesData(),
-    getCurrentRole(),
   ]);
 
   return {
-    batches: role === "admin" ? batches : hideBatchCosts(batches),
+    batches,
     role,
     products: products.filter((product) => product.isActive),
     supplies: supplies.filter((supply) => supply.isActive),
@@ -552,36 +633,34 @@ export async function getProductionData() {
 }
 
 export async function getReportData() {
-  const [sales, expenses, products, supplies, batches, role] = await Promise.all([
-    getSalesOrdersData(),
+  const role = await getCurrentRole();
+  const [sales, expenses, products, supplies, batches] = await Promise.all([
+    getSalesForRole(role),
     getExpensesRecordsData(),
     getProductsData(),
     getSuppliesData(),
-    getProductionBatchesData(),
-    getCurrentRole(),
+    getBatchesForRole(role),
   ]);
-  const isAdmin = role === "admin";
 
   return {
-    sales: isAdmin ? sales : hideSaleCosts(sales),
+    sales,
     expenses,
     products,
     supplies,
-    batches: isAdmin ? batches : hideBatchCosts(batches),
+    batches,
     role,
   };
 }
 
 export async function getDashboardData(): Promise<DashboardData> {
-  const [allSales, expenses, products, supplies, role] = await Promise.all([
-    getSalesOrdersData(),
+  const role = await getCurrentRole();
+  const [sales, expenses, products, supplies] = await Promise.all([
+    getSalesForRole(role),
     getExpensesRecordsData(),
     getProductsData(),
     getSuppliesData(),
-    getCurrentRole(),
   ]);
   const isAdmin = role === "admin";
-  const sales = isAdmin ? allSales : hideSaleCosts(allSales);
 
   const monthStart = startOfMonth(new Date()).toISOString().slice(0, 10);
   const monthEnd = endOfMonth(new Date()).toISOString().slice(0, 10);

@@ -24,6 +24,8 @@ type BundleFormProps = {
 };
 
 export function BundleForm({ bundle, products, onSuccess }: BundleFormProps) {
+  "use no memo";
+
   const [pending, startTransition] = useTransition();
   const [feedback, setFeedback] = useState<{ tone: "success" | "error"; message: string } | null>(null);
   const bundleProductIds = new Set(bundle?.items.map((item) => item.productId) ?? []);
@@ -71,7 +73,7 @@ export function BundleForm({ bundle, products, onSuccess }: BundleFormProps) {
         },
       )}
     >
-      <div className="grid gap-4 md:grid-cols-[1.4fr_0.8fr]">
+      <div className="grid gap-3 sm:grid-cols-[1.4fr_0.8fr]">
         <Field label="Nombre" error={form.formState.errors.name?.message}>
           <Controller
             control={form.control}
@@ -97,6 +99,7 @@ export function BundleForm({ bundle, products, onSuccess }: BundleFormProps) {
                 onBlur={field.onBlur}
                 onChange={(event) => field.onChange(toNumberValue(event.target.value))}
                 type="number"
+                inputMode="decimal"
                 min="0.01"
                 step="0.01"
               />
@@ -105,8 +108,8 @@ export function BundleForm({ bundle, products, onSuccess }: BundleFormProps) {
         </Field>
       </div>
 
-      <div className="rounded-[26px] border border-[var(--line)] bg-[#f7f5ef] p-4">
-        <div className="mb-4 flex items-center justify-between gap-3">
+      <div className="rounded-[var(--radius-card)] border border-[var(--line)] bg-[var(--surface-2)] p-3.5">
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
           <div>
             <h4 className="text-lg font-semibold">Componentes</h4>
             <p className="text-sm text-[var(--muted)]">
@@ -132,7 +135,7 @@ export function BundleForm({ bundle, products, onSuccess }: BundleFormProps) {
           {items.fields.map((field, index) => (
             <div
               key={field.id}
-              className="grid gap-3 rounded-[24px] border border-[var(--line)] bg-white/90 p-4 md:grid-cols-[1.6fr_0.7fr_auto]"
+              className="grid gap-3 rounded-[var(--radius-card)] border border-[var(--line)] bg-[var(--surface)] p-3.5 sm:grid-cols-[1.6fr_0.7fr_auto]"
             >
               <Field label="Producto" error={form.formState.errors.items?.[index]?.productId?.message}>
                 <Controller
@@ -165,6 +168,7 @@ export function BundleForm({ bundle, products, onSuccess }: BundleFormProps) {
                       onBlur={itemField.onBlur}
                       onChange={(event) => itemField.onChange(toNumberValue(event.target.value))}
                       type="number"
+                      inputMode="decimal"
                       min="1"
                       step="1"
                     />
@@ -175,6 +179,7 @@ export function BundleForm({ bundle, products, onSuccess }: BundleFormProps) {
                 <Button
                   type="button"
                   variant="ghost"
+                  className="text-[var(--danger)]"
                   aria-label={`Quitar producto ${index + 1}`}
                   disabled={items.fields.length <= 1}
                   onClick={() => (items.fields.length > 1 ? items.remove(index) : null)}
@@ -205,7 +210,7 @@ export function BundleForm({ bundle, products, onSuccess }: BundleFormProps) {
         />
       </Field>
 
-      <label className="flex items-center gap-3 rounded-2xl border border-[var(--line)] bg-white/70 px-4 py-3 text-sm">
+      <label className="flex items-center gap-3 min-h-12 rounded-[var(--radius-control)] border border-[var(--line)] bg-[var(--surface)] px-3.5 py-3 text-[15px]">
         <Controller
           control={form.control}
           name="isActive"
@@ -217,7 +222,7 @@ export function BundleForm({ bundle, products, onSuccess }: BundleFormProps) {
               checked={Boolean(field.value)}
               onBlur={field.onBlur}
               onChange={(event) => field.onChange(event.target.checked)}
-              className="h-4 w-4 accent-[var(--accent)]"
+              className="h-5 w-5 accent-[var(--accent)]"
             />
           )}
         />
@@ -226,8 +231,8 @@ export function BundleForm({ bundle, products, onSuccess }: BundleFormProps) {
 
       {feedback ? <ActionNotice tone={feedback.tone} message={feedback.message} /> : null}
 
-      <div className="flex justify-end">
-        <Button type="submit" busy={pending}>
+      <div className="sheet-actions flex items-center justify-end gap-2">
+        <Button type="submit" size="lg" busy={pending}>
           {bundle ? "Guardar cambios" : "Crear combo"}
         </Button>
       </div>

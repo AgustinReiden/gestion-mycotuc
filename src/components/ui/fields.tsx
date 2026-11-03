@@ -11,6 +11,10 @@ import {
 } from "react";
 import { cn } from "@/lib/utils";
 
+/* 16 px para que iOS no haga zoom al enfocar; 48 px de alto para el pulgar. */
+const CONTROL_CLASSES =
+  "min-h-12 w-full rounded-[var(--radius-control)] border border-[var(--line-strong)] bg-[var(--surface)] px-3.5 py-2.5 text-base text-[var(--foreground)] placeholder:text-[#958d84] transition-colors focus:border-[var(--foreground)] focus:ring-2 focus:ring-[var(--amber-soft)] disabled:bg-[var(--surface-2)] disabled:text-[var(--muted)] read-only:bg-[var(--surface-2)] aria-[invalid=true]:border-[var(--danger)]";
+
 type FieldProps = {
   label: string;
   error?: string;
@@ -74,19 +78,19 @@ export function Field({ label, error, hint, children }: FieldProps) {
   }
 
   return (
-    <div className="space-y-2">
+    <div className="grid gap-1.5">
       {isFieldControl(children) ? (
-        <label id={labelId} htmlFor={(children.props.id as string | undefined) ?? controlId} className="text-sm font-semibold text-[var(--foreground)]">
+        <label id={labelId} htmlFor={(children.props.id as string | undefined) ?? controlId} className="text-sm font-semibold text-[var(--ink-2)]">
           {label}
         </label>
       ) : (
-        <span id={labelId} className="text-sm font-semibold text-[var(--foreground)]">
+        <span id={labelId} className="text-sm font-semibold text-[var(--ink-2)]">
           {label}
         </span>
       )}
       {content}
-      {error ? <span id={errorId} className="text-sm text-[var(--danger)]">{error}</span> : null}
-      {!error && hint ? <span id={hintId} className="text-xs text-[var(--muted)]">{hint}</span> : null}
+      {error ? <span id={errorId} className="text-sm font-medium text-[var(--danger)]">{error}</span> : null}
+      {!error && hint ? <span id={hintId} className="text-[13px] leading-snug text-[var(--muted)]">{hint}</span> : null}
     </div>
   );
 }
@@ -98,7 +102,7 @@ export const TextInput = forwardRef<HTMLInputElement, InputHTMLAttributes<HTMLIn
       {...props}
       ref={ref}
       className={cn(
-        "w-full rounded-2xl border border-[var(--line)] bg-white/90 px-4 py-3 text-sm text-[var(--foreground)] placeholder:text-[#7e867e] focus:border-[#87b89c]",
+        CONTROL_CLASSES,
         props.className,
       )}
     />
@@ -114,7 +118,7 @@ export const SelectInput = forwardRef<HTMLSelectElement, SelectHTMLAttributes<HT
       {...props}
       ref={ref}
       className={cn(
-        "w-full rounded-2xl border border-[var(--line)] bg-white/90 px-4 py-3 text-sm text-[var(--foreground)] focus:border-[#87b89c]",
+        CONTROL_CLASSES, "appearance-none bg-[length:18px] bg-[right_12px_center] bg-no-repeat pr-10 [background-image:var(--select-chevron)]",
         props.className,
       )}
     />
@@ -132,7 +136,7 @@ export const TextareaInput = forwardRef<
       {...props}
       ref={ref}
       className={cn(
-        "w-full rounded-2xl border border-[var(--line)] bg-white/90 px-4 py-3 text-sm text-[var(--foreground)] placeholder:text-[#7e867e] focus:border-[#87b89c]",
+        CONTROL_CLASSES,
         props.className,
       )}
     />

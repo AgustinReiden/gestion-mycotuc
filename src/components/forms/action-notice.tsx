@@ -11,10 +11,10 @@ export function ActionNotice({ tone, message }: ActionNoticeProps) {
       role={tone === "error" ? "alert" : "status"}
       aria-live={tone === "error" ? "assertive" : "polite"}
       className={cn(
-        "rounded-2xl px-4 py-3 text-sm",
-        tone === "success" && "border border-[#cfe5d8] bg-[#eef8f1] text-[#216247]",
-        tone === "error" && "border border-[#eccac2] bg-[#fff1ed] text-[#934534]",
-        tone === "warning" && "border border-[#ead9b1] bg-[#fff8e8] text-[#8a6118]",
+        "rounded-[var(--radius-control)] border-l-4 px-3.5 py-3 text-[15px] leading-snug",
+        tone === "success" && "border-[var(--moss)] bg-[var(--moss-soft)] text-[#1f4a2f]",
+        tone === "error" && "border-[var(--danger)] bg-[var(--danger-soft)] text-[#7a1a14]",
+        tone === "warning" && "border-[var(--amber)] bg-[var(--amber-soft)] text-[var(--amber-ink)]",
       )}
     >
       {message}

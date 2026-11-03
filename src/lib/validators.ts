@@ -43,7 +43,7 @@ function validatePaymentFields(
 }
 
 export const loginSchema = z.object({
-  email: z.email("Ingresa un email válido."),
+  email: z.email("Ingresá un email válido."),
   password: z.string().min(6, "La contraseña debe tener al menos 6 caracteres."),
 });
 
@@ -60,7 +60,7 @@ export const contactFormSchema = z.object({
 export const productFormSchema = z.object({
   id: z.string().uuid().optional(),
   name: z.string().trim().min(2, "El nombre es obligatorio."),
-  category: z.string().trim().min(1, "Selecciona una categoría."),
+  category: z.string().trim().min(1, "Seleccioná una categoría."),
   unit: z.string().trim().min(1, "La unidad es obligatoria."),
   salePrice: z.coerce.number().nonnegative("El precio no puede ser negativo."),
   minStock: z.coerce.number().nonnegative("El stock mínimo no puede ser negativo."),
@@ -77,18 +77,43 @@ export const supplyFormSchema = z.object({
   isActive: z.boolean().default(true),
 });
 
-export const stockAdjustmentSchema = z.object({
+/** Costo unitario opcional del ajuste: vacio = sin costo (no toca el costo promedio). */
+const optionalUnitCost = z.preprocess(
+  (value) => (value === "" || value === null || value === undefined ? undefined : value),
+  z.coerce.number().positive("El costo unitario debe ser mayor a cero.").optional(),
+);
+
+export const stockAdjustmentSchema = z
+  .object({
+    entityType: z.enum(["product", "supply"]),
+    entityId: z.string().uuid(),
+    quantity: z.coerce.number().refine((value) => value !== 0, "La variación no puede ser 0."),
+    unitCost: optionalUnitCost,
+    notes: z.string().trim().min(3, "El motivo del ajuste es obligatorio."),
+    movementDate: z.string().min(1, "La fecha es obligatoria."),
+  })
+  .superRefine((data, ctx) => {
+    if (data.unitCost !== undefined && data.quantity < 0) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["unitCost"],
+        message: "El costo unitario solo se informa en ajustes positivos.",
+      });
+    }
+  });
+
+/** Correccion manual del costo promedio (solo admin, con motivo). */
+export const averageCostCorrectionSchema = z.object({
   entityType: z.enum(["product", "supply"]),
   entityId: z.string().uuid(),
-  quantity: z.coerce.number().refine((value) => value !== 0, "La variación no puede ser 0."),
-  notes: z.string().trim().min(3, "El motivo del ajuste es obligatorio."),
-  movementDate: z.string().min(1, "La fecha es obligatoria."),
+  avgCost: z.coerce.number().nonnegative("El costo promedio no puede ser negativo."),
+  reason: z.string().trim().min(3, "El motivo de la corrección es obligatorio."),
 });
 
 export const expenseFormSchema = z.object({
   concept: z.string().trim().min(2, "El concepto es obligatorio."),
   expenseDate: z.string().min(1, "La fecha es obligatoria."),
-  categoryId: z.string().uuid("Selecciona una categoría."),
+  categoryId: z.string().uuid("Seleccioná una categoría."),
   amount: z.coerce.number().positive("El monto debe ser mayor a cero."),
   notes: optionalTrimmedString,
 });
@@ -115,7 +140,7 @@ export const saleItemSchema = z
       ctx.addIssue({
         code: "custom",
         path: ["productId"],
-        message: "Selecciona un producto o un combo.",
+        message: "Seleccioná un producto o un combo.",
       });
     }
 
@@ -135,7 +160,7 @@ export const priceTierSchema = z.object({
 
 export const priceTiersFormSchema = z
   .object({
-    productId: z.string().uuid("Selecciona un producto."),
+    productId: z.string().uuid("Seleccioná un producto."),
     tiers: z.array(priceTierSchema).default([]),
   })
   .superRefine((data, ctx) => {
@@ -159,7 +184,7 @@ export const priceTiersFormSchema = z
   }));
 
 export const bundleItemSchema = z.object({
-  productId: z.string().uuid("Selecciona un producto."),
+  productId: z.string().uuid("Seleccioná un producto."),
   quantity: z.coerce.number().min(1, "La cantidad debe ser al menos 1."),
 });
 
@@ -201,13 +226,13 @@ export const saleOrderFormSchema = z
     customerPhone: optionalTrimmedString,
     customerEmail: optionalTrimmedString,
     saleDate: z.string().min(1, "La fecha es obligatoria."),
-    channelId: z.string().uuid("Selecciona un canal."),
+    channelId: z.string().uuid("Seleccioná un canal."),
     paymentStatus: z.enum(["pending", "partial", "paid"]),
     paymentMethod: optionalTrimmedString,
     paidAt: optionalTrimmedString,
     amountPaid: optionalAmount,
     notes: optionalTrimmedString,
-    items: z.array(saleItemSchema).min(1, "Agrega al menos un ítem."),
+    items: z.array(saleItemSchema).min(1, "Agregá al menos un ítem."),
   })
   .superRefine((data, ctx) => {
     validatePaymentFields(data, ctx);
@@ -216,7 +241,7 @@ export const saleOrderFormSchema = z
       ctx.addIssue({
         code: "custom",
         path: ["amountPaid"],
-        message: "Ingresa el monto cobrado de la venta parcial.",
+        message: "Ingresá el monto cobrado de la venta parcial.",
       });
     }
 
@@ -224,7 +249,7 @@ export const saleOrderFormSchema = z
       ctx.addIssue({
         code: "custom",
         path: ["customerName"],
-        message: "Selecciona un cliente sugerido o ingresa uno nuevo.",
+        message: "Seleccioná un cliente sugerido o ingresa uno nuevo.",
       });
     }
 
@@ -232,37 +257,37 @@ export const saleOrderFormSchema = z
       ctx.addIssue({
         code: "custom",
         path: ["customerName"],
-        message: "Ingresa el nombre del cliente.",
+        message: "Ingresá el nombre del cliente.",
       });
     }
   });
 
 export const purchaseItemSchema = z.object({
-  supplyId: z.string().uuid("Selecciona un insumo."),
+  supplyId: z.string().uuid("Seleccioná un insumo."),
   quantity: z.coerce.number().positive("La cantidad debe ser mayor a cero."),
   unitCost: z.coerce.number().positive("El costo unitario debe ser mayor a cero."),
 });
 
 export const purchaseFormSchema = z.object({
-  supplierId: z.string().uuid("Selecciona un proveedor."),
+  supplierId: z.string().uuid("Seleccioná un proveedor."),
   purchaseDate: z.string().min(1, "La fecha es obligatoria."),
   notes: optionalTrimmedString,
-  items: z.array(purchaseItemSchema).min(1, "Agrega al menos un ítem."),
+  items: z.array(purchaseItemSchema).min(1, "Agregá al menos un ítem."),
 });
 
 export const productionInputSchema = z.object({
-  supplyId: z.string().uuid("Selecciona un insumo."),
+  supplyId: z.string().uuid("Seleccioná un insumo."),
   quantity: z.coerce.number().positive("La cantidad debe ser mayor a cero."),
 });
 
 export const productionOutputSchema = z.object({
-  productId: z.string().uuid("Selecciona un producto."),
+  productId: z.string().uuid("Seleccioná un producto."),
   quantity: z.coerce.number().positive("La cantidad debe ser mayor a cero."),
 });
 
 export const productionBatchFormSchema = z.object({
   id: z.string().uuid().optional(),
-  productId: z.string().uuid("Selecciona un producto."),
+  productId: z.string().uuid("Seleccioná un producto."),
   status: z.enum(["draft", "active", "completed", "cancelled"]),
   startedAt: z.string().min(1, "La fecha de inicio es obligatoria."),
   completedAt: optionalTrimmedString,
@@ -288,7 +313,7 @@ export const productionBatchFormSchema = z.object({
     ctx.addIssue({
       code: "custom",
       path: ["inputs"],
-      message: "No puedes completar un lote sin insumos consumidos.",
+      message: "No podés completar un lote sin insumos consumidos.",
     });
   }
 
@@ -296,7 +321,7 @@ export const productionBatchFormSchema = z.object({
     ctx.addIssue({
       code: "custom",
       path: ["outputs"],
-      message: "No puedes completar un lote sin salidas registradas.",
+      message: "No podés completar un lote sin salidas registradas.",
     });
   }
 
@@ -324,7 +349,7 @@ export const paymentStatusUpdateSchema = z
       ctx.addIssue({
         code: "custom",
         path: ["amount"],
-        message: "Ingresa el monto del cobro parcial.",
+        message: "Ingresá el monto del cobro parcial.",
       });
     }
   });

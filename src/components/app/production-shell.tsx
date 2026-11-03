@@ -1,7 +1,7 @@
 "use client";
 
-import { useDeferredValue, useEffect, useState, useTransition } from "react";
-import { Plus, RotateCcw, Sprout, Warehouse } from "lucide-react";
+import { useDeferredValue, useState, useTransition } from "react";
+import { Plus, RotateCcw, Search, Sprout } from "lucide-react";
 import { reverseProductionBatchAction } from "@/actions/production";
 import { ProductionBatchForm } from "@/components/forms/production-batch-form";
 import { ActionNotice } from "@/components/forms/action-notice";
@@ -11,6 +11,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { Modal } from "@/components/ui/modal";
 import { Panel } from "@/components/ui/panel";
 import type { AppRole, ProductRecord, ProductionBatchRecord, SupplyRecord } from "@/lib/domain";
+import { useQuickCreate } from "@/lib/hooks/use-quick-create";
 import { cn, formatCurrency, formatDate } from "@/lib/utils";
 
 type ProductionShellProps = {
@@ -74,12 +75,12 @@ function NewBatchModal({
   supplies: SupplyRecord[];
   onBatchSaved: (batch: ProductionBatchRecord) => void;
 }) {
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useQuickCreate("lote");
 
   return (
     <>
-      <Button type="button" className="w-full sm:w-auto" onClick={() => setOpen(true)}>
-        <Plus className="h-4 w-4" />
+      <Button type="button" size="lg" className="w-full sm:w-auto" onClick={() => setOpen(true)}>
+        <Plus className="h-5 w-5" />
         Nuevo lote
       </Button>
       <Modal open={open} onClose={() => setOpen(false)} title="Nuevo lote" description="Al completar el lote se impactan insumos y productos en inventario." size="xl">
@@ -143,25 +144,25 @@ function ReverseBatchModal({
       open
       onClose={onClose}
       title="Anular lote"
-      description="Cancela el lote y revierte inventario si ya había sido completado."
+      description="Cancelá el lote y revierte inventario si ya había sido completado."
     >
       <div className="space-y-4">
-        <div className="rounded-2xl border border-[var(--line)] bg-[#f7f5ef] px-4 py-3 text-sm text-[var(--muted)]">
+        <div className="rounded-[var(--radius-control)] bg-[var(--surface-2)] px-3.5 py-3 text-[15px] text-[var(--ink-2)]">
           Si el lote ya impactó inventario, se devolverán insumos y se descontarán salidas. La base
           rechazará la anulación si los productos quedarían con stock negativo.
         </div>
-        <label className="space-y-2 text-sm font-semibold">
+        <label className="grid gap-1.5 text-sm font-semibold text-[var(--ink-2)]">
           Motivo
           <textarea
             value={reason}
             onChange={(event) => setReason(event.target.value)}
-            className="w-full rounded-2xl border border-[var(--line)] bg-white/90 px-4 py-3 text-sm font-normal"
+            className="min-h-24 w-full rounded-[var(--radius-control)] border border-[var(--line-strong)] bg-[var(--surface)] px-3.5 py-2.5 text-base font-normal focus:border-[var(--foreground)]"
             rows={4}
             placeholder="Error de carga, lote descartado o control de calidad."
           />
         </label>
         {feedback ? <ActionNotice tone="error" message={feedback} /> : null}
-        <div className="flex justify-end gap-2">
+        <div className="sheet-actions flex items-center justify-end gap-2">
           <Button type="button" variant="ghost" onClick={onClose}>
             Cancelar
           </Button>
@@ -207,9 +208,12 @@ export function ProductionShell({ batches, products, supplies, role }: Productio
     ? batchRecords.find((batch) => batch.id === reverseBatchId) ?? null
     : null;
 
-  useEffect(() => {
+  // Cuando el servidor manda datos nuevos (router.refresh), reemplazan a los locales.
+  const [syncedBatches, setSyncedBatches] = useState(batches);
+  if (syncedBatches !== batches) {
+    setSyncedBatches(batches);
     setBatchRecords(sortBatches(batches));
-  }, [batches]);
+  }
 
   const filteredBatches = batchRecords.filter((batch) => {
     const query = deferredSearch.toLowerCase();
@@ -222,36 +226,25 @@ export function ProductionShell({ batches, products, supplies, role }: Productio
 
   return (
     <div className="page-grid">
-      <Panel>
-        <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
-          <div>
-            <p className="text-sm font-semibold uppercase tracking-[0.18em] text-[#55755e]">Producción</p>
-            <h2 className="mt-2 text-3xl font-semibold">Lotes, consumos y rendimiento</h2>
-            <p className="mt-2 text-sm text-[var(--muted)]">
-              Sigue cada lote simple y registra impacto real sobre insumos y producto terminado.
-            </p>
-          </div>
-          <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
-            <label className="flex w-full items-center gap-3 rounded-2xl border border-[var(--line)] bg-white/80 px-4 py-3 sm:min-w-[260px] sm:flex-1">
-              <Warehouse className="h-4 w-4 text-[var(--muted)]" />
-              <input
-                value={search}
-                onChange={(event) => setSearch(event.target.value)}
-                placeholder="Buscar lote o insumo..."
-                aria-label="Buscar lotes de producción"
-                className="flex-1 bg-transparent text-sm placeholder:text-[#7e867e]"
-              />
-            </label>
-            <NewBatchModal
-              products={products}
-              supplies={supplies}
-              onBatchSaved={(batch) => {
-                setBatchRecords((current) => upsertBatch(current, batch));
-              }}
-            />
-          </div>
-        </div>
-      </Panel>
+      <div className="grid gap-3 md:grid-cols-[1fr_auto] md:items-center">
+        <label className="flex min-h-12 items-center gap-2 rounded-[var(--radius-control)] border border-[var(--line-strong)] bg-[var(--surface)] px-3.5 focus-within:border-[var(--foreground)]">
+          <Search className="h-4 w-4 shrink-0 text-[var(--muted)]" aria-hidden />
+          <input
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+            placeholder="Buscar lote o insumo"
+            aria-label="Buscar lotes de producción"
+            className="min-w-0 flex-1 bg-transparent text-base placeholder:text-[#958d84]"
+          />
+        </label>
+        <NewBatchModal
+          products={products}
+          supplies={supplies}
+          onBatchSaved={(batch) => {
+            setBatchRecords((current) => upsertBatch(current, batch));
+          }}
+        />
+      </div>
 
       {filteredBatches.length === 0 ? (
         <Panel>
@@ -259,20 +252,20 @@ export function ProductionShell({ batches, products, supplies, role }: Productio
             title={hasSearchQuery ? "No encontramos lotes" : "Todavía no hay lotes"}
             description={
               hasSearchQuery
-                ? "Prueba otro término de búsqueda o crea un lote nuevo."
-                : "Crea un lote para empezar a seguir producción y rendimiento."
+                ? "Probá con otro término de búsqueda o creá un lote nuevo."
+                : "Creá un lote para empezar a seguir producción y rendimiento."
             }
             icon={Sprout}
           />
         </Panel>
       ) : (
-        <div className="grid gap-4 xl:grid-cols-2">
+        <div className="grid gap-3 xl:grid-cols-2">
           {filteredBatches.map((batch) => (
-            <Panel key={batch.id} className="flex flex-col gap-4">
+            <Panel key={batch.id} className="flex flex-col gap-3">
               <div className="flex items-start justify-between">
                 <div>
-                  <p className="text-sm font-semibold uppercase tracking-[0.18em] text-[#6b7b6c]">Lote / Cepa</p>
-                  <h3 className="mt-2 text-2xl font-semibold text-[#2d3329]">{batch.productName}</h3>
+                  <p className="text-[13px] font-medium text-[var(--muted)]">Lote / Cepa</p>
+                  <h3 className="mt-1 text-xl font-semibold text-[var(--foreground)]">{batch.productName}</h3>
                 </div>
                 <div className="flex flex-wrap justify-end gap-2">
                   <Badge tone={getStatusTone(batch.status)}>{getStatusLabel(batch.status)}</Badge>
@@ -281,47 +274,47 @@ export function ProductionShell({ batches, products, supplies, role }: Productio
               </div>
 
               {batch.status !== "cancelled" ? (
-                <div className="flex h-2 w-full overflow-hidden rounded-full bg-[#e8e6d2]">
+                <div className="flex h-2 w-full overflow-hidden rounded-full bg-[var(--surface-2)]">
                   <div
                     className={cn(
                       "h-full rounded-full",
-                      batch.status === "draft" ? "w-1/3 bg-[#b77f28]" : batch.status === "active" ? "w-2/3 bg-[#3b5f42]" : "w-full bg-[#27432d]"
+                      batch.status === "draft" ? "w-1/3 bg-[var(--amber)]" : batch.status === "active" ? "w-2/3 bg-[var(--moss)]" : "w-full bg-[var(--foreground)]"
                     )}
                   />
                 </div>
               ) : (
-                <div className="flex h-2 w-full overflow-hidden rounded-full bg-[#f8e4e0]">
-                  <div className="h-full w-full rounded-full bg-[#a54b3d]" />
+                <div className="flex h-2 w-full overflow-hidden rounded-full bg-[var(--danger-soft)]">
+                  <div className="h-full w-full rounded-full bg-[var(--danger)]" />
                 </div>
               )}
 
-              <div className="grid gap-3 rounded-[24px] border border-[var(--line)] bg-[#fdfcf8] p-5 shadow-sm md:grid-cols-4">
-                <div className="col-span-2 md:col-span-1">
-                  <p className="text-xs uppercase tracking-[0.18em] text-[#798075]">Inicio</p>
-                  <p className="mt-2 text-sm font-semibold">{formatDate(batch.startedAt)}</p>
+              <div className="grid grid-cols-2 gap-3 rounded-[var(--radius-card)] border border-[var(--line)] bg-[var(--surface-2)] p-3.5 md:grid-cols-4">
+                <div>
+                  <p className="text-[13px] font-medium text-[var(--muted)]">Inicio</p>
+                  <p className="mt-1 text-sm font-semibold">{formatDate(batch.startedAt)}</p>
                 </div>
-                <div className="col-span-2 md:col-span-1">
-                  <p className="text-xs uppercase tracking-[0.18em] text-[#798075]">Cierre</p>
-                  <p className="mt-2 text-sm font-semibold">{formatDate(batch.completedAt)}</p>
+                <div>
+                  <p className="text-[13px] font-medium text-[var(--muted)]">Cierre</p>
+                  <p className="mt-1 text-sm font-semibold">{formatDate(batch.completedAt)}</p>
                 </div>
-                <div className="col-span-2 md:col-span-1">
-                  <p className="text-xs uppercase tracking-[0.18em] text-[#798075]">Esperado</p>
-                  <p className="mt-2 text-sm font-semibold">{batch.expectedQty ?? "-"} un.</p>
+                <div>
+                  <p className="text-[13px] font-medium text-[var(--muted)]">Esperado</p>
+                  <p className="mt-1 text-sm font-semibold">{batch.expectedQty ?? "-"} un.</p>
                 </div>
-                <div className="col-span-2 md:col-span-1">
-                  <p className="text-xs uppercase tracking-[0.18em] text-[#798075]">Real</p>
-                  <p className="mt-2 text-sm font-semibold text-[#3b5f42]">{batch.actualQty ?? "-"} un.</p>
+                <div>
+                  <p className="text-[13px] font-medium text-[var(--muted)]">Real</p>
+                  <p className="mt-1 text-sm font-semibold text-[var(--moss)]">{batch.actualQty ?? "-"} un.</p>
                 </div>
               </div>
 
-              <div className="grid gap-4 md:grid-cols-2">
-                <div className="rounded-[24px] border border-[var(--line)] bg-[#faf9f5] p-5">
-                  <p className="text-sm font-semibold text-[#2d3329]">Insumos consumidos (Sustrato/Desove)</p>
-                  <div className="mt-4 space-y-3 text-sm text-[var(--muted)]">
+              <div className="grid gap-3 md:grid-cols-2">
+                <div className="rounded-[var(--radius-card)] border border-[var(--line)] bg-[var(--surface)] p-3.5">
+                  <p className="text-sm font-semibold text-[var(--foreground)]">Insumos consumidos (Sustrato/Desove)</p>
+                  <div className="mt-3 space-y-2 text-sm text-[var(--muted)]">
                     {batch.inputs.map((input) => (
                       <div key={input.id} className="flex items-center justify-between border-b border-[var(--line)] pb-2 last:border-0 last:pb-0">
                         <span>{input.supplyName}</span>
-                        <span className="font-semibold text-[#2d3329]">
+                        <span className="font-semibold text-[var(--foreground)]">
                           x {input.quantity}
                           {isAdmin && input.unitCost !== null ? (
                             <span className="ml-2 text-xs font-normal text-[var(--muted)]">
@@ -334,13 +327,13 @@ export function ProductionShell({ batches, products, supplies, role }: Productio
                     {batch.inputs.length === 0 && <p className="text-sm italic">Sin consumos registrados.</p>}
                   </div>
                 </div>
-                <div className="rounded-[24px] border border-[var(--line)] bg-[#faf9f5] p-5">
-                  <p className="text-sm font-semibold text-[#2d3329]">Cosecha (Salida)</p>
-                  <div className="mt-4 space-y-3 text-sm text-[var(--muted)]">
+                <div className="rounded-[var(--radius-card)] border border-[var(--line)] bg-[var(--surface)] p-3.5">
+                  <p className="text-sm font-semibold text-[var(--foreground)]">Cosecha (Salida)</p>
+                  <div className="mt-3 space-y-2 text-sm text-[var(--muted)]">
                     {batch.outputs.map((output) => (
                       <div key={output.id} className="flex items-center justify-between border-b border-[var(--line)] pb-2 last:border-0 last:pb-0">
                         <span>{output.productName}</span>
-                        <span className="font-semibold text-[#3b5f42]">x {output.quantity}</span>
+                        <span className="font-semibold text-[var(--moss)]">x {output.quantity}</span>
                       </div>
                     ))}
                     {batch.outputs.length === 0 && <p className="text-sm italic">Pendiente de cosecha.</p>}
@@ -348,17 +341,22 @@ export function ProductionShell({ batches, products, supplies, role }: Productio
                 </div>
               </div>
 
+              {isAdmin && batch.status === "completed" && batch.totalCost === null ? (
+                <p className="rounded-[var(--radius-control)] bg-[var(--amber-soft)] px-3.5 py-2.5 text-sm text-[var(--amber-ink)]">
+                  Sin costo: los insumos de este lote no tenían costo cargado.
+                </p>
+              ) : null}
               {isAdmin && batch.totalCost !== null ? (
-                <div className="grid gap-3 rounded-[24px] border border-[var(--line)] bg-[#eef4ea] p-4 text-sm sm:grid-cols-2">
+                <div className="grid gap-3 rounded-[var(--radius-card)] border border-[var(--line)] bg-[var(--moss-soft)] p-3.5 text-sm grid-cols-2">
                   <div>
-                    <p className="text-xs uppercase tracking-[0.18em] text-[#55755e]">Costo total</p>
-                    <p className="mt-1 text-lg font-semibold text-[#15553e]">
+                    <p className="text-[13px] font-medium text-[var(--ink-2)]">Costo total</p>
+                    <p className="mt-1 text-lg font-semibold text-[var(--moss)]">
                       {formatCurrency(batch.totalCost)}
                     </p>
                   </div>
                   <div>
-                    <p className="text-xs uppercase tracking-[0.18em] text-[#55755e]">Costo unitario</p>
-                    <p className="mt-1 text-lg font-semibold text-[#15553e]">
+                    <p className="text-[13px] font-medium text-[var(--ink-2)]">Costo unitario</p>
+                    <p className="mt-1 text-lg font-semibold text-[var(--moss)]">
                       {formatCurrency(batch.unitCost ?? 0)}
                     </p>
                   </div>
@@ -367,7 +365,7 @@ export function ProductionShell({ batches, products, supplies, role }: Productio
 
               {batch.notes ? <p className="text-sm text-[var(--muted)]">{batch.notes}</p> : null}
 
-              <div className="mt-auto flex flex-wrap justify-end gap-2">
+              <div className="mt-auto flex flex-wrap items-center justify-between gap-2">
                 <Button
                   type="button"
                   variant="secondary"
@@ -378,7 +376,8 @@ export function ProductionShell({ batches, products, supplies, role }: Productio
                 </Button>
                 <Button
                   type="button"
-                  variant="danger"
+                  variant="ghost"
+                  className="text-[var(--danger)]"
                   disabled={batch.isVoided || batch.status === "cancelled"}
                   onClick={() => setReverseBatchId(batch.id)}
                 >
