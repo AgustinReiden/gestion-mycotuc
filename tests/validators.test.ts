@@ -1,5 +1,16 @@
 import { describe, expect, it } from "vitest";
 import {
+  formatPercent,
+  getLineCost,
+  getMarginByProduct,
+  getMarginPercent,
+  getPartialAmountError,
+  getSaleBalance,
+  getStockValue,
+  summarizeMargin,
+  summarizeReceivables,
+} from "../src/lib/finance";
+import {
   getDirectProductQuantities,
   getRequiredStock,
   resolveProductListPrice,
@@ -347,5 +358,186 @@ describe("client pricing rules", () => {
 
     expect(required.get(ids.product)).toBe(7);
     expect(required.get(ids.otherProduct)).toBe(3);
+  });
+});
+
+describe("partial payment validation", () => {
+  it("requires the collected amount for partial sales and accepts it", () => {
+    const partial = {
+      ...baseSale,
+      paymentStatus: "partial",
+      paymentMethod: "Efectivo",
+      paidAt: "2026-04-27",
+    };
+    const missing = saleOrderFormSchema.safeParse({ ...partial, amountPaid: "" });
+
+    expect(missing.success).toBe(false);
+    if (!missing.success) {
+      expect(missing.error.issues.map((issue) => issue.path.join("."))).toContain("amountPaid");
+    }
+
+    const valid = saleOrderFormSchema.safeParse({ ...partial, amountPaid: "40" });
+    expect(valid.success).toBe(true);
+    if (valid.success) {
+      expect(valid.data.amountPaid).toBe(40);
+    }
+  });
+
+  it("rejects zero or negative collected amounts", () => {
+    const partial = {
+      ...baseSale,
+      paymentStatus: "partial",
+      paymentMethod: "Efectivo",
+      paidAt: "2026-04-27",
+    };
+
+    expect(saleOrderFormSchema.safeParse({ ...partial, amountPaid: 0 }).success).toBe(false);
+    expect(saleOrderFormSchema.safeParse({ ...partial, amountPaid: -5 }).success).toBe(false);
+  });
+
+  it("does not require an amount for pending or paid sales", () => {
+    expect(saleOrderFormSchema.safeParse({ ...baseSale, amountPaid: "" }).success).toBe(true);
+    expect(
+      saleOrderFormSchema.safeParse({
+        ...baseSale,
+        paymentStatus: "paid",
+        paymentMethod: "Transferencia",
+        paidAt: "2026-04-27",
+      }).success,
+    ).toBe(true);
+  });
+
+  it("requires a positive amount to register a partial collection", () => {
+    const base = {
+      saleOrderId: ids.sale,
+      paymentStatus: "partial",
+      paymentMethod: "Transferencia",
+      paidAt: "2026-04-27",
+    };
+
+    const missing = paymentStatusUpdateSchema.safeParse({ ...base, amount: "" });
+    expect(missing.success).toBe(false);
+    if (!missing.success) {
+      expect(missing.error.issues.map((issue) => issue.path.join("."))).toContain("amount");
+    }
+
+    expect(paymentStatusUpdateSchema.safeParse({ ...base, amount: 0 }).success).toBe(false);
+
+    const valid = paymentStatusUpdateSchema.safeParse({ ...base, amount: "250.5" });
+    expect(valid.success).toBe(true);
+    if (valid.success) {
+      expect(valid.data.amount).toBe(250.5);
+    }
+  });
+
+  it("settles or resets payments without an amount", () => {
+    expect(
+      paymentStatusUpdateSchema.safeParse({
+        saleOrderId: ids.sale,
+        paymentStatus: "paid",
+        paymentMethod: "Transferencia",
+        paidAt: "2026-04-27",
+      }).success,
+    ).toBe(true);
+    expect(
+      paymentStatusUpdateSchema.safeParse({
+        saleOrderId: ids.sale,
+        paymentStatus: "pending",
+        paymentMethod: "",
+        paidAt: "",
+        amount: "",
+      }).success,
+    ).toBe(true);
+  });
+});
+
+describe("balances and partial amount limits", () => {
+  it("computes the outstanding balance without going negative", () => {
+    expect(getSaleBalance(1000, 400)).toBe(600);
+    expect(getSaleBalance(1000, 1000)).toBe(0);
+    expect(getSaleBalance(100.1, 100.3)).toBe(0);
+    expect(getSaleBalance(100.3, 0.1)).toBe(100.2);
+  });
+
+  it("accepts only amounts strictly between zero and the limit", () => {
+    expect(getPartialAmountError(400, 1000)).toBeNull();
+    expect(getPartialAmountError(999.99, 1000)).toBeNull();
+    expect(getPartialAmountError(0, 1000)).not.toBeNull();
+    expect(getPartialAmountError(undefined, 1000)).not.toBeNull();
+    expect(getPartialAmountError(1000, 1000)).not.toBeNull();
+    expect(getPartialAmountError(1200, 1000)).not.toBeNull();
+  });
+
+  it("sums billed, collected and pending of non voided sales using amount paid", () => {
+    const summary = summarizeReceivables([
+      { totalAmount: 1000, amountPaid: 1000, isVoided: false },
+      { totalAmount: 500, amountPaid: 200, isVoided: false },
+      { totalAmount: 300, amountPaid: 0, isVoided: false },
+      { totalAmount: 900, amountPaid: 900, isVoided: true },
+    ]);
+
+    expect(summary).toEqual({ billed: 1800, collected: 1200, pending: 600 });
+  });
+});
+
+describe("costs and margins", () => {
+  it("computes line cost and margin percent", () => {
+    expect(getLineCost(3, 12.5)).toBe(37.5);
+    expect(getLineCost(3, null)).toBeNull();
+    expect(getMarginPercent(200, 50)).toBe(75);
+    expect(getMarginPercent(0, 50)).toBeNull();
+    expect(getMarginPercent(100, 130)).toBe(-30);
+  });
+
+  it("values stock at average cost", () => {
+    expect(getStockValue(10, 2.5)).toBe(25);
+    expect(getStockValue(-3, 2.5)).toBe(0);
+    expect(getStockValue(10, null)).toBeNull();
+  });
+
+  it("summarizes margin only over lines with a frozen cost", () => {
+    const summary = summarizeMargin([
+      { quantity: 2, lineTotal: 200, unitCost: 40 },
+      { quantity: 1, lineTotal: 150, unitCost: 0 },
+      { quantity: 5, lineTotal: 500, unitCost: null },
+    ]);
+
+    expect(summary).toEqual({
+      revenue: 350,
+      cost: 80,
+      margin: 270,
+      marginPercent: (270 / 350) * 100,
+      missingCostLines: 1,
+    });
+  });
+
+  it("groups margin by product for non voided sales", () => {
+    const rows = getMarginByProduct([
+      {
+        isVoided: false,
+        items: [
+          { productName: "Melena", quantity: 2, lineTotal: 200, unitCost: 30 },
+          { productName: "Reishi", quantity: 1, lineTotal: 80, unitCost: 50 },
+        ],
+      },
+      {
+        isVoided: false,
+        items: [{ productName: "Melena", quantity: 1, lineTotal: 100, unitCost: 30 }],
+      },
+      {
+        isVoided: true,
+        items: [{ productName: "Reishi", quantity: 10, lineTotal: 800, unitCost: 50 }],
+      },
+    ]);
+
+    expect(rows.map((row) => row.productName)).toEqual(["Melena", "Reishi"]);
+    expect(rows[0]).toMatchObject({ quantity: 3, revenue: 300, cost: 90, margin: 210, marginPercent: 70 });
+    expect(rows[1]).toMatchObject({ quantity: 1, revenue: 80, cost: 50, margin: 30 });
+  });
+
+  it("formats percentages with one decimal or a dash", () => {
+    expect(formatPercent(null)).toBe("-");
+    expect(formatPercent(70)).toBe("70%");
+    expect(formatPercent(33.333)).toMatch(/^33[,.]3%$/);
   });
 });

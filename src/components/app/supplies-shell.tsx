@@ -15,19 +15,26 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { Modal } from "@/components/ui/modal";
 import { Panel } from "@/components/ui/panel";
 import type {
+  AppRole,
   ContactRecord,
   InventoryMovementRecord,
   PurchaseRecord,
   SupplyRecord,
 } from "@/lib/domain";
-import { formatDate } from "@/lib/utils";
+import { getStockValue as getCostValue } from "@/lib/finance";
+import { formatCurrency, formatDate, sumBy } from "@/lib/utils";
 
 type SuppliesShellProps = {
   supplies: SupplyRecord[];
   suppliers: ContactRecord[];
   purchases: PurchaseRecord[];
   movements: InventoryMovementRecord[];
+  role: AppRole;
 };
+
+function getStockValue(supply: SupplyRecord) {
+  return getCostValue(supply.currentStock, supply.avgCost);
+}
 
 type PurchaseSuccessResult = {
   purchase: PurchaseRecord;
@@ -71,15 +78,24 @@ function sortMovements(list: InventoryMovementRecord[]) {
   });
 }
 
+/** Las acciones no devuelven el costo promedio: se conserva el que llego del servidor. */
+function withPreviousCost(list: SupplyRecord[], supply: SupplyRecord): SupplyRecord {
+  const previous = list.find((entry) => entry.id === supply.id);
+  return { ...supply, avgCost: supply.avgCost ?? previous?.avgCost ?? null };
+}
+
 function upsertSupply(list: SupplyRecord[], supply: SupplyRecord) {
-  return sortSupplies([supply, ...list.filter((entry) => entry.id !== supply.id)]);
+  return sortSupplies([
+    withPreviousCost(list, supply),
+    ...list.filter((entry) => entry.id !== supply.id),
+  ]);
 }
 
 function mergeSupplies(list: SupplyRecord[], nextSupplies: SupplyRecord[]) {
   const registry = new Map(list.map((supply) => [supply.id, supply]));
 
   nextSupplies.forEach((supply) => {
-    registry.set(supply.id, supply);
+    registry.set(supply.id, withPreviousCost(list, supply));
   });
 
   return sortSupplies(Array.from(registry.values()));
@@ -300,7 +316,9 @@ export function SuppliesShell({
   suppliers,
   purchases,
   movements,
+  role,
 }: SuppliesShellProps) {
+  const isAdmin = role === "admin";
   const [search, setSearch] = useState("");
   const [supplyRecords, setSupplyRecords] = useState(() => sortSupplies(supplies));
   const [purchaseRecords, setPurchaseRecords] = useState(() => sortPurchases(purchases));
@@ -337,6 +355,7 @@ export function SuppliesShell({
   const filteredSupplies = supplyRecords.filter((supply) =>
     supply.name.toLowerCase().includes(deferredSearch.toLowerCase()),
   );
+  const totalStockValue = sumBy(supplyRecords, (supply) => getStockValue(supply) ?? 0);
 
   return (
     <div className="page-grid">
@@ -348,6 +367,12 @@ export function SuppliesShell({
             <p className="mt-2 text-sm text-[var(--muted)]">
               Controla existencias, compras ligadas a gastos y ajustes manuales de inventario.
             </p>
+            {isAdmin ? (
+              <p className="mt-2 text-sm">
+                Valor del stock (costo promedio):{" "}
+                <span className="font-semibold">{formatCurrency(totalStockValue)}</span>
+              </p>
+            ) : null}
           </div>
 
           <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
@@ -420,6 +445,12 @@ export function SuppliesShell({
                     Minimo: {supply.minStock} {supply.unit}
                   </p>
                   <p>Ultima compra: {formatDate(supply.lastPurchaseAt)}</p>
+                  {isAdmin && supply.avgCost !== null ? (
+                    <>
+                      <p>Costo promedio: {formatCurrency(supply.avgCost)}</p>
+                      <p>Valor stock: {formatCurrency(getStockValue(supply) ?? 0)}</p>
+                    </>
+                  ) : null}
                 </div>
 
                 <div className="flex flex-col gap-2 sm:flex-row">
@@ -454,6 +485,12 @@ export function SuppliesShell({
                   <th className="px-4 py-3 font-medium">Stock actual</th>
                   <th className="px-4 py-3 font-medium">Minimo</th>
                   <th className="px-4 py-3 font-medium">Ultima compra</th>
+                  {isAdmin ? (
+                    <>
+                      <th className="px-4 py-3 font-medium">Costo promedio</th>
+                      <th className="px-4 py-3 font-medium">Valor stock</th>
+                    </>
+                  ) : null}
                   <th className="px-4 py-3 font-medium">Estado</th>
                   <th className="px-4 py-3 font-medium text-right">Acciones</th>
                 </tr>
@@ -472,6 +509,16 @@ export function SuppliesShell({
                       {supply.minStock} {supply.unit}
                     </td>
                     <td className="px-4 py-4">{formatDate(supply.lastPurchaseAt)}</td>
+                    {isAdmin ? (
+                      <>
+                        <td className="px-4 py-4">
+                          {supply.avgCost === null ? "-" : formatCurrency(supply.avgCost)}
+                        </td>
+                        <td className="px-4 py-4">
+                          {supply.avgCost === null ? "-" : formatCurrency(getStockValue(supply) ?? 0)}
+                        </td>
+                      </>
+                    ) : null}
                     <td className="px-4 py-4">
                       <Badge tone={supply.currentStock <= supply.minStock ? "danger" : "success"}>
                         {supply.currentStock <= supply.minStock ? "Reponer" : "OK"}

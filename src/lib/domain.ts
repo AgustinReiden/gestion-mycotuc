@@ -45,6 +45,8 @@ export type ProductRecord = {
   notes: string | null;
   isActive: boolean;
   currentStock: number;
+  /** Costo promedio ponderado; null cuando no se envia (operador) o no se cargo. */
+  avgCost: number | null;
   createdAt: string;
 };
 
@@ -87,6 +89,8 @@ export type SupplyRecord = {
   isActive: boolean;
   currentStock: number;
   lastPurchaseAt: string | null;
+  /** Costo promedio ponderado; null cuando no se envia (operador) o no se cargo. */
+  avgCost: number | null;
   createdAt: string;
 };
 
@@ -100,6 +104,16 @@ export type SaleOrderItemRecord = {
   listPrice: number | null;
   bundleId: string | null;
   bundleName: string | null;
+  /** Costo unitario congelado al vender; null si no se registro o no se envia (operador). */
+  unitCost: number | null;
+};
+
+export type SalePaymentRecord = {
+  id: string;
+  amount: number;
+  paymentMethod: string | null;
+  paidAt: string | null;
+  createdAt: string;
 };
 
 export type SaleOrderRecord = {
@@ -108,6 +122,7 @@ export type SaleOrderRecord = {
   contactName: string | null;
   channelName: string | null;
   totalAmount: number;
+  amountPaid: number;
   paymentStatus: PaymentStatus;
   paymentMethod: string | null;
   paidAt: string | null;
@@ -118,6 +133,7 @@ export type SaleOrderRecord = {
   totalUnits: number;
   createdAt: string;
   items: SaleOrderItemRecord[];
+  payments: SalePaymentRecord[];
 };
 
 export type ExpenseRecord = {
@@ -169,6 +185,8 @@ export type BatchInputRecord = {
   supplyId: string;
   supplyName: string;
   quantity: number;
+  /** Costo unitario fijado al completar el lote; null si no hay o no se envia (operador). */
+  unitCost: number | null;
 };
 
 export type BatchOutputRecord = {
@@ -189,6 +207,8 @@ export type ProductionBatchRecord = {
   actualQty: number | null;
   notes: string | null;
   inventoryPostedAt: string | null;
+  totalCost: number | null;
+  unitCost: number | null;
   isVoided: boolean;
   voidedAt: string | null;
   voidReason: string | null;
@@ -213,6 +233,8 @@ export type DashboardData = {
   accrualProfit: number;
   cashProfit: number;
   pendingReceivables: number;
+  /** Margen bruto de las ventas del mes (solo admin; null para operador). */
+  monthlyGrossMargin: { margin: number; marginPercent: number | null; missingCostLines: number } | null;
   soldUnits: number;
   lowStockProducts: StockAlertRecord[];
   lowStockSupplies: StockAlertRecord[];

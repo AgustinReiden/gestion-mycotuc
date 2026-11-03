@@ -21,7 +21,14 @@ import type {
   SaleOrderItemRecord,
   SaleOrderRecord,
 } from "@/lib/domain";
-import { formatQuantity } from "@/lib/pricing";
+import {
+  formatPercent,
+  getLineCost,
+  getMarginPercent,
+  getSaleBalance,
+  summarizeMargin,
+} from "@/lib/finance";
+import { formatQuantity, roundMoney } from "@/lib/pricing";
 import { formatCurrency, formatDate, sumBy } from "@/lib/utils";
 
 type SalesShellProps = {
@@ -42,8 +49,14 @@ type SaleLineGroup = {
   unitPrice: number;
   listPrice: number | null;
   lineTotal: number;
+  /** Costo de la linea (o suma de componentes del combo); null si falta algun costo. */
+  cost: number | null;
   components: SaleOrderItemRecord[];
 };
+
+function addCost(current: number | null, next: number | null) {
+  return current === null || next === null ? null : roundMoney(current + next);
+}
 
 /** Agrupa las lineas de un combo (mismo bundle_id) bajo el nombre del combo. */
 function groupSaleItems(items: SaleOrderItemRecord[]): SaleLineGroup[] {
@@ -60,6 +73,7 @@ function groupSaleItems(items: SaleOrderItemRecord[]): SaleLineGroup[] {
         unitPrice: item.unitPrice,
         listPrice: item.listPrice,
         lineTotal: item.lineTotal,
+        cost: getLineCost(item.quantity, item.unitCost),
         components: [],
       });
       return;
@@ -69,6 +83,7 @@ function groupSaleItems(items: SaleOrderItemRecord[]): SaleLineGroup[] {
 
     if (existing) {
       existing.lineTotal += item.lineTotal;
+      existing.cost = addCost(existing.cost, getLineCost(item.quantity, item.unitCost));
       existing.components.push(item);
       return;
     }
@@ -81,6 +96,7 @@ function groupSaleItems(items: SaleOrderItemRecord[]): SaleLineGroup[] {
       unitPrice: 0,
       listPrice: null,
       lineTotal: item.lineTotal,
+      cost: getLineCost(item.quantity, item.unitCost),
       components: [item],
     };
 
@@ -130,8 +146,34 @@ function sortSales(list: SaleOrderRecord[]) {
   });
 }
 
+/** Las acciones no devuelven costos: se conservan los que ya llegaron del servidor. */
 function upsertSale(list: SaleOrderRecord[], sale: SaleOrderRecord) {
-  return sortSales([sale, ...list.filter((entry) => entry.id !== sale.id)]);
+  const previous = list.find((entry) => entry.id === sale.id);
+  const merged = previous
+    ? {
+        ...sale,
+        items: sale.items.map((item) => ({
+          ...item,
+          unitCost:
+            item.unitCost ?? previous.items.find((entry) => entry.id === item.id)?.unitCost ?? null,
+        })),
+      }
+    : sale;
+
+  return sortSales([merged, ...list.filter((entry) => entry.id !== sale.id)]);
+}
+
+function PaymentSummary({ sale }: { sale: SaleOrderRecord }) {
+  if (sale.paymentStatus === "paid" || sale.isVoided) {
+    return null;
+  }
+
+  return (
+    <p className="mt-1 text-xs text-[var(--muted)]">
+      Cobrado {formatCurrency(sale.amountPaid)} / Saldo{" "}
+      {formatCurrency(getSaleBalance(sale.totalAmount, sale.amountPaid))}
+    </p>
+  );
 }
 
 function upsertContact(list: ContactRecord[], contact: ContactRecord) {
@@ -191,10 +233,12 @@ function NewSaleModal({
 
 function PaymentModal({
   sale,
+  role,
   onClose,
   onSaleUpdated,
 }: {
   sale: SaleOrderRecord;
+  role: AppRole;
   onClose: () => void;
   onSaleUpdated: (sale: SaleOrderRecord) => void;
 }) {
@@ -203,13 +247,16 @@ function PaymentModal({
       open
       onClose={onClose}
       title="Actualizar estado de cobro"
-      description="Ajusta el estado, metodo y fecha de cobro del pedido."
+      description="Registra un cobro parcial, salda el pedido o ajusta metodo y fecha de cobro."
     >
       <PaymentStatusForm
         saleOrderId={sale.id}
         paymentStatus={sale.paymentStatus}
         paymentMethod={sale.paymentMethod}
         paidAt={sale.paidAt}
+        totalAmount={sale.totalAmount}
+        amountPaid={sale.amountPaid}
+        role={role}
         onSuccess={(updatedSale) => {
           onSaleUpdated(updatedSale);
           onClose();
@@ -219,8 +266,17 @@ function PaymentModal({
   );
 }
 
-function SaleDetailModal({ sale, onClose }: { sale: SaleOrderRecord; onClose: () => void }) {
+function SaleDetailModal({
+  sale,
+  isAdmin,
+  onClose,
+}: {
+  sale: SaleOrderRecord;
+  isAdmin: boolean;
+  onClose: () => void;
+}) {
   const groups = groupSaleItems(sale.items);
+  const margin = isAdmin ? summarizeMargin(sale.items) : null;
 
   return (
     <Modal
@@ -257,6 +313,15 @@ function SaleDetailModal({ sale, onClose }: { sale: SaleOrderRecord; onClose: ()
                 <p className="font-semibold">{formatCurrency(group.lineTotal)}</p>
               </div>
             </div>
+            {isAdmin ? (
+              <p className="mt-2 text-xs text-[var(--muted)]">
+                {group.cost === null
+                  ? "Sin costo registrado"
+                  : `Costo ${formatCurrency(group.cost)} / Margen ${formatCurrency(
+                      group.lineTotal - group.cost,
+                    )} (${formatPercent(getMarginPercent(group.lineTotal, group.cost))})`}
+              </p>
+            ) : null}
             {group.isBundle ? (
               <ul className="mt-2 space-y-1 text-xs text-[var(--muted)]">
                 {group.components.map((component) => (
@@ -271,6 +336,56 @@ function SaleDetailModal({ sale, onClose }: { sale: SaleOrderRecord; onClose: ()
         <div className="flex items-center justify-between rounded-[22px] border border-[var(--line)] bg-[#eef4ea] px-4 py-3">
           <p className="text-sm text-[#55755e]">Total</p>
           <p className="text-lg font-semibold text-[#15553e]">{formatCurrency(sale.totalAmount)}</p>
+        </div>
+        {margin ? (
+          <div className="grid gap-3 rounded-[22px] border border-[var(--line)] bg-white/80 px-4 py-3 text-sm sm:grid-cols-3">
+            <div>
+              <p className="text-xs uppercase tracking-[0.18em] text-[#55755e]">Costo</p>
+              <p className="mt-1 font-semibold">{formatCurrency(margin.cost)}</p>
+            </div>
+            <div>
+              <p className="text-xs uppercase tracking-[0.18em] text-[#55755e]">Margen</p>
+              <p className="mt-1 font-semibold text-[#15553e]">{formatCurrency(margin.margin)}</p>
+            </div>
+            <div>
+              <p className="text-xs uppercase tracking-[0.18em] text-[#55755e]">Margen %</p>
+              <p className="mt-1 font-semibold">{formatPercent(margin.marginPercent)}</p>
+            </div>
+            {margin.missingCostLines > 0 ? (
+              <p className="text-xs text-[var(--muted)] sm:col-span-3">
+                {margin.missingCostLines} linea(s) sin costo registrado no entran al margen.
+              </p>
+            ) : null}
+          </div>
+        ) : null}
+        <div className="grid gap-3 rounded-[22px] border border-[var(--line)] bg-[#f7f5ef] px-4 py-3 text-sm sm:grid-cols-2">
+          <div>
+            <p className="text-xs uppercase tracking-[0.18em] text-[#55755e]">Cobrado</p>
+            <p className="mt-1 font-semibold text-[#15553e]">{formatCurrency(sale.amountPaid)}</p>
+          </div>
+          <div>
+            <p className="text-xs uppercase tracking-[0.18em] text-[#55755e]">Saldo pendiente</p>
+            <p className="mt-1 font-semibold text-[#8c5b17]">
+              {formatCurrency(getSaleBalance(sale.totalAmount, sale.amountPaid))}
+            </p>
+          </div>
+        </div>
+        <div className="rounded-[22px] border border-[var(--line)] bg-white/80 p-4 text-sm">
+          <p className="font-semibold">Historial de cobros</p>
+          {sale.payments.length === 0 ? (
+            <p className="mt-2 text-xs text-[var(--muted)]">Todavia no hay cobros registrados.</p>
+          ) : (
+            <ul className="mt-2 space-y-2">
+              {sale.payments.map((payment) => (
+                <li key={payment.id} className="flex items-center justify-between gap-3">
+                  <span className="text-[var(--muted)]">
+                    {formatDate(payment.paidAt)} - {payment.paymentMethod ?? "Sin metodo"}
+                  </span>
+                  <span className="font-semibold">{formatCurrency(payment.amount)}</span>
+                </li>
+              ))}
+            </ul>
+          )}
         </div>
       </div>
     </Modal>
@@ -400,9 +515,8 @@ export function SalesShell({
 
   const activeSales = saleRecords.filter((sale) => !sale.isVoided);
   const paidCount = activeSales.filter((sale) => sale.paymentStatus === "paid").length;
-  const pendingAmount = sumBy(
-    activeSales.filter((sale) => sale.paymentStatus !== "paid"),
-    (sale) => sale.totalAmount,
+  const pendingAmount = sumBy(activeSales, (sale) =>
+    getSaleBalance(sale.totalAmount, sale.amountPaid),
   );
 
   return (
@@ -525,6 +639,7 @@ export function SalesShell({
                       </Badge>
                       {sale.isVoided ? <Badge tone="danger">Anulada</Badge> : null}
                     </div>
+                    <PaymentSummary sale={sale} />
 
                     <div className="space-y-2 rounded-[22px] border border-[var(--line)] bg-[#f8f6ef] p-4 text-sm">
                       {groupSaleItems(sale.items).slice(0, 3).map((group) => (
@@ -616,6 +731,7 @@ export function SalesShell({
                             {getPaymentLabel(sale.paymentStatus)}
                           </Badge>
                           {sale.isVoided ? <Badge tone="danger">Anulada</Badge> : null}
+                          <PaymentSummary sale={sale} />
                         </td>
                         <td className="px-4 py-4 font-semibold">{formatCurrency(sale.totalAmount)}</td>
                         <td className="px-4 py-4 text-right">
@@ -660,6 +776,7 @@ export function SalesShell({
       {selectedSale ? (
         <PaymentModal
           sale={selectedSale}
+          role={role}
           onClose={() => setSelectedSaleId(null)}
           onSaleUpdated={(updatedSale) => {
             setSaleRecords((current) => upsertSale(current, updatedSale));
@@ -667,7 +784,11 @@ export function SalesShell({
         />
       ) : null}
       {detailSale ? (
-        <SaleDetailModal sale={detailSale} onClose={() => setDetailSaleId(null)} />
+        <SaleDetailModal
+          sale={detailSale}
+          isAdmin={isAdmin}
+          onClose={() => setDetailSaleId(null)}
+        />
       ) : null}
       {reverseSale ? (
         <ReverseSaleModal

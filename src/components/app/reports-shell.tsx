@@ -4,7 +4,21 @@ import { useState } from "react";
 import { BarChart3, CircleAlert, Package, Sprout } from "lucide-react";
 import { ActionNotice } from "@/components/forms/action-notice";
 import { Panel } from "@/components/ui/panel";
-import type { ExpenseRecord, ProductRecord, ProductionBatchRecord, SaleOrderRecord, SupplyRecord } from "@/lib/domain";
+import type {
+  AppRole,
+  ExpenseRecord,
+  ProductRecord,
+  ProductionBatchRecord,
+  SaleOrderRecord,
+  SupplyRecord,
+} from "@/lib/domain";
+import {
+  formatPercent,
+  getMarginByProduct,
+  summarizeMargin,
+  summarizeReceivables,
+} from "@/lib/finance";
+import { formatQuantity } from "@/lib/pricing";
 import { formatCurrency, sumBy } from "@/lib/utils";
 
 type ReportsShellProps = {
@@ -13,6 +27,7 @@ type ReportsShellProps = {
   products: ProductRecord[];
   supplies: SupplyRecord[];
   batches: ProductionBatchRecord[];
+  role: AppRole;
 };
 
 type RangeFilter = {
@@ -35,7 +50,15 @@ function normalizeRange(range: RangeFilter): RangeFilter {
   };
 }
 
-export function ReportsShell({ sales, expenses, products, supplies, batches }: ReportsShellProps) {
+export function ReportsShell({
+  sales,
+  expenses,
+  products,
+  supplies,
+  batches,
+  role,
+}: ReportsShellProps) {
+  const isAdmin = role === "admin";
   const [range, setRange] = useState<RangeFilter>({
     from: new Date(new Date().setDate(new Date().getDate() - 30)).toISOString().slice(0, 10),
     to: new Date().toISOString().slice(0, 10),
@@ -70,13 +93,17 @@ export function ReportsShell({ sales, expenses, products, supplies, batches }: R
     expensesByCategory.set(expense.categoryName ?? "Sin categoria", (expensesByCategory.get(expense.categoryName ?? "Sin categoria") ?? 0) + expense.amount);
   });
 
-  const totalSales = sumBy(filteredSales, (sale) => sale.totalAmount);
-  const totalCollected = sumBy(
-    filteredSales.filter((sale) => sale.paymentStatus === "paid"),
-    (sale) => sale.totalAmount,
-  );
+  // Cobrado usa lo efectivamente cobrado (incluye parciales); el saldo es total menos cobrado.
+  const {
+    billed: totalSales,
+    collected: totalCollected,
+    pending: pendingReceivables,
+  } = summarizeReceivables(filteredSales);
   const totalExpenses = sumBy(filteredExpenses, (expense) => expense.amount);
-  const pendingReceivables = totalSales - totalCollected;
+  const marginByProduct = isAdmin ? getMarginByProduct(filteredSales) : [];
+  const totalMargin = isAdmin
+    ? summarizeMargin(filteredSales.flatMap((sale) => sale.items))
+    : null;
 
   const criticalStock = [...products, ...supplies].filter(
     (item) => item.isActive && item.currentStock <= item.minStock,
@@ -156,7 +183,64 @@ export function ReportsShell({ sales, expenses, products, supplies, batches }: R
             {formatCurrency(pendingReceivables)}
           </p>
         </Panel>
+        {totalMargin ? (
+          <Panel>
+            <p className="text-sm text-[var(--muted)]">Margen bruto (ventas - costo)</p>
+            <p className="mt-2 text-3xl font-semibold text-[#15553e]">
+              {formatCurrency(totalMargin.margin)}
+            </p>
+            <p className="mt-1 text-sm text-[var(--muted)]">
+              {formatPercent(totalMargin.marginPercent)} sobre ventas con costo registrado
+            </p>
+          </Panel>
+        ) : null}
       </div>
+
+      {isAdmin ? (
+        <Panel>
+          <div className="flex items-center gap-3">
+            <BarChart3 className="h-5 w-5 text-[#15553e]" />
+            <h3 className="text-2xl font-semibold">Margen por producto</h3>
+          </div>
+          {totalMargin && totalMargin.missingCostLines > 0 ? (
+            <p className="mt-2 text-sm text-[var(--muted)]">
+              {totalMargin.missingCostLines} linea(s) de venta sin costo registrado no entran al margen.
+            </p>
+          ) : null}
+          {marginByProduct.length === 0 ? (
+            <div className="mt-5 rounded-[24px] border border-[var(--line)] bg-white/80 p-4 text-sm text-[var(--muted)]">
+              No hay ventas en el rango seleccionado.
+            </div>
+          ) : (
+            <div className="mt-5 overflow-x-auto rounded-[24px] border border-[var(--line)]">
+              <table className="min-w-full text-left text-sm">
+                <thead className="bg-[#f4f1e8] text-[var(--muted)]">
+                  <tr>
+                    <th className="px-4 py-3 font-medium">Producto</th>
+                    <th className="px-4 py-3 font-medium">Unidades</th>
+                    <th className="px-4 py-3 font-medium">Ventas</th>
+                    <th className="px-4 py-3 font-medium">Costo</th>
+                    <th className="px-4 py-3 font-medium">Margen</th>
+                    <th className="px-4 py-3 font-medium">Margen %</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {marginByProduct.map((row) => (
+                    <tr key={row.productName} className="border-t border-[var(--line)] bg-white/80">
+                      <td className="px-4 py-3 font-semibold">{row.productName}</td>
+                      <td className="px-4 py-3">{formatQuantity(row.quantity)}</td>
+                      <td className="px-4 py-3">{formatCurrency(row.revenue)}</td>
+                      <td className="px-4 py-3">{formatCurrency(row.cost)}</td>
+                      <td className="px-4 py-3 font-semibold">{formatCurrency(row.margin)}</td>
+                      <td className="px-4 py-3">{formatPercent(row.marginPercent)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </Panel>
+      ) : null}
 
       <div className="grid gap-4 xl:grid-cols-2">
         <Panel>

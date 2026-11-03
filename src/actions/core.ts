@@ -65,8 +65,9 @@ type StockAdjustmentResult = {
   supply: SupplyRecord | null;
 };
 
+// Sin costos: las acciones devuelven datos a cualquier rol; los costos llegan con el refresco del servidor.
 const SALE_ORDER_SELECT =
-  "id, sale_date, total_amount, payment_status, payment_method, paid_at, notes, voided_at, void_reason, created_at, contacts(name), sales_channels(name), sales_order_items(id, product_id, bundle_id, quantity, unit_price, list_price, line_total, products(name), product_bundles(name))";
+  "id, sale_date, total_amount, amount_paid, payment_status, payment_method, paid_at, notes, voided_at, void_reason, created_at, contacts(name), sales_channels(name), sales_order_items(id, product_id, bundle_id, quantity, unit_price, list_price, line_total, products(name), product_bundles(name)), sale_payments(id, amount, payment_method, paid_at, created_at)";
 const BUNDLE_SELECT =
   "id, name, sale_price, notes, is_active, created_at, product_bundle_items(id, product_id, quantity, products(name))";
 const EXPENSE_SELECT =
@@ -146,6 +147,7 @@ function mapSupply(record: RawRecord): SupplyRecord {
     isActive: Boolean(record.is_active),
     currentStock: toNumber(record.current_stock),
     lastPurchaseAt: (record.last_purchase_at as string | null | undefined) ?? null,
+    avgCost: null,
     createdAt: String(record.created_at ?? ""),
   };
 }
@@ -161,6 +163,7 @@ function mapProduct(record: RawRecord): ProductRecord {
     notes: (record.notes as string | null | undefined) ?? null,
     isActive: Boolean(record.is_active),
     currentStock: toNumber(record.current_stock),
+    avgCost: null,
     createdAt: String(record.created_at ?? ""),
   };
 }
@@ -183,6 +186,7 @@ function mapSale(record: RawRecord): SaleOrderRecord {
           : toNumber(item.list_price),
       bundleId: (item.bundle_id as string | null | undefined) ?? null,
       bundleName: (bundle.name as string | null | undefined) ?? null,
+      unitCost: null,
     };
   });
   const contact = asRecord(record.contacts);
@@ -194,6 +198,7 @@ function mapSale(record: RawRecord): SaleOrderRecord {
     contactName: (contact.name as string | null | undefined) ?? null,
     channelName: (channel.name as string | null | undefined) ?? null,
     totalAmount: toNumber(record.total_amount),
+    amountPaid: toNumber(record.amount_paid),
     paymentStatus: (record.payment_status as SaleOrderRecord["paymentStatus"]) ?? "pending",
     paymentMethod: (record.payment_method as string | null | undefined) ?? null,
     paidAt: (record.paid_at as string | null | undefined) ?? null,
@@ -204,6 +209,17 @@ function mapSale(record: RawRecord): SaleOrderRecord {
     totalUnits: items.reduce((sum, item) => sum + item.quantity, 0),
     createdAt: String(record.created_at ?? ""),
     items,
+    payments: asArray(record.sale_payments)
+      .map((payment) => ({
+        id: String(payment.id ?? ""),
+        amount: toNumber(payment.amount),
+        paymentMethod: (payment.payment_method as string | null | undefined) ?? null,
+        paidAt: (payment.paid_at as string | null | undefined) ?? null,
+        createdAt: String(payment.created_at ?? ""),
+      }))
+      .sort((left, right) =>
+        `${left.paidAt ?? ""}${left.createdAt}`.localeCompare(`${right.paidAt ?? ""}${right.createdAt}`),
+      ),
   };
 }
 
@@ -310,6 +326,8 @@ function mapBatch(record: RawRecord): ProductionBatchRecord {
     actualQty: record.actual_qty === null ? null : toNumber(record.actual_qty),
     notes: (record.notes as string | null | undefined) ?? null,
     inventoryPostedAt: (record.inventory_posted_at as string | null | undefined) ?? null,
+    totalCost: null,
+    unitCost: null,
     isVoided: Boolean(record.voided_at),
     voidedAt: (record.voided_at as string | null | undefined) ?? null,
     voidReason: (record.void_reason as string | null | undefined) ?? null,
@@ -322,6 +340,7 @@ function mapBatch(record: RawRecord): ProductionBatchRecord {
         supplyId: String(input.supply_id ?? ""),
         supplyName: String(supply.name ?? "Insumo"),
         quantity: toNumber(input.quantity),
+        unitCost: null,
       };
     }),
     outputs: asArray(record.production_batch_outputs).map((output) => {
@@ -1006,6 +1025,7 @@ export async function createSaleOrderAction(
         paymentStatus: parsed.data.paymentStatus,
         paymentMethod: parsed.data.paymentMethod,
         paidAt: parsed.data.paidAt,
+        amountPaid: parsed.data.paymentStatus === "partial" ? parsed.data.amountPaid : null,
         notes: parsed.data.notes,
         items: parsed.data.items.map((item) =>
           item.bundleId
@@ -1059,6 +1079,7 @@ export async function updateSalePaymentStatusAction(
         paymentStatus: parsed.data.paymentStatus,
         paymentMethod: parsed.data.paymentMethod,
         paidAt: parsed.data.paidAt,
+        amount: parsed.data.paymentStatus === "partial" ? parsed.data.amount : null,
       },
     });
 
@@ -1075,7 +1096,10 @@ export async function updateSalePaymentStatusAction(
     revalidatePath("/ventas");
     revalidatePath("/dashboard");
     revalidatePath("/reportes");
-    return success("Estado de cobro actualizado.", sale);
+    return success(
+      parsed.data.paymentStatus === "partial" ? "Cobro parcial registrado." : "Estado de cobro actualizado.",
+      sale,
+    );
   } catch (error) {
     return failure("No pudimos actualizar el cobro.", error);
   }

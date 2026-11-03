@@ -20,6 +20,7 @@ import type {
   ProductCategoryRecord,
   ProductRecord,
 } from "@/lib/domain";
+import { formatPercent, getMarginPercent } from "@/lib/finance";
 import { formatQuantity, groupTiersByProduct } from "@/lib/pricing";
 import { formatCurrency } from "@/lib/utils";
 
@@ -44,8 +45,12 @@ function sortProducts(list: ProductRecord[]) {
   return [...list].sort((left, right) => left.name.localeCompare(right.name, "es", { sensitivity: "base" }));
 }
 
+/** Las acciones no devuelven el costo promedio: se conserva el que llego del servidor. */
 function upsertProduct(list: ProductRecord[], product: ProductRecord) {
-  return sortProducts([product, ...list.filter((entry) => entry.id !== product.id)]);
+  const previous = list.find((entry) => entry.id === product.id);
+  const merged = { ...product, avgCost: product.avgCost ?? previous?.avgCost ?? null };
+
+  return sortProducts([merged, ...list.filter((entry) => entry.id !== product.id)]);
 }
 
 function sortMovements(list: InventoryMovementRecord[]) {
@@ -281,6 +286,20 @@ export function ProductsShell({
                   <p className="text-xs uppercase tracking-[0.18em] text-[#55755e]">Precio</p>
                   <p className="mt-2 text-2xl font-semibold text-[#15553e]">{formatCurrency(product.salePrice)}</p>
                 </div>
+                {isAdmin && product.avgCost !== null ? (
+                  <>
+                    <div>
+                      <p className="text-xs uppercase tracking-[0.18em] text-[#55755e]">Costo promedio</p>
+                      <p className="mt-2 text-lg font-semibold">{formatCurrency(product.avgCost)}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs uppercase tracking-[0.18em] text-[#55755e]">Margen unitario</p>
+                      <p className="mt-2 text-lg font-semibold">
+                        {formatPercent(getMarginPercent(product.salePrice, product.avgCost))}
+                      </p>
+                    </div>
+                  </>
+                ) : null}
               </div>
 
               <div className="rounded-[20px] border border-[var(--line)] bg-white/70 px-4 py-3 text-sm">

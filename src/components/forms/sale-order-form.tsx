@@ -17,6 +17,7 @@ import type {
   SaleCustomerMode,
   SaleOrderRecord,
 } from "@/lib/domain";
+import { getPartialAmountError, getSaleBalance } from "@/lib/finance";
 import {
   formatQuantity,
   getDirectProductQuantities,
@@ -162,6 +163,7 @@ function getDefaultValues(products: ProductRecord[], channels: LookupOption[]): 
     paymentStatus: "pending",
     paymentMethod: "",
     paidAt: "",
+    amountPaid: "",
     notes: "",
     items: [getInitialItem(products)],
   };
@@ -248,6 +250,10 @@ export function SaleOrderForm({
     control: form.control,
     name: "paymentStatus",
   });
+  const amountPaid = useWatch({
+    control: form.control,
+    name: "amountPaid",
+  });
   const manualFlags = items.fields.map((field) => isAdmin && manualPriceIds.includes(field.id));
   const linePricing = getLinePricing({
     items: watchedItems as SaleLineValues[],
@@ -333,6 +339,10 @@ export function SaleOrderForm({
       form.setValue("paymentMethod", "", { shouldDirty: true, shouldValidate: true });
       form.setValue("paidAt", "", { shouldDirty: true, shouldValidate: true });
     }
+
+    if (paymentStatus !== "partial") {
+      form.setValue("amountPaid", "", { shouldDirty: true });
+    }
   }, [form, paymentStatus]);
 
   return (
@@ -373,6 +383,16 @@ export function SaleOrderForm({
               message: `Stock insuficiente. ${submitStockIssues.join(". ")}.`,
             });
             return;
+          }
+
+          if (values.paymentStatus === "partial") {
+            const submitTotal = roundMoney(submitPricing.reduce((sum, line) => sum + line.subtotal, 0));
+            const amountError = getPartialAmountError(values.amountPaid, submitTotal);
+
+            if (amountError) {
+              setFeedback({ tone: "error", message: amountError });
+              return;
+            }
           }
 
           const payload = {
@@ -601,6 +621,35 @@ export function SaleOrderForm({
           />
         </Field>
       </div>
+
+      {paymentStatus === "partial" ? (
+        <div className="grid gap-4 md:grid-cols-4">
+          <Field
+            label="Monto cobrado"
+            error={form.formState.errors.amountPaid?.message}
+            hint={`Mayor a cero y menor al total. Saldo: ${formatCurrency(
+              getSaleBalance(total, Number(amountPaid) || 0),
+            )}.`}
+          >
+            <Controller
+              control={form.control}
+              name="amountPaid"
+              render={({ field }) => (
+                <TextInput
+                  name={field.name}
+                  ref={field.ref}
+                  value={toInputValue(field.value)}
+                  onBlur={field.onBlur}
+                  onChange={(event) => field.onChange(toNumberValue(event.target.value))}
+                  type="number"
+                  min="0.01"
+                  step="0.01"
+                />
+              )}
+            />
+          </Field>
+        </div>
+      ) : null}
 
       <div className="rounded-[26px] border border-[var(--line)] bg-[#f7f5ef] p-4">
         <div className="mb-4 flex items-center justify-between">

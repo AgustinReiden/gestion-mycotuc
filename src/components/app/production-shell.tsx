@@ -10,13 +10,14 @@ import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Modal } from "@/components/ui/modal";
 import { Panel } from "@/components/ui/panel";
-import type { ProductRecord, ProductionBatchRecord, SupplyRecord } from "@/lib/domain";
-import { cn, formatDate } from "@/lib/utils";
+import type { AppRole, ProductRecord, ProductionBatchRecord, SupplyRecord } from "@/lib/domain";
+import { cn, formatCurrency, formatDate } from "@/lib/utils";
 
 type ProductionShellProps = {
   batches: ProductionBatchRecord[];
   products: ProductRecord[];
   supplies: SupplyRecord[];
+  role: AppRole;
 };
 
 function getStatusTone(status: ProductionBatchRecord["status"]) {
@@ -45,8 +46,23 @@ function sortBatches(list: ProductionBatchRecord[]) {
   });
 }
 
+/** Las acciones no devuelven costos: se conservan los que ya llegaron del servidor. */
 function upsertBatch(list: ProductionBatchRecord[], batch: ProductionBatchRecord) {
-  return sortBatches([batch, ...list.filter((entry) => entry.id !== batch.id)]);
+  const previous = list.find((entry) => entry.id === batch.id);
+  const merged = previous
+    ? {
+        ...batch,
+        totalCost: batch.totalCost ?? previous.totalCost,
+        unitCost: batch.unitCost ?? previous.unitCost,
+        inputs: batch.inputs.map((input) => ({
+          ...input,
+          unitCost:
+            input.unitCost ?? previous.inputs.find((entry) => entry.id === input.id)?.unitCost ?? null,
+        })),
+      }
+    : batch;
+
+  return sortBatches([merged, ...list.filter((entry) => entry.id !== batch.id)]);
 }
 
 function NewBatchModal({
@@ -176,7 +192,8 @@ function ReverseBatchModal({
   );
 }
 
-export function ProductionShell({ batches, products, supplies }: ProductionShellProps) {
+export function ProductionShell({ batches, products, supplies, role }: ProductionShellProps) {
+  const isAdmin = role === "admin";
   const [search, setSearch] = useState("");
   const [batchRecords, setBatchRecords] = useState(() => sortBatches(batches));
   const [selectedBatchId, setSelectedBatchId] = useState<string | null>(null);
@@ -304,7 +321,14 @@ export function ProductionShell({ batches, products, supplies }: ProductionShell
                     {batch.inputs.map((input) => (
                       <div key={input.id} className="flex items-center justify-between border-b border-[var(--line)] pb-2 last:border-0 last:pb-0">
                         <span>{input.supplyName}</span>
-                        <span className="font-semibold text-[#2d3329]">x {input.quantity}</span>
+                        <span className="font-semibold text-[#2d3329]">
+                          x {input.quantity}
+                          {isAdmin && input.unitCost !== null ? (
+                            <span className="ml-2 text-xs font-normal text-[var(--muted)]">
+                              {formatCurrency(input.unitCost)} c/u
+                            </span>
+                          ) : null}
+                        </span>
                       </div>
                     ))}
                     {batch.inputs.length === 0 && <p className="text-sm italic">Sin consumos registrados.</p>}
@@ -323,6 +347,23 @@ export function ProductionShell({ batches, products, supplies }: ProductionShell
                   </div>
                 </div>
               </div>
+
+              {isAdmin && batch.totalCost !== null ? (
+                <div className="grid gap-3 rounded-[24px] border border-[var(--line)] bg-[#eef4ea] p-4 text-sm sm:grid-cols-2">
+                  <div>
+                    <p className="text-xs uppercase tracking-[0.18em] text-[#55755e]">Costo total</p>
+                    <p className="mt-1 text-lg font-semibold text-[#15553e]">
+                      {formatCurrency(batch.totalCost)}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-xs uppercase tracking-[0.18em] text-[#55755e]">Costo unitario</p>
+                    <p className="mt-1 text-lg font-semibold text-[#15553e]">
+                      {formatCurrency(batch.unitCost ?? 0)}
+                    </p>
+                  </div>
+                </div>
+              ) : null}
 
               {batch.notes ? <p className="text-sm text-[var(--muted)]">{batch.notes}</p> : null}
 

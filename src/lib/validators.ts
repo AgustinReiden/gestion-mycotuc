@@ -12,6 +12,11 @@ const optionalNonnegativeNumber = z.preprocess(
   z.coerce.number().nonnegative("El valor no puede ser negativo.").nullable().optional(),
 );
 
+const optionalAmount = z.preprocess(
+  (value) => (value === "" || value === null || value === undefined ? undefined : value),
+  z.coerce.number().positive("El monto cobrado debe ser mayor a cero.").optional(),
+);
+
 function validatePaymentFields(
   data: {
     paymentStatus: "pending" | "partial" | "paid";
@@ -200,11 +205,20 @@ export const saleOrderFormSchema = z
     paymentStatus: z.enum(["pending", "partial", "paid"]),
     paymentMethod: optionalTrimmedString,
     paidAt: optionalTrimmedString,
+    amountPaid: optionalAmount,
     notes: optionalTrimmedString,
     items: z.array(saleItemSchema).min(1, "Agrega al menos un item."),
   })
   .superRefine((data, ctx) => {
     validatePaymentFields(data, ctx);
+
+    if (data.paymentStatus === "partial" && data.amountPaid === undefined) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["amountPaid"],
+        message: "Ingresa el monto cobrado de la venta parcial.",
+      });
+    }
 
     if (data.customerMode === "existing" && !data.contactId) {
       ctx.addIssue({
@@ -301,8 +315,19 @@ export const paymentStatusUpdateSchema = z
     paymentStatus: z.enum(["pending", "partial", "paid"]),
     paymentMethod: optionalTrimmedString,
     paidAt: optionalTrimmedString,
+    amount: optionalAmount,
   })
-  .superRefine(validatePaymentFields);
+  .superRefine((data, ctx) => {
+    validatePaymentFields(data, ctx);
+
+    if (data.paymentStatus === "partial" && data.amount === undefined) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["amount"],
+        message: "Ingresa el monto del cobro parcial.",
+      });
+    }
+  });
 
 export const reversalSchema = z.object({
   id: z.string().uuid(),

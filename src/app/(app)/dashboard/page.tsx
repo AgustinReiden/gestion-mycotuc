@@ -4,6 +4,7 @@ import {
   BarChart3,
   DollarSign,
   Package,
+  Percent,
   ShoppingCart,
   TrendingDown,
   TrendingUp,
@@ -13,6 +14,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { MetricCard } from "@/components/ui/metric-card";
 import { Panel } from "@/components/ui/panel";
+import { formatPercent } from "@/lib/finance";
 import { getDashboardData } from "@/lib/queries";
 import { formatCurrency, formatDate } from "@/lib/utils";
 
@@ -46,7 +48,7 @@ export default async function DashboardPage() {
         <MetricCard
           label="Cobrado del mes"
           value={formatCurrency(data.monthlyCollected)}
-          helper="Ventas pagadas dentro del periodo actual."
+          helper="Cobrado de las ventas del periodo actual, incluye cobros parciales."
           icon={DollarSign}
           tone="accent"
         />
@@ -67,10 +69,23 @@ export default async function DashboardPage() {
         <MetricCard
           label="Pendiente de cobro"
           value={formatCurrency(data.pendingReceivables)}
-          helper="Total historico facturado y no cobrado."
+          helper="Saldo historico: facturado menos lo ya cobrado."
           icon={Package}
           tone="info"
         />
+        {data.monthlyGrossMargin ? (
+          <MetricCard
+            label="Margen bruto del mes"
+            value={formatCurrency(data.monthlyGrossMargin.margin)}
+            helper={`${formatPercent(data.monthlyGrossMargin.marginPercent)} sobre ventas, a costo congelado al vender.${
+              data.monthlyGrossMargin.missingCostLines > 0
+                ? ` ${data.monthlyGrossMargin.missingCostLines} linea(s) sin costo no cuentan.`
+                : ""
+            }`}
+            icon={Percent}
+            tone={data.monthlyGrossMargin.margin >= 0 ? "accent" : "danger"}
+          />
+        ) : null}
       </div>
 
       <div className="grid gap-4 xl:grid-cols-[1.9fr_1.1fr]">
