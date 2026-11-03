@@ -141,7 +141,20 @@ describe("stock, payment and reversal validation", () => {
     expect(result.success).toBe(false);
   });
 
-  it("accepts reversal payloads with optional reason", () => {
+  it("rejects reversals and adjustments without a reason", () => {
+    expect(reversalSchema.safeParse({ id: ids.sale, reason: "" }).success).toBe(false);
+    expect(
+      stockAdjustmentSchema.safeParse({
+        entityType: "product",
+        entityId: ids.product,
+        quantity: 5,
+        notes: "",
+        movementDate: "2026-04-27",
+      }).success,
+    ).toBe(false);
+  });
+
+  it("accepts reversal payloads with a reason", () => {
     const result = reversalSchema.safeParse({
       id: ids.sale,
       reason: "Error de carga",

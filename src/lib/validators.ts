@@ -76,7 +76,7 @@ export const stockAdjustmentSchema = z.object({
   entityType: z.enum(["product", "supply"]),
   entityId: z.string().uuid(),
   quantity: z.coerce.number().refine((value) => value !== 0, "La variacion no puede ser 0."),
-  notes: optionalTrimmedString,
+  notes: z.string().trim().min(3, "El motivo del ajuste es obligatorio."),
   movementDate: z.string().min(1, "La fecha es obligatoria."),
 });
 
@@ -212,5 +212,5 @@ export const paymentStatusUpdateSchema = z
 
 export const reversalSchema = z.object({
   id: z.string().uuid(),
-  reason: optionalTrimmedString,
+  reason: z.string().trim().min(3, "El motivo de la anulacion es obligatorio."),
 });

@@ -314,13 +314,14 @@ const getSalesOrdersData = cache(async () =>
   runUserCachedQuery({
     key: ["sales-orders-data"],
     query: async (supabase) => {
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from("sales_orders")
         .select(
           "id, sale_date, total_amount, payment_status, payment_method, paid_at, notes, voided_at, void_reason, created_at, contacts(name), sales_channels(name), sales_order_items(id, product_id, quantity, unit_price, line_total, products(name))",
         )
         .order("sale_date", { ascending: false })
         .order("created_at", { ascending: false });
+      if (error) throw error;
 
       return (data ?? []).map(mapSale);
     },
@@ -333,13 +334,14 @@ const getExpensesRecordsData = cache(async () =>
   runUserCachedQuery({
     key: ["expenses-records-data"],
     query: async (supabase) => {
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from("expenses")
         .select(
           "id, expense_date, concept, amount, source, notes, linked_purchase_id, voided_at, void_reason, created_at, expense_categories(name), purchases(contacts(name))",
         )
         .order("expense_date", { ascending: false })
         .order("created_at", { ascending: false });
+      if (error) throw error;
 
       return (data ?? []).map(mapExpense);
     },
@@ -352,13 +354,14 @@ const getProductionBatchesData = cache(async () =>
   runUserCachedQuery({
     key: ["production-batches-data"],
     query: async (supabase) => {
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from("production_batches")
         .select(
           "id, product_id, status, started_at, completed_at, expected_qty, actual_qty, notes, inventory_posted_at, voided_at, void_reason, created_at, products(name), production_batch_inputs(id, supply_id, quantity, supplies(name)), production_batch_outputs(id, product_id, quantity, products(name))",
         )
         .order("started_at", { ascending: false })
         .order("created_at", { ascending: false });
+      if (error) throw error;
 
       return (data ?? []).map(mapBatch);
     },
@@ -441,7 +444,8 @@ export const getContactsData = cache(async () =>
   runUserCachedQuery({
     key: ["contacts-data"],
     query: async (supabase) => {
-      const { data } = await supabase.from("contacts").select("*").order("name");
+      const { data, error } = await supabase.from("contacts").select("*").order("name");
+      if (error) throw error;
       return (data ?? []).map(mapContact);
     },
     revalidate: 120,
@@ -453,7 +457,8 @@ export const getProductsData = cache(async () =>
   runUserCachedQuery({
     key: ["products-data"],
     query: async (supabase) => {
-      const { data } = await supabase.from("product_inventory_overview").select("*").order("name");
+      const { data, error } = await supabase.from("product_inventory_overview").select("*").order("name");
+      if (error) throw error;
       return (data ?? []).map(mapProduct);
     },
     revalidate: 120,
@@ -465,7 +470,8 @@ export const getSuppliesData = cache(async () =>
   runUserCachedQuery({
     key: ["supplies-data"],
     query: async (supabase) => {
-      const { data } = await supabase.from("supply_inventory_overview").select("*").order("name");
+      const { data, error } = await supabase.from("supply_inventory_overview").select("*").order("name");
+      if (error) throw error;
       return (data ?? []).map(mapSupply);
     },
     revalidate: 120,
@@ -488,7 +494,8 @@ export const getInventoryMovementsData = cache(
           query = query.eq("entity_type", entityType);
         }
 
-        const { data } = await query;
+        const { data, error } = await query;
+        if (error) throw error;
         return (data ?? []).map((record) => mapInventoryMovement(asRecord(record)));
       },
       revalidate: 60,
@@ -503,12 +510,13 @@ export const getPurchasesData = cache(async (limit = 8) =>
   runUserCachedQuery({
     key: ["purchases-data", String(limit)],
     query: async (supabase) => {
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from("purchases")
         .select("id, purchase_date, total_amount, notes, voided_at, void_reason, created_at, contacts(name)")
         .order("purchase_date", { ascending: false })
         .order("created_at", { ascending: false })
         .limit(limit);
+      if (error) throw error;
 
       return (data ?? []).map((record) => mapPurchase(asRecord(record)));
     },
