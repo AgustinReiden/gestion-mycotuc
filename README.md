@@ -73,9 +73,20 @@ npm.cmd run build
 
 ## Notas del modelo
 
-- Todos los usuarios autenticados comparten permisos operativos.
+- Hay dos roles: `admin` y `operator`. El primer perfil creado queda admin. Solo el admin anula ventas/compras/lotes, ajusta stock, cambia precios base, define escalas y combos, y ve costos y margenes. El operador vende a precio de lista.
+- Desactivar el registro publico en Supabase Auth (Allow new users to sign up).
 - Las migraciones `20260318152000_auth_profile_sync.sql` y `20260318164000_profile_self_heal_and_policy.sql` corrigen usuarios ya existentes en `auth.users`, dejan triggers para altas/updates futuros y endurecen la policy de `profiles`.
 - La migracion `20260318180000_inventory_history_and_batch_guards.sql` agrega historial legible de movimientos y evita completar lotes con insumos insuficientes o sin salidas cargadas.
 - Las compras aumentan stock de insumos y generan un gasto en la categoria `Insumos`.
 - El stock actual se calcula desde `inventory_movements`.
 - Los lotes impactan inventario solo al completarse.
+
+## Tests
+
+```bash
+npm run typecheck
+npm run lint
+npm test
+```
+
+`supabase/tests/business_regressions.sql` prueba la base (roles, permisos, escalas, combos, stock, costos, cobros y anulaciones). Se pega en el SQL Editor de una base con todas las migraciones aplicadas; corre en una transaccion que se revierte y termina con `PASS: N verificaciones OK` o `FAIL: ...`. No usa datos reales.
