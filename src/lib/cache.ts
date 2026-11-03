@@ -1,9 +1,12 @@
 export const CACHE_TAGS = {
+  bundles: "bundles",
+  categories: "product-categories",
   contacts: "contacts",
   expenses: "expenses",
   inventoryProduct: "inventory-product",
   inventorySupply: "inventory-supply",
   lookups: "lookups",
+  priceTiers: "price-tiers",
   production: "production",
   products: "products",
   profile: "profile",

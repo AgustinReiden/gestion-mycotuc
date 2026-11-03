@@ -5,11 +5,15 @@ import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { dedupeTags, CACHE_TAGS } from "@/lib/cache";
 import type { Database } from "@/lib/database.types";
 import type {
+  AppRole,
+  BundleRecord,
   ContactRecord,
   DashboardData,
   ExpenseRecord,
   InventoryMovementRecord,
   LookupOption,
+  PriceTierRecord,
+  ProductCategoryRecord,
   ProductRecord,
   ProductionBatchRecord,
   ProfileSummary,
@@ -91,6 +95,7 @@ function mapSupply(record: RawRecord): SupplyRecord {
 
 function mapSaleItem(record: RawRecord): SaleOrderItemRecord {
   const product = asRecord(record.products);
+  const bundle = asRecord(record.product_bundles);
 
   return {
     id: String(record.id ?? ""),
@@ -99,6 +104,52 @@ function mapSaleItem(record: RawRecord): SaleOrderItemRecord {
     quantity: toNumber(record.quantity),
     unitPrice: toNumber(record.unit_price),
     lineTotal: toNumber(record.line_total),
+    listPrice:
+      record.list_price === null || record.list_price === undefined
+        ? null
+        : toNumber(record.list_price),
+    bundleId: (record.bundle_id as string | null | undefined) ?? null,
+    bundleName: (bundle.name as string | null | undefined) ?? null,
+  };
+}
+
+function mapProductCategory(record: RawRecord): ProductCategoryRecord {
+  return {
+    id: String(record.id ?? ""),
+    name: String(record.name ?? ""),
+    isActive: Boolean(record.is_active),
+  };
+}
+
+function mapPriceTier(record: RawRecord): PriceTierRecord {
+  return {
+    id: String(record.id ?? ""),
+    productId: String(record.product_id ?? ""),
+    minQty: toNumber(record.min_qty),
+    unitPrice: toNumber(record.unit_price),
+  };
+}
+
+function mapBundle(record: RawRecord): BundleRecord {
+  return {
+    id: String(record.id ?? ""),
+    name: String(record.name ?? ""),
+    salePrice: toNumber(record.sale_price),
+    notes: (record.notes as string | null | undefined) ?? null,
+    isActive: Boolean(record.is_active),
+    createdAt: String(record.created_at ?? ""),
+    items: asArray(record.product_bundle_items)
+      .map((item) => {
+        const product = asRecord(item.products);
+
+        return {
+          id: String(item.id ?? ""),
+          productId: String(item.product_id ?? ""),
+          productName: String(product.name ?? "Producto"),
+          quantity: toNumber(item.quantity),
+        };
+      })
+      .sort((left, right) => left.productName.localeCompare(right.productName, "es")),
   };
 }
 
@@ -235,6 +286,10 @@ function toStockAlert(record: ProductRecord | SupplyRecord, type: "product" | "s
   };
 }
 
+function toRole(value: unknown): AppRole {
+  return value === "admin" ? "admin" : "operator";
+}
+
 function createSupabaseAuthorizedClient(accessToken: string): QueryClient {
   const { url, anonKey } = getSupabaseEnv();
 
@@ -317,7 +372,7 @@ const getSalesOrdersData = cache(async () =>
       const { data, error } = await supabase
         .from("sales_orders")
         .select(
-          "id, sale_date, total_amount, payment_status, payment_method, paid_at, notes, voided_at, void_reason, created_at, contacts(name), sales_channels(name), sales_order_items(id, product_id, quantity, unit_price, line_total, products(name))",
+          "id, sale_date, total_amount, payment_status, payment_method, paid_at, notes, voided_at, void_reason, created_at, contacts(name), sales_channels(name), sales_order_items(id, product_id, bundle_id, quantity, unit_price, list_price, line_total, products(name), product_bundles(name))",
         )
         .order("sale_date", { ascending: false })
         .order("created_at", { ascending: false });
@@ -370,7 +425,7 @@ const getProductionBatchesData = cache(async () =>
   }),
 );
 
-export async function getProfileSummary(): Promise<ProfileSummary | null> {
+export const getProfileSummary = cache(async (): Promise<ProfileSummary | null> => {
   const auth = await getAuthContext();
 
   if (!auth) {
@@ -378,11 +433,11 @@ export async function getProfileSummary(): Promise<ProfileSummary | null> {
   }
 
   const cachedProfile = await runUserCachedQuery({
-    key: ["profile-summary"],
+    key: ["profile-summary-v2"],
     query: async (supabase) => {
       const { data: profile } = await supabase
         .from("profiles")
-        .select("id, full_name, email")
+        .select("id, full_name, email, role")
         .eq("id", auth.userId)
         .maybeSingle();
 
@@ -390,6 +445,7 @@ export async function getProfileSummary(): Promise<ProfileSummary | null> {
         ? {
             email: profile.email ?? null,
             fullName: profile.full_name ?? null,
+            role: toRole(profile.role),
           }
         : null;
     },
@@ -402,13 +458,14 @@ export async function getProfileSummary(): Promise<ProfileSummary | null> {
       id: auth.userId,
       fullName: cachedProfile.fullName ?? auth.email?.split("@")[0] ?? null,
       email: cachedProfile.email ?? auth.email ?? null,
+      role: cachedProfile.role,
     };
   }
 
   const supabase = await getSupabase();
   const { data: profile } = await supabase
     .from("profiles")
-    .select("id, full_name, email")
+    .select("id, full_name, email, role")
     .eq("id", auth.userId)
     .maybeSingle();
 
@@ -418,7 +475,13 @@ export async function getProfileSummary(): Promise<ProfileSummary | null> {
     id: auth.userId,
     fullName: syncedProfile?.full_name ?? auth.email?.split("@")[0] ?? null,
     email: syncedProfile?.email ?? auth.email ?? null,
+    role: toRole(syncedProfile?.role),
   };
+});
+
+async function getCurrentRole(): Promise<AppRole> {
+  const profile = await getProfileSummary();
+  return profile?.role ?? "operator";
 }
 
 export const getLookupData = cache(async () =>
@@ -463,6 +526,57 @@ export const getProductsData = cache(async () =>
     },
     revalidate: 120,
     tags: [CACHE_TAGS.products],
+  }),
+);
+
+export const getProductCategoriesData = cache(async () =>
+  runUserCachedQuery({
+    key: ["product-categories-data"],
+    query: async (supabase) => {
+      const { data, error } = await supabase
+        .from("product_categories")
+        .select("id, name, is_active")
+        .order("name");
+      if (error) throw error;
+      return (data ?? []).map((record) => mapProductCategory(asRecord(record)));
+    },
+    revalidate: 900,
+    tags: [CACHE_TAGS.categories],
+  }),
+);
+
+export const getPriceTiersData = cache(async () =>
+  runUserCachedQuery({
+    key: ["price-tiers-data"],
+    query: async (supabase) => {
+      const { data, error } = await supabase
+        .from("product_price_tiers")
+        .select("id, product_id, min_qty, unit_price")
+        .order("product_id")
+        .order("min_qty");
+      if (error) throw error;
+      return (data ?? []).map((record) => mapPriceTier(asRecord(record)));
+    },
+    revalidate: 300,
+    tags: [CACHE_TAGS.priceTiers],
+  }),
+);
+
+export const getBundlesData = cache(async () =>
+  runUserCachedQuery({
+    key: ["bundles-data"],
+    query: async (supabase) => {
+      const { data, error } = await supabase
+        .from("product_bundles")
+        .select(
+          "id, name, sale_price, notes, is_active, created_at, product_bundle_items(id, product_id, quantity, products(name))",
+        )
+        .order("name");
+      if (error) throw error;
+      return (data ?? []).map((record) => mapBundle(asRecord(record)));
+    },
+    revalidate: 300,
+    tags: [CACHE_TAGS.bundles, CACHE_TAGS.products],
   }),
 );
 
@@ -526,18 +640,31 @@ export const getPurchasesData = cache(async (limit = 8) =>
 );
 
 export async function getSalesData() {
-  const [sales, contacts, products, lookup] = await Promise.all([
+  const [sales, contacts, products, lookup, priceTiers, bundles, role] = await Promise.all([
     getSalesOrdersData(),
     getContactsData(),
     getProductsData(),
     getLookupData(),
+    getPriceTiersData(),
+    getBundlesData(),
+    getCurrentRole(),
   ]);
+  const activeProducts = products.filter((product) => product.isActive);
+  const activeProductIds = new Set(activeProducts.map((product) => product.id));
 
   return {
     sales,
     contacts: contacts.filter((contact) => contact.type === "client" && contact.isActive),
-    products: products.filter((product) => product.isActive),
+    products: activeProducts,
     channels: lookup.channels,
+    priceTiers: priceTiers.filter((tier) => activeProductIds.has(tier.productId)),
+    bundles: bundles.filter(
+      (bundle) =>
+        bundle.isActive &&
+        bundle.items.length > 0 &&
+        bundle.items.every((item) => activeProductIds.has(item.productId)),
+    ),
+    role,
   };
 }
 
@@ -567,14 +694,22 @@ export async function getSuppliesPageData() {
 }
 
 export async function getProductsPageData() {
-  const [products, movements] = await Promise.all([
+  const [products, movements, categories, priceTiers, bundles, role] = await Promise.all([
     getProductsData(),
     getInventoryMovementsData("product"),
+    getProductCategoriesData(),
+    getPriceTiersData(),
+    getBundlesData(),
+    getCurrentRole(),
   ]);
 
   return {
     products,
     movements,
+    categories,
+    priceTiers,
+    bundles,
+    role,
   };
 }
 

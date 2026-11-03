@@ -6,9 +6,11 @@ import { CACHE_TAGS } from "@/lib/cache";
 import { ANONYMOUS_CUSTOMER_NAME } from "@/lib/constants";
 import type {
   ActionResponse,
+  BundleRecord,
   ContactRecord,
   ExpenseRecord,
   InventoryMovementRecord,
+  PriceTierRecord,
   ProductRecord,
   ProductionBatchRecord,
   PurchaseRecord,
@@ -17,9 +19,12 @@ import type {
 } from "@/lib/domain";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import {
+  bundleFormSchema,
+  bundleStatusSchema,
   contactFormSchema,
   expenseFormSchema,
   paymentStatusUpdateSchema,
+  priceTiersFormSchema,
   productFormSchema,
   productionBatchFormSchema,
   purchaseFormSchema,
@@ -61,7 +66,9 @@ type StockAdjustmentResult = {
 };
 
 const SALE_ORDER_SELECT =
-  "id, sale_date, total_amount, payment_status, payment_method, paid_at, notes, voided_at, void_reason, created_at, contacts(name), sales_channels(name), sales_order_items(id, product_id, quantity, unit_price, line_total, products(name))";
+  "id, sale_date, total_amount, payment_status, payment_method, paid_at, notes, voided_at, void_reason, created_at, contacts(name), sales_channels(name), sales_order_items(id, product_id, bundle_id, quantity, unit_price, list_price, line_total, products(name), product_bundles(name))";
+const BUNDLE_SELECT =
+  "id, name, sale_price, notes, is_active, created_at, product_bundle_items(id, product_id, quantity, products(name))";
 const EXPENSE_SELECT =
   "id, expense_date, concept, amount, source, notes, linked_purchase_id, voided_at, void_reason, created_at, expense_categories(name), purchases(contacts(name))";
 const PURCHASE_SELECT =
@@ -161,6 +168,7 @@ function mapProduct(record: RawRecord): ProductRecord {
 function mapSale(record: RawRecord): SaleOrderRecord {
   const items = asArray(record.sales_order_items).map((item) => {
     const product = asRecord(item.products);
+    const bundle = asRecord(item.product_bundles);
 
     return {
       id: String(item.id ?? ""),
@@ -169,6 +177,12 @@ function mapSale(record: RawRecord): SaleOrderRecord {
       quantity: toNumber(item.quantity),
       unitPrice: toNumber(item.unit_price),
       lineTotal: toNumber(item.line_total),
+      listPrice:
+        item.list_price === null || item.list_price === undefined
+          ? null
+          : toNumber(item.list_price),
+      bundleId: (item.bundle_id as string | null | undefined) ?? null,
+      bundleName: (bundle.name as string | null | undefined) ?? null,
     };
   });
   const contact = asRecord(record.contacts);
@@ -190,6 +204,38 @@ function mapSale(record: RawRecord): SaleOrderRecord {
     totalUnits: items.reduce((sum, item) => sum + item.quantity, 0),
     createdAt: String(record.created_at ?? ""),
     items,
+  };
+}
+
+function mapPriceTier(record: RawRecord): PriceTierRecord {
+  return {
+    id: String(record.id ?? ""),
+    productId: String(record.product_id ?? ""),
+    minQty: toNumber(record.min_qty),
+    unitPrice: toNumber(record.unit_price),
+  };
+}
+
+function mapBundle(record: RawRecord): BundleRecord {
+  return {
+    id: String(record.id ?? ""),
+    name: String(record.name ?? ""),
+    salePrice: toNumber(record.sale_price),
+    notes: (record.notes as string | null | undefined) ?? null,
+    isActive: Boolean(record.is_active),
+    createdAt: String(record.created_at ?? ""),
+    items: asArray(record.product_bundle_items)
+      .map((item) => {
+        const product = asRecord(item.products);
+
+        return {
+          id: String(item.id ?? ""),
+          productId: String(item.product_id ?? ""),
+          productName: String(product.name ?? "Producto"),
+          quantity: toNumber(item.quantity),
+        };
+      })
+      .sort((left, right) => left.productName.localeCompare(right.productName, "es")),
   };
 }
 
@@ -327,6 +373,20 @@ async function getProductRecord(supabase: SupabaseServerClient, productId: strin
   }
 
   return data ? mapProduct(asRecord(data)) : null;
+}
+
+async function getBundleRecord(supabase: SupabaseServerClient, bundleId: string) {
+  const { data, error } = await supabase
+    .from("product_bundles")
+    .select(BUNDLE_SELECT)
+    .eq("id", bundleId)
+    .maybeSingle();
+
+  if (error) {
+    throw error;
+  }
+
+  return data ? mapBundle(asRecord(data)) : null;
 }
 
 async function getProductionBatchRecord(supabase: SupabaseServerClient, batchId: string) {
@@ -712,6 +772,131 @@ export async function saveProductAction(input: unknown): Promise<ActionResponse<
   }
 }
 
+export async function savePriceTiersAction(
+  input: unknown,
+): Promise<ActionResponse<PriceTierRecord[]>> {
+  const parsed = priceTiersFormSchema.safeParse(input);
+
+  if (!parsed.success) {
+    return failure("No pudimos guardar las escalas de precio.", parsed.error);
+  }
+
+  try {
+    const { supabase } = await getAuthenticatedClient();
+    const { data, error } = await supabase.rpc("save_price_tiers", {
+      payload: {
+        productId: parsed.data.productId,
+        tiers: parsed.data.tiers.map((tier) => ({
+          minQty: tier.minQty,
+          unitPrice: tier.unitPrice,
+        })),
+      },
+    });
+
+    if (error) throw error;
+
+    const tiers = asArray(data)
+      .map(mapPriceTier)
+      .sort((left, right) => left.minQty - right.minQty);
+
+    refreshTags(CACHE_TAGS.priceTiers);
+    revalidatePath("/productos");
+    revalidatePath("/ventas");
+    return success("Escalas de precio guardadas.", tiers);
+  } catch (error) {
+    return failure("No pudimos guardar las escalas de precio.", error);
+  }
+}
+
+export async function saveBundleAction(input: unknown): Promise<ActionResponse<BundleRecord>> {
+  const parsed = bundleFormSchema.safeParse(input);
+
+  if (!parsed.success) {
+    return failure("No pudimos guardar el combo.", parsed.error);
+  }
+
+  try {
+    const { supabase } = await getAuthenticatedClient();
+    const { data, error } = await supabase.rpc("upsert_bundle", {
+      payload: {
+        id: parsed.data.id,
+        name: parsed.data.name,
+        salePrice: parsed.data.salePrice,
+        notes: parsed.data.notes,
+        isActive: parsed.data.isActive,
+        items: parsed.data.items.map((item) => ({
+          productId: item.productId,
+          quantity: item.quantity,
+        })),
+      },
+    });
+
+    if (error) throw error;
+
+    const bundleId = getReturnedId(data) ?? parsed.data.id ?? null;
+    const bundle = bundleId ? await getBundleRecord(supabase, bundleId) : null;
+
+    if (!bundle) {
+      throw new Error("No pudimos recuperar el combo guardado.");
+    }
+
+    refreshTags(CACHE_TAGS.bundles);
+    revalidatePath("/productos");
+    revalidatePath("/ventas");
+    return success("Combo guardado.", bundle);
+  } catch (error) {
+    return failure("No pudimos guardar el combo.", error);
+  }
+}
+
+export async function setBundleStatusAction(
+  input: unknown,
+): Promise<ActionResponse<BundleRecord>> {
+  const parsed = bundleStatusSchema.safeParse(input);
+
+  if (!parsed.success) {
+    return failure("No pudimos actualizar el combo.", parsed.error);
+  }
+
+  try {
+    const { supabase } = await getAuthenticatedClient();
+    const current = await getBundleRecord(supabase, parsed.data.id);
+
+    if (!current) {
+      throw new Error("No encontramos el combo seleccionado.");
+    }
+
+    const { error } = await supabase.rpc("upsert_bundle", {
+      payload: {
+        id: current.id,
+        name: current.name,
+        salePrice: current.salePrice,
+        notes: current.notes,
+        isActive: parsed.data.isActive,
+        items: current.items.map((item) => ({
+          productId: item.productId,
+          quantity: item.quantity,
+        })),
+      },
+    });
+
+    if (error) throw error;
+
+    const bundle = await getBundleRecord(supabase, current.id);
+
+    if (!bundle) {
+      throw new Error("No pudimos recuperar el combo actualizado.");
+    }
+
+    refreshTags(CACHE_TAGS.bundles);
+    revalidatePath("/productos");
+    revalidatePath("/ventas");
+    return success(parsed.data.isActive ? "Combo activado." : "Combo desactivado.", bundle);
+  } catch (error) {
+    return failure("No pudimos actualizar el combo.", error);
+  }
+}
+
 export async function saveSupplyAction(input: unknown): Promise<ActionResponse<SupplyRecord>> {
   const parsed = supplyFormSchema.safeParse(input);
 
@@ -822,7 +1007,11 @@ export async function createSaleOrderAction(
         paymentMethod: parsed.data.paymentMethod,
         paidAt: parsed.data.paidAt,
         notes: parsed.data.notes,
-        items: parsed.data.items,
+        items: parsed.data.items.map((item) =>
+          item.bundleId
+            ? { bundleId: item.bundleId, quantity: item.quantity, unitPrice: item.unitPrice ?? null }
+            : { productId: item.productId, quantity: item.quantity, unitPrice: item.unitPrice ?? null },
+        ),
       },
     });
 

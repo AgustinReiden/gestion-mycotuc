@@ -97,6 +97,9 @@ export function AppShell({ profile, children }: AppShellProps) {
             <p className="text-sm text-[#bfd5c7]">Conectado como</p>
             <p className="mt-1 text-lg font-semibold">{profile.fullName ?? "Equipo Mycotuc"}</p>
             <p className="text-sm text-[#9fb7a9]">{profile.email ?? "Sin email"}</p>
+            <p className="mt-1 text-xs font-semibold uppercase tracking-[0.18em] text-[#a9c7b5]">
+              {profile.role === "admin" ? "Administrador" : "Operador"}
+            </p>
             <Button
               type="button"
               variant="secondary"

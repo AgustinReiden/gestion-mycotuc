@@ -8,20 +8,39 @@ import type { z } from "zod";
 import { createSaleOrderAction } from "@/actions/core";
 import { ANONYMOUS_CUSTOMER_NAME, PAYMENT_STATUSES } from "@/lib/constants";
 import type {
+  AppRole,
+  BundleRecord,
   ContactRecord,
   LookupOption,
+  PriceTierRecord,
   ProductRecord,
   SaleCustomerMode,
   SaleOrderRecord,
 } from "@/lib/domain";
+import {
+  formatQuantity,
+  getDirectProductQuantities,
+  getRequiredStock,
+  groupTiersByProduct,
+  resolveProductListPrice,
+  roundMoney,
+} from "@/lib/pricing";
 import { saleOrderFormSchema } from "@/lib/validators";
 import { ActionNotice } from "@/components/forms/action-notice";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Field, SelectInput, TextInput, TextareaInput } from "@/components/ui/fields";
 import { getFirstFormError, toInputValue, toNumberValue } from "@/components/forms/value-helpers";
 import { formatCurrency } from "@/lib/utils";
 
 type SaleOrderValues = z.input<typeof saleOrderFormSchema>;
+type SaleOrderOutput = z.output<typeof saleOrderFormSchema>;
+type SaleLineValues = {
+  productId?: string | null;
+  bundleId?: string | null;
+  quantity?: unknown;
+  unitPrice?: unknown;
+};
 type CreateSaleOrderResult = {
   sale: SaleOrderRecord;
   contact: ContactRecord;
@@ -31,17 +50,104 @@ type SaleOrderFormProps = {
   contacts: ContactRecord[];
   products: ProductRecord[];
   channels: LookupOption[];
+  priceTiers: PriceTierRecord[];
+  bundles: BundleRecord[];
+  role: AppRole;
   onSuccess: (result: CreateSaleOrderResult) => void;
 };
 
-function getInitialItem(products: ProductRecord[]) {
-  const product = products[0];
+type LinePricing = {
+  product: ProductRecord | null;
+  bundle: BundleRecord | null;
+  quantity: number;
+  listPrice: number;
+  tierMinQty: number | null;
+  isManual: boolean;
+  unitPrice: number;
+  subtotal: number;
+};
 
+function getInitialItem(products: ProductRecord[]) {
   return {
-    productId: product?.id ?? "",
+    productId: products[0]?.id ?? "",
+    bundleId: "",
     quantity: 1,
-    unitPrice: product?.salePrice ?? 0,
+    unitPrice: "" as const,
   };
+}
+
+function toLineKey(item: SaleLineValues | undefined) {
+  if (item?.bundleId) return `bundle:${item.bundleId}`;
+  if (item?.productId) return `product:${item.productId}`;
+  return "";
+}
+
+function getLinePricing({
+  items,
+  manualFlags,
+  products,
+  bundles,
+  tiersByProduct,
+}: {
+  items: SaleLineValues[];
+  manualFlags: boolean[];
+  products: ProductRecord[];
+  bundles: BundleRecord[];
+  tiersByProduct: Map<string, PriceTierRecord[]>;
+}): LinePricing[] {
+  const directQuantities = getDirectProductQuantities(items);
+
+  return items.map((item, index) => {
+    const quantity = Number(item.quantity) > 0 ? Number(item.quantity) : 0;
+    const bundle = item.bundleId ? bundles.find((entry) => entry.id === item.bundleId) ?? null : null;
+    const product =
+      !bundle && item.productId ? products.find((entry) => entry.id === item.productId) ?? null : null;
+    let listPrice = 0;
+    let tierMinQty: number | null = null;
+
+    if (bundle) {
+      listPrice = bundle.salePrice;
+    } else if (product) {
+      const resolved = resolveProductListPrice(
+        product.salePrice,
+        tiersByProduct.get(product.id) ?? [],
+        directQuantities.get(product.id) ?? 0,
+      );
+      listPrice = resolved.unitPrice;
+      tierMinQty = resolved.tier?.minQty ?? null;
+    }
+
+    const isManual = Boolean(manualFlags[index]);
+    const unitPrice = isManual ? Number(item.unitPrice) || 0 : listPrice;
+
+    return {
+      product,
+      bundle,
+      quantity,
+      listPrice,
+      tierMinQty,
+      isManual,
+      unitPrice,
+      subtotal: roundMoney(unitPrice * quantity),
+    };
+  });
+}
+
+function getStockIssues(items: SaleLineValues[], products: ProductRecord[], bundles: BundleRecord[]) {
+  const required = getRequiredStock(items, bundles);
+  const issues: string[] = [];
+
+  required.forEach((quantity, productId) => {
+    const product = products.find((entry) => entry.id === productId);
+
+    if (product && quantity > product.currentStock) {
+      issues.push(
+        `${product.name}: requiere ${formatQuantity(quantity)} ${product.unit}, hay ${formatQuantity(product.currentStock)}`,
+      );
+    }
+  });
+
+  return issues;
 }
 
 function getDefaultValues(products: ProductRecord[], channels: LookupOption[]): SaleOrderValues {
@@ -85,11 +191,22 @@ function getCustomerHint(mode: SaleCustomerMode, hasSelectedContact: boolean) {
   return "Escribe nombre, telefono o mail para ver sugerencias. Si no coincide nadie, se crea al guardar.";
 }
 
-export function SaleOrderForm({ contacts, products, channels, onSuccess }: SaleOrderFormProps) {
+export function SaleOrderForm({
+  contacts,
+  products,
+  channels,
+  priceTiers,
+  bundles,
+  role,
+  onSuccess,
+}: SaleOrderFormProps) {
   const [pending, startTransition] = useTransition();
   const [feedback, setFeedback] = useState<{ tone: "success" | "error"; message: string } | null>(null);
   const [showSuggestions, setShowSuggestions] = useState(false);
-  const form = useForm<SaleOrderValues>({
+  const [manualPriceIds, setManualPriceIds] = useState<string[]>([]);
+  const isAdmin = role === "admin";
+  const tiersByProduct = groupTiersByProduct(priceTiers);
+  const form = useForm<SaleOrderValues, unknown, SaleOrderOutput>({
     resolver: zodResolver(saleOrderFormSchema),
     defaultValues: getDefaultValues(products, channels),
   });
@@ -131,10 +248,16 @@ export function SaleOrderForm({ contacts, products, channels, onSuccess }: SaleO
     control: form.control,
     name: "paymentStatus",
   });
-  const total = watchedItems.reduce(
-    (sum, item) => sum + (Number(item.quantity) || 0) * (Number(item.unitPrice) || 0),
-    0,
-  );
+  const manualFlags = items.fields.map((field) => isAdmin && manualPriceIds.includes(field.id));
+  const linePricing = getLinePricing({
+    items: watchedItems as SaleLineValues[],
+    manualFlags,
+    products,
+    bundles,
+    tiersByProduct,
+  });
+  const total = roundMoney(linePricing.reduce((sum, line) => sum + line.subtotal, 0));
+  const stockIssues = getStockIssues(watchedItems as SaleLineValues[], products, bundles);
   const selectedContact = contacts.find((contact) => contact.id === selectedContactId) ?? null;
   const customerTerms = customerMode === "anonymous" ? [] : toSearchTerms(customerName);
   const suggestedContacts =
@@ -153,7 +276,18 @@ export function SaleOrderForm({ contacts, products, channels, onSuccess }: SaleO
 
   function resetForm() {
     form.reset(getDefaultValues(products, channels));
+    setManualPriceIds([]);
     setShowSuggestions(false);
+  }
+
+  function setManualPrice(fieldId: string, manual: boolean) {
+    setManualPriceIds((current) =>
+      manual
+        ? current.includes(fieldId)
+          ? current
+          : [...current, fieldId]
+        : current.filter((entry) => entry !== fieldId),
+    );
   }
 
   function setCustomerMode(mode: SaleCustomerMode) {
@@ -214,9 +348,46 @@ export function SaleOrderForm({ contacts, products, channels, onSuccess }: SaleO
             return;
           }
 
+          const submitPricing = getLinePricing({
+            items: values.items,
+            manualFlags,
+            products,
+            bundles,
+            tiersByProduct,
+          });
+          const invalidLine = submitPricing.findIndex((line) => !(line.unitPrice > 0));
+
+          if (invalidLine >= 0) {
+            setFeedback({
+              tone: "error",
+              message: `La linea ${invalidLine + 1} no tiene un precio unitario valido.`,
+            });
+            return;
+          }
+
+          const submitStockIssues = getStockIssues(values.items, products, bundles);
+
+          if (submitStockIssues.length > 0) {
+            setFeedback({
+              tone: "error",
+              message: `Stock insuficiente. ${submitStockIssues.join(". ")}.`,
+            });
+            return;
+          }
+
+          const payload = {
+            ...values,
+            items: values.items.map((item, index) => ({
+              productId: item.bundleId ? undefined : item.productId,
+              bundleId: item.bundleId,
+              quantity: item.quantity,
+              unitPrice: submitPricing[index].unitPrice,
+            })),
+          };
+
           setFeedback(null);
           startTransition(async () => {
-            const result = await createSaleOrderAction(values);
+            const result = await createSaleOrderAction(payload);
             if (result.success && result.data) {
               onSuccess(result.data);
               resetForm();
@@ -435,7 +606,9 @@ export function SaleOrderForm({ contacts, products, channels, onSuccess }: SaleO
         <div className="mb-4 flex items-center justify-between">
           <div>
             <h4 className="text-lg font-semibold">Items del pedido</h4>
-            <p className="text-sm text-[var(--muted)]">Cada linea descuenta stock al confirmar la venta.</p>
+            <p className="text-sm text-[var(--muted)]">
+              Cada linea es un producto o un combo y descuenta stock al confirmar la venta.
+            </p>
           </div>
           <Button
             type="button"
@@ -450,48 +623,66 @@ export function SaleOrderForm({ contacts, products, channels, onSuccess }: SaleO
 
         <div className="space-y-3">
           {items.fields.map((field, index) => {
-            const selectedProductId = watchedItems[index]?.productId;
-            const selectedProduct = products.find((product) => product.id === selectedProductId);
+            const line = linePricing[index];
+            const itemErrors = form.formState.errors.items?.[index];
+            const unitLabel = line?.bundle ? "combo" : line?.product?.unit ?? "unidad";
+            let priceHint = "Precio de lista";
+
+            if (line?.bundle) {
+              priceHint = "Precio fijo del combo";
+            } else if (line?.tierMinQty !== null && line?.tierMinQty !== undefined) {
+              priceHint = `Escala desde ${formatQuantity(line.tierMinQty)} u.`;
+            }
 
             return (
               <div
                 key={field.id}
-                className="grid gap-3 rounded-[24px] border border-[var(--line)] bg-white/90 p-4 md:grid-cols-[1.6fr_0.7fr_0.8fr_auto]"
+                className="grid gap-3 rounded-[24px] border border-[var(--line)] bg-white/90 p-4 md:grid-cols-[1.6fr_0.7fr_0.9fr_auto]"
               >
-                <Field label="Producto" error={form.formState.errors.items?.[index]?.productId?.message}>
-                  <Controller
-                    control={form.control}
-                    name={`items.${index}.productId`}
-                    render={({ field: itemField }) => (
-                      <SelectInput
-                        name={itemField.name}
-                        ref={itemField.ref}
-                        value={toInputValue(itemField.value)}
-                        onBlur={itemField.onBlur}
-                        disabled={!hasProducts}
-                        onChange={(event) => {
-                          itemField.onChange(event.target.value);
-                          const product = products.find((entry) => entry.id === event.target.value);
-                          form.setValue(`items.${index}.unitPrice`, product?.salePrice ?? 0, {
-                            shouldDirty: true,
-                            shouldValidate: true,
-                          });
-                        }}
-                      >
-                        {!hasProducts ? (
-                          <option value="">No hay productos activos disponibles</option>
-                        ) : null}
-                        {products.map((product) => (
-                          <option key={product.id} value={product.id}>
-                            {product.name}
+                <Field
+                  label="Producto o combo"
+                  error={itemErrors?.productId?.message ?? itemErrors?.bundleId?.message}
+                >
+                  <SelectInput
+                    value={toLineKey(watchedItems[index] as SaleLineValues | undefined)}
+                    disabled={!hasProducts}
+                    onChange={(event) => {
+                      const [kind, id] = event.target.value.split(":");
+                      form.setValue(`items.${index}.productId`, kind === "product" ? id : "", {
+                        shouldDirty: true,
+                        shouldValidate: true,
+                      });
+                      form.setValue(`items.${index}.bundleId`, kind === "bundle" ? id : "", {
+                        shouldDirty: true,
+                        shouldValidate: true,
+                      });
+                      form.setValue(`items.${index}.unitPrice`, "", { shouldDirty: true });
+                      setManualPrice(field.id, false);
+                    }}
+                  >
+                    {!hasProducts ? (
+                      <option value="">No hay productos activos disponibles</option>
+                    ) : null}
+                    <optgroup label="Productos">
+                      {products.map((product) => (
+                        <option key={product.id} value={`product:${product.id}`}>
+                          {product.name}
+                        </option>
+                      ))}
+                    </optgroup>
+                    {bundles.length > 0 ? (
+                      <optgroup label="Combos">
+                        {bundles.map((bundle) => (
+                          <option key={bundle.id} value={`bundle:${bundle.id}`}>
+                            {bundle.name}
                           </option>
                         ))}
-                      </SelectInput>
-                    )}
-                  />
+                      </optgroup>
+                    ) : null}
+                  </SelectInput>
                 </Field>
 
-                <Field label="Cantidad" error={form.formState.errors.items?.[index]?.quantity?.message}>
+                <Field label="Cantidad" error={itemErrors?.quantity?.message}>
                   <Controller
                     control={form.control}
                     name={`items.${index}.quantity`}
@@ -510,33 +701,67 @@ export function SaleOrderForm({ contacts, products, channels, onSuccess }: SaleO
                   />
                 </Field>
 
-                <Field label="Precio unitario" error={form.formState.errors.items?.[index]?.unitPrice?.message}>
-                  <Controller
-                    control={form.control}
-                    name={`items.${index}.unitPrice`}
-                    render={({ field: itemField }) => (
-                      <TextInput
-                        name={itemField.name}
-                        ref={itemField.ref}
-                        value={toInputValue(itemField.value)}
-                        onBlur={itemField.onBlur}
-                        onChange={(event) => itemField.onChange(toNumberValue(event.target.value))}
-                        type="number"
-                        min="0.01"
-                        step="0.01"
-                      />
+                <div className="space-y-2">
+                  <Field
+                    label="Precio unitario"
+                    error={itemErrors?.unitPrice?.message}
+                    hint={isAdmin ? undefined : "Solo un administrador puede cambiar el precio."}
+                  >
+                    <Controller
+                      control={form.control}
+                      name={`items.${index}.unitPrice`}
+                      render={({ field: itemField }) => (
+                        <TextInput
+                          name={itemField.name}
+                          ref={itemField.ref}
+                          value={line?.isManual ? toInputValue(itemField.value) : toInputValue(line?.listPrice ?? "")}
+                          onBlur={itemField.onBlur}
+                          readOnly={!isAdmin}
+                          onChange={(event) => {
+                            if (!isAdmin) {
+                              return;
+                            }
+
+                            setManualPrice(field.id, true);
+                            itemField.onChange(toNumberValue(event.target.value));
+                          }}
+                          type="number"
+                          min="0.01"
+                          step="0.01"
+                          className={!isAdmin ? "bg-[#f4f2e9]" : undefined}
+                        />
+                      )}
+                    />
+                  </Field>
+                  <div className="flex flex-wrap items-center gap-2 text-xs text-[var(--muted)]">
+                    {line?.isManual ? (
+                      <>
+                        <Badge tone="warning">Precio manual</Badge>
+                        <span>Lista: {formatCurrency(line.listPrice)}</span>
+                        <button
+                          type="button"
+                          className="font-semibold text-[#1e5f44] underline-offset-2 hover:underline"
+                          onClick={() => {
+                            setManualPrice(field.id, false);
+                            form.setValue(`items.${index}.unitPrice`, "", { shouldDirty: true });
+                          }}
+                        >
+                          Usar precio de lista
+                        </button>
+                      </>
+                    ) : (
+                      <Badge tone={line && (line.tierMinQty !== null || line.bundle) ? "accent" : "neutral"}>
+                        {priceHint}
+                      </Badge>
                     )}
-                  />
-                </Field>
+                  </div>
+                </div>
 
                 <div className="flex items-end gap-2">
                   <div className="min-w-28 rounded-2xl bg-[#eef4ea] px-3 py-3 text-sm font-semibold text-[#1e5f44]">
-                    {formatCurrency(
-                      (Number(watchedItems[index]?.quantity) || 0) *
-                        (Number(watchedItems[index]?.unitPrice) || 0),
-                    )}
+                    {formatCurrency(line?.subtotal ?? 0)}
                     <div className="mt-1 text-xs font-medium text-[#55755e]">
-                      {selectedProduct?.unit ?? "unidad"}
+                      Subtotal / {unitLabel}
                     </div>
                   </div>
                   <Button
@@ -544,15 +769,41 @@ export function SaleOrderForm({ contacts, products, channels, onSuccess }: SaleO
                     variant="ghost"
                     aria-label={`Quitar item ${index + 1}`}
                     disabled={items.fields.length <= 1}
-                    onClick={() => (items.fields.length > 1 ? items.remove(index) : null)}
+                    onClick={() => {
+                      if (items.fields.length > 1) {
+                        setManualPrice(field.id, false);
+                        items.remove(index);
+                      }
+                    }}
                   >
                     <Trash2 className="h-4 w-4" />
                   </Button>
                 </div>
+
+                {line?.bundle ? (
+                  <p className="text-xs text-[var(--muted)] md:col-span-4">
+                    Incluye:{" "}
+                    {line.bundle.items
+                      .map(
+                        (component) =>
+                          `${component.productName} x ${formatQuantity(component.quantity * (line.quantity || 1))}`,
+                      )
+                      .join(", ")}
+                  </p>
+                ) : null}
               </div>
             );
           })}
         </div>
+
+        {stockIssues.length > 0 ? (
+          <div className="mt-3">
+            <ActionNotice
+              tone="warning"
+              message={`Stock insuficiente (sumando productos y combos): ${stockIssues.join("; ")}.`}
+            />
+          </div>
+        ) : null}
       </div>
 
       <Field label="Notas" error={form.formState.errors.notes?.message}>
@@ -574,7 +825,7 @@ export function SaleOrderForm({ contacts, products, channels, onSuccess }: SaleO
 
       <div className="flex items-center justify-between rounded-[24px] border border-[var(--line)] bg-[#eef4ea] px-4 py-4">
         <div>
-          <p className="text-sm text-[#55755e]">Total estimado</p>
+          <p className="text-sm text-[#55755e]">Total</p>
           <p className="text-2xl font-semibold text-[#15553e]">{formatCurrency(total)}</p>
         </div>
         <Button type="submit" busy={pending} disabled={!canSubmitSale}>

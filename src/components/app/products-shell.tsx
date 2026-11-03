@@ -1,8 +1,10 @@
 "use client";
 
 import { useDeferredValue, useEffect, useState } from "react";
-import { Edit3, Package, Plus, Search, Settings2 } from "lucide-react";
+import { Edit3, Layers, Package, Plus, Search, Settings2 } from "lucide-react";
+import { BundlesPanel } from "@/components/app/bundles-panel";
 import { StockHistoryPanel } from "@/components/app/stock-history-panel";
+import { PriceTiersForm } from "@/components/forms/price-tiers-form";
 import { ProductForm } from "@/components/forms/product-form";
 import { StockAdjustmentForm } from "@/components/forms/stock-adjustment-form";
 import { Badge } from "@/components/ui/badge";
@@ -10,13 +12,33 @@ import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Modal } from "@/components/ui/modal";
 import { Panel } from "@/components/ui/panel";
-import type { InventoryMovementRecord, ProductRecord } from "@/lib/domain";
+import type {
+  AppRole,
+  BundleRecord,
+  InventoryMovementRecord,
+  PriceTierRecord,
+  ProductCategoryRecord,
+  ProductRecord,
+} from "@/lib/domain";
+import { formatQuantity, groupTiersByProduct } from "@/lib/pricing";
 import { formatCurrency } from "@/lib/utils";
 
 type ProductsShellProps = {
   products: ProductRecord[];
   movements: InventoryMovementRecord[];
+  categories: ProductCategoryRecord[];
+  priceTiers: PriceTierRecord[];
+  bundles: BundleRecord[];
+  role: AppRole;
 };
+
+function sortBundles(list: BundleRecord[]) {
+  return [...list].sort((left, right) => left.name.localeCompare(right.name, "es", { sensitivity: "base" }));
+}
+
+function upsertBundle(list: BundleRecord[], bundle: BundleRecord) {
+  return sortBundles([bundle, ...list.filter((entry) => entry.id !== bundle.id)]);
+}
 
 function sortProducts(list: ProductRecord[]) {
   return [...list].sort((left, right) => left.name.localeCompare(right.name, "es", { sensitivity: "base" }));
@@ -49,7 +71,13 @@ function mergeMovements(
   ]).slice(0, limit);
 }
 
-function NewProductModal({ onProductSaved }: { onProductSaved: (product: ProductRecord) => void }) {
+function NewProductModal({
+  categories,
+  onProductSaved,
+}: {
+  categories: ProductCategoryRecord[];
+  onProductSaved: (product: ProductRecord) => void;
+}) {
   const [open, setOpen] = useState(false);
 
   return (
@@ -59,7 +87,7 @@ function NewProductModal({ onProductSaved }: { onProductSaved: (product: Product
         Nuevo producto
       </Button>
       <Modal open={open} onClose={() => setOpen(false)} title="Nuevo producto" description="Actualiza catalogo, precio y stock minimo.">
-        <ProductForm product={null} onSuccess={(product) => { setOpen(false); onProductSaved(product); }} />
+        <ProductForm product={null} categories={categories} onSuccess={(product) => { setOpen(false); onProductSaved(product); }} />
       </Modal>
     </>
   );
@@ -67,16 +95,43 @@ function NewProductModal({ onProductSaved }: { onProductSaved: (product: Product
 
 function EditProductModal({
   product,
+  categories,
   onClose,
   onProductSaved,
 }: {
   product: ProductRecord;
+  categories: ProductCategoryRecord[];
   onClose: () => void;
   onProductSaved: (product: ProductRecord) => void;
 }) {
   return (
     <Modal open onClose={onClose} title="Editar producto" description="Actualiza catalogo, precio y stock minimo.">
-      <ProductForm product={product} onSuccess={(updatedProduct) => { onProductSaved(updatedProduct); onClose(); }} />
+      <ProductForm product={product} categories={categories} onSuccess={(updatedProduct) => { onProductSaved(updatedProduct); onClose(); }} />
+    </Modal>
+  );
+}
+
+function PriceTiersModal({
+  product,
+  tiers,
+  onClose,
+  onTiersSaved,
+}: {
+  product: ProductRecord;
+  tiers: PriceTierRecord[];
+  onClose: () => void;
+  onTiersSaved: (tiers: PriceTierRecord[]) => void;
+}) {
+  return (
+    <Modal open onClose={onClose} title="Escalas de precio" description={`Precios por cantidad para ${product.name}.`}>
+      <PriceTiersForm
+        product={product}
+        tiers={tiers}
+        onSuccess={(savedTiers) => {
+          onTiersSaved(savedTiers);
+          onClose();
+        }}
+      />
     </Modal>
   );
 }
@@ -108,10 +163,21 @@ function AdjustStockModal({
   );
 }
 
-export function ProductsShell({ products, movements }: ProductsShellProps) {
+export function ProductsShell({
+  products,
+  movements,
+  categories,
+  priceTiers,
+  bundles,
+  role,
+}: ProductsShellProps) {
+  const isAdmin = role === "admin";
   const [search, setSearch] = useState("");
   const [productRecords, setProductRecords] = useState(() => sortProducts(products));
   const [movementRecords, setMovementRecords] = useState(() => sortMovements(movements));
+  const [tierRecords, setTierRecords] = useState(priceTiers);
+  const [bundleRecords, setBundleRecords] = useState(() => sortBundles(bundles));
+  const [tiersProduct, setTiersProduct] = useState<ProductRecord | null>(null);
   const [selectedProduct, setSelectedProduct] = useState<ProductRecord | null>(null);
   const [adjustmentProduct, setAdjustmentProduct] = useState<ProductRecord | null>(null);
   const deferredSearch = useDeferredValue(search);
@@ -125,6 +191,16 @@ export function ProductsShell({ products, movements }: ProductsShellProps) {
   useEffect(() => {
     setMovementRecords(sortMovements(movements));
   }, [movements]);
+
+  useEffect(() => {
+    setTierRecords(priceTiers);
+  }, [priceTiers]);
+
+  useEffect(() => {
+    setBundleRecords(sortBundles(bundles));
+  }, [bundles]);
+
+  const tiersByProduct = groupTiersByProduct(tierRecords);
 
   const filteredProducts = productRecords.filter((product) => {
     const query = deferredSearch.toLowerCase();
@@ -154,6 +230,7 @@ export function ProductsShell({ products, movements }: ProductsShellProps) {
               />
             </label>
             <NewProductModal
+              categories={categories}
               onProductSaved={(product) => {
                 setProductRecords((current) => upsertProduct(current, product));
               }}
@@ -206,22 +283,55 @@ export function ProductsShell({ products, movements }: ProductsShellProps) {
                 </div>
               </div>
 
+              <div className="rounded-[20px] border border-[var(--line)] bg-white/70 px-4 py-3 text-sm">
+                <p className="text-xs uppercase tracking-[0.18em] text-[#55755e]">Escalas de precio</p>
+                {(tiersByProduct.get(product.id) ?? []).length === 0 ? (
+                  <p className="mt-1 text-[var(--muted)]">Sin escalas: siempre precio base.</p>
+                ) : (
+                  <ul className="mt-1 space-y-1">
+                    {(tiersByProduct.get(product.id) ?? []).map((tier) => (
+                      <li key={tier.id}>
+                        Desde {formatQuantity(tier.minQty)} {product.unit}:{" "}
+                        <span className="font-semibold">{formatCurrency(tier.unitPrice)}</span> c/u
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+
               {product.notes ? <p className="text-sm text-[var(--muted)]">{product.notes}</p> : null}
 
-              <div className="mt-auto flex flex-col gap-3 sm:flex-row">
+              <div className="mt-auto flex flex-col flex-wrap gap-3 sm:flex-row">
                 <Button type="button" variant="secondary" className="flex-1" onClick={() => setSelectedProduct(product)}>
                   <Edit3 className="h-4 w-4" />
                   Editar
                 </Button>
-                <Button type="button" variant="ghost" className="flex-1" onClick={() => setAdjustmentProduct(product)}>
-                  <Settings2 className="h-4 w-4" />
-                  Ajustar stock
-                </Button>
+                {isAdmin ? (
+                  <Button type="button" variant="ghost" className="flex-1" onClick={() => setTiersProduct(product)}>
+                    <Layers className="h-4 w-4" />
+                    Escalas
+                  </Button>
+                ) : null}
+                {isAdmin ? (
+                  <Button type="button" variant="ghost" className="flex-1" onClick={() => setAdjustmentProduct(product)}>
+                    <Settings2 className="h-4 w-4" />
+                    Ajustar stock
+                  </Button>
+                ) : null}
               </div>
             </Panel>
           ))}
         </div>
       )}
+
+      <BundlesPanel
+        bundles={bundleRecords}
+        products={productRecords}
+        isAdmin={isAdmin}
+        onBundleSaved={(bundle) => {
+          setBundleRecords((current) => upsertBundle(current, bundle));
+        }}
+      />
 
       <StockHistoryPanel
         title="Historial de stock de productos"
@@ -232,9 +342,24 @@ export function ProductsShell({ products, movements }: ProductsShellProps) {
       {selectedProduct ? (
         <EditProductModal
           product={selectedProduct}
+          categories={categories}
           onClose={() => setSelectedProduct(null)}
           onProductSaved={(product) => {
             setProductRecords((current) => upsertProduct(current, product));
+          }}
+        />
+      ) : null}
+      {isAdmin && tiersProduct ? (
+        <PriceTiersModal
+          product={tiersProduct}
+          tiers={tiersByProduct.get(tiersProduct.id) ?? []}
+          onClose={() => setTiersProduct(null)}
+          onTiersSaved={(savedTiers) => {
+            const productId = tiersProduct.id;
+            setTierRecords((current) => [
+              ...current.filter((tier) => tier.productId !== productId),
+              ...savedTiers,
+            ]);
           }}
         />
       ) : null}

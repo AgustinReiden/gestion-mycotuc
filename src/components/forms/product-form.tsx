@@ -7,8 +7,8 @@ import type { z } from "zod";
 import { saveProductAction } from "@/actions/core";
 import { ActionNotice } from "@/components/forms/action-notice";
 import { Button } from "@/components/ui/button";
-import { Field, TextInput, TextareaInput } from "@/components/ui/fields";
-import type { ProductRecord } from "@/lib/domain";
+import { Field, SelectInput, TextInput, TextareaInput } from "@/components/ui/fields";
+import type { ProductCategoryRecord, ProductRecord } from "@/lib/domain";
 import { productFormSchema } from "@/lib/validators";
 import { getFirstFormError, toInputValue, toNumberValue } from "@/components/forms/value-helpers";
 
@@ -16,10 +16,17 @@ type ProductFormValues = z.input<typeof productFormSchema>;
 
 type ProductFormProps = {
   product?: ProductRecord | null;
+  categories: ProductCategoryRecord[];
   onSuccess: (product: ProductRecord) => void;
 };
 
-export function ProductForm({ product, onSuccess }: ProductFormProps) {
+export function ProductForm({ product, categories, onSuccess }: ProductFormProps) {
+  const activeCategories = categories.filter((category) => category.isActive);
+  const defaultCategory = activeCategories[0]?.name ?? "";
+  const currentCategory = product?.category ?? "";
+  const hasInactiveCategory =
+    currentCategory.length > 0 &&
+    !activeCategories.some((category) => category.name === currentCategory);
   const [pending, startTransition] = useTransition();
   const [feedback, setFeedback] = useState<{ tone: "success" | "error"; message: string } | null>(null);
   const form = useForm<ProductFormValues>({
@@ -27,7 +34,7 @@ export function ProductForm({ product, onSuccess }: ProductFormProps) {
     defaultValues: {
       id: product?.id,
       name: product?.name ?? "",
-      category: product?.category ?? "",
+      category: product?.category ?? defaultCategory,
       unit: product?.unit ?? "frasco",
       salePrice: product?.salePrice ?? 0,
       minStock: product?.minStock ?? 0,
@@ -40,14 +47,14 @@ export function ProductForm({ product, onSuccess }: ProductFormProps) {
     form.reset({
       id: product?.id,
       name: product?.name ?? "",
-      category: product?.category ?? "",
+      category: product?.category ?? defaultCategory,
       unit: product?.unit ?? "frasco",
       salePrice: product?.salePrice ?? 0,
       minStock: product?.minStock ?? 0,
       notes: product?.notes ?? "",
       isActive: product?.isActive ?? true,
     });
-  }, [product, form]);
+  }, [product, form, defaultCategory]);
 
   return (
     <form
@@ -62,7 +69,7 @@ export function ProductForm({ product, onSuccess }: ProductFormProps) {
               onSuccess(result.data);
               form.reset({
                 name: "",
-                category: "",
+                category: defaultCategory,
                 unit: "frasco",
                 salePrice: 0,
                 minStock: 0,
@@ -90,12 +97,34 @@ export function ProductForm({ product, onSuccess }: ProductFormProps) {
             )}
           />
         </Field>
-        <Field label="Categoria" error={form.formState.errors.category?.message}>
+        <Field
+          label="Categoria"
+          error={form.formState.errors.category?.message}
+          hint={
+            hasInactiveCategory
+              ? "La categoria actual no esta activa. Elegi una categoria activa para guardar."
+              : undefined
+          }
+        >
           <Controller
             control={form.control}
             name="category"
             render={({ field }) => (
-              <TextInput {...field} value={toInputValue(field.value)} placeholder="Extractos" />
+              <SelectInput {...field} value={toInputValue(field.value)} disabled={activeCategories.length === 0}>
+                {activeCategories.length === 0 ? (
+                  <option value="">No hay categorias activas</option>
+                ) : null}
+                {hasInactiveCategory ? (
+                  <option value={currentCategory} disabled>
+                    {currentCategory} (inactiva)
+                  </option>
+                ) : null}
+                {activeCategories.map((category) => (
+                  <option key={category.id} value={category.name}>
+                    {category.name}
+                  </option>
+                ))}
+              </SelectInput>
             )}
           />
         </Field>

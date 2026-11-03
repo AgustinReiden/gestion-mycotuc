@@ -3,6 +3,7 @@ export type ContactType = "client" | "supplier";
 export type EntityType = "product" | "supply";
 export type BatchStatus = "draft" | "active" | "completed" | "cancelled";
 export type SaleCustomerMode = "existing" | "inline" | "anonymous";
+export type AppRole = "admin" | "operator";
 
 export type ActionResponse<T = void> = {
   success: boolean;
@@ -15,6 +16,7 @@ export type ProfileSummary = {
   id: string;
   fullName: string | null;
   email: string | null;
+  role: AppRole;
 };
 
 export type LookupOption = {
@@ -46,6 +48,36 @@ export type ProductRecord = {
   createdAt: string;
 };
 
+export type ProductCategoryRecord = {
+  id: string;
+  name: string;
+  isActive: boolean;
+};
+
+export type PriceTierRecord = {
+  id: string;
+  productId: string;
+  minQty: number;
+  unitPrice: number;
+};
+
+export type BundleItemRecord = {
+  id: string;
+  productId: string;
+  productName: string;
+  quantity: number;
+};
+
+export type BundleRecord = {
+  id: string;
+  name: string;
+  salePrice: number;
+  notes: string | null;
+  isActive: boolean;
+  createdAt: string;
+  items: BundleItemRecord[];
+};
+
 export type SupplyRecord = {
   id: string;
   name: string;
@@ -65,6 +97,9 @@ export type SaleOrderItemRecord = {
   quantity: number;
   unitPrice: number;
   lineTotal: number;
+  listPrice: number | null;
+  bundleId: string | null;
+  bundleName: string | null;
 };
 
 export type SaleOrderRecord = {

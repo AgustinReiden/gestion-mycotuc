@@ -5,6 +5,7 @@ type ProfileRow = {
   id: string;
   full_name: string | null;
   email: string | null;
+  role?: "admin" | "operator" | null;
 };
 
 export async function ensureProfileForUser(supabase: SupabaseClient<Database>): Promise<ProfileRow | null> {

@@ -1,7 +1,7 @@
 "use client";
 
 import { useDeferredValue, useEffect, useState, useTransition } from "react";
-import { CircleDollarSign, Filter, Plus, RotateCcw, Search } from "lucide-react";
+import { CircleDollarSign, Eye, Filter, Plus, RotateCcw, Search } from "lucide-react";
 import { reverseSaleOrderAction } from "@/actions/core";
 import { ActionNotice } from "@/components/forms/action-notice";
 import { PaymentStatusForm } from "@/components/forms/payment-status-form";
@@ -12,11 +12,16 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { Modal } from "@/components/ui/modal";
 import { Panel } from "@/components/ui/panel";
 import type {
+  AppRole,
+  BundleRecord,
   ContactRecord,
   LookupOption,
+  PriceTierRecord,
   ProductRecord,
+  SaleOrderItemRecord,
   SaleOrderRecord,
 } from "@/lib/domain";
+import { formatQuantity } from "@/lib/pricing";
 import { formatCurrency, formatDate, sumBy } from "@/lib/utils";
 
 type SalesShellProps = {
@@ -24,7 +29,77 @@ type SalesShellProps = {
   contacts: ContactRecord[];
   products: ProductRecord[];
   channels: LookupOption[];
+  priceTiers: PriceTierRecord[];
+  bundles: BundleRecord[];
+  role: AppRole;
 };
+
+type SaleLineGroup = {
+  key: string;
+  label: string;
+  isBundle: boolean;
+  quantity: number;
+  unitPrice: number;
+  listPrice: number | null;
+  lineTotal: number;
+  components: SaleOrderItemRecord[];
+};
+
+/** Agrupa las lineas de un combo (mismo bundle_id) bajo el nombre del combo. */
+function groupSaleItems(items: SaleOrderItemRecord[]): SaleLineGroup[] {
+  const groups: SaleLineGroup[] = [];
+  const bundleGroups = new Map<string, SaleLineGroup>();
+
+  items.forEach((item) => {
+    if (!item.bundleId) {
+      groups.push({
+        key: item.id,
+        label: item.productName,
+        isBundle: false,
+        quantity: item.quantity,
+        unitPrice: item.unitPrice,
+        listPrice: item.listPrice,
+        lineTotal: item.lineTotal,
+        components: [],
+      });
+      return;
+    }
+
+    const existing = bundleGroups.get(item.bundleId);
+
+    if (existing) {
+      existing.lineTotal += item.lineTotal;
+      existing.components.push(item);
+      return;
+    }
+
+    const group: SaleLineGroup = {
+      key: `bundle-${item.bundleId}`,
+      label: item.bundleName ?? "Combo",
+      isBundle: true,
+      quantity: 0,
+      unitPrice: 0,
+      listPrice: null,
+      lineTotal: item.lineTotal,
+      components: [item],
+    };
+
+    bundleGroups.set(item.bundleId, group);
+    groups.push(group);
+  });
+
+  return groups;
+}
+
+function describeGroup(group: SaleLineGroup) {
+  if (!group.isBundle) {
+    return `${group.label} x ${formatQuantity(group.quantity)}`;
+  }
+
+  return `Combo ${group.label} (${group.components
+    .map((component) => `${component.productName} x ${formatQuantity(component.quantity)}`)
+    .join(", ")})`;
+}
 
 type CreateSaleOrderResult = {
   sale: SaleOrderRecord;
@@ -69,11 +144,17 @@ function NewSaleModal({
   contacts,
   products,
   channels,
+  priceTiers,
+  bundles,
+  role,
   onSaleCreated,
 }: {
   contacts: ContactRecord[];
   products: ProductRecord[];
   channels: LookupOption[];
+  priceTiers: PriceTierRecord[];
+  bundles: BundleRecord[];
+  role: AppRole;
   onSaleCreated: (result: CreateSaleOrderResult) => void;
 }) {
   const [open, setOpen] = useState(false);
@@ -95,6 +176,9 @@ function NewSaleModal({
           contacts={contacts}
           products={products}
           channels={channels}
+          priceTiers={priceTiers}
+          bundles={bundles}
+          role={role}
           onSuccess={(result) => {
             setOpen(false);
             onSaleCreated(result);
@@ -131,6 +215,64 @@ function PaymentModal({
           onClose();
         }}
       />
+    </Modal>
+  );
+}
+
+function SaleDetailModal({ sale, onClose }: { sale: SaleOrderRecord; onClose: () => void }) {
+  const groups = groupSaleItems(sale.items);
+
+  return (
+    <Modal
+      open
+      onClose={onClose}
+      title="Detalle de la venta"
+      description={`${sale.contactName ?? "Sin cliente"} - ${formatDate(sale.saleDate)}`}
+    >
+      <div className="space-y-3">
+        {groups.map((group) => (
+          <div
+            key={group.key}
+            className="rounded-[22px] border border-[var(--line)] bg-white/80 p-4 text-sm"
+          >
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <p className="font-semibold">
+                  {group.isBundle ? `Combo ${group.label}` : group.label}
+                </p>
+                {!group.isBundle ? (
+                  <p className="text-xs text-[var(--muted)]">
+                    {formatQuantity(group.quantity)} x {formatCurrency(group.unitPrice)}
+                    {group.listPrice !== null && group.listPrice !== group.unitPrice
+                      ? ` (lista ${formatCurrency(group.listPrice)})`
+                      : ""}
+                  </p>
+                ) : null}
+              </div>
+              <div className="flex items-center gap-2">
+                {group.isBundle ? <Badge tone="accent">Combo</Badge> : null}
+                {!group.isBundle && group.listPrice !== null && group.listPrice !== group.unitPrice ? (
+                  <Badge tone="warning">Precio manual</Badge>
+                ) : null}
+                <p className="font-semibold">{formatCurrency(group.lineTotal)}</p>
+              </div>
+            </div>
+            {group.isBundle ? (
+              <ul className="mt-2 space-y-1 text-xs text-[var(--muted)]">
+                {group.components.map((component) => (
+                  <li key={component.id}>
+                    {component.productName} x {formatQuantity(component.quantity)}
+                  </li>
+                ))}
+              </ul>
+            ) : null}
+          </div>
+        ))}
+        <div className="flex items-center justify-between rounded-[22px] border border-[var(--line)] bg-[#eef4ea] px-4 py-3">
+          <p className="text-sm text-[#55755e]">Total</p>
+          <p className="text-lg font-semibold text-[#15553e]">{formatCurrency(sale.totalAmount)}</p>
+        </div>
+      </div>
     </Modal>
   );
 }
@@ -202,7 +344,17 @@ function ReverseSaleModal({
   );
 }
 
-export function SalesShell({ sales, contacts, products, channels }: SalesShellProps) {
+export function SalesShell({
+  sales,
+  contacts,
+  products,
+  channels,
+  priceTiers,
+  bundles,
+  role,
+}: SalesShellProps) {
+  const isAdmin = role === "admin";
+  const [detailSaleId, setDetailSaleId] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<"all" | SaleOrderRecord["paymentStatus"]>("all");
   const [saleRecords, setSaleRecords] = useState(() => sortSales(sales));
@@ -217,6 +369,9 @@ export function SalesShell({ sales, contacts, products, channels }: SalesShellPr
     : null;
   const reverseSale = reverseSaleId
     ? saleRecords.find((sale) => sale.id === reverseSaleId) ?? null
+    : null;
+  const detailSale = detailSaleId
+    ? saleRecords.find((sale) => sale.id === detailSaleId) ?? null
     : null;
 
   useEffect(() => {
@@ -233,7 +388,11 @@ export function SalesShell({ sales, contacts, products, channels }: SalesShellPr
       query.length === 0 ||
       sale.contactName?.toLowerCase().includes(query) ||
       sale.channelName?.toLowerCase().includes(query) ||
-      sale.items.some((item) => item.productName.toLowerCase().includes(query));
+      sale.items.some(
+        (item) =>
+          item.productName.toLowerCase().includes(query) ||
+          Boolean(item.bundleName?.toLowerCase().includes(query)),
+      );
     const matchesStatus = statusFilter === "all" ? true : sale.paymentStatus === statusFilter;
 
     return matchesSearch && matchesStatus;
@@ -263,6 +422,9 @@ export function SalesShell({ sales, contacts, products, channels }: SalesShellPr
               contacts={contactRecords}
               products={products}
               channels={channels}
+              priceTiers={priceTiers}
+              bundles={bundles}
+              role={role}
               onSaleCreated={(result) => {
                 setSaleRecords((current) => upsertSale(current, result.sale));
                 setContactRecords((current) => upsertContact(current, result.contact));
@@ -301,7 +463,7 @@ export function SalesShell({ sales, contacts, products, channels }: SalesShellPr
               <input
                 value={search}
                 onChange={(event) => setSearch(event.target.value)}
-                placeholder="Buscar por cliente, canal o producto..."
+                placeholder="Buscar por cliente, canal, producto o combo..."
                 aria-label="Buscar ventas"
                 className="min-w-0 flex-1 bg-transparent text-sm placeholder:text-[#7e867e]"
               />
@@ -365,19 +527,26 @@ export function SalesShell({ sales, contacts, products, channels }: SalesShellPr
                     </div>
 
                     <div className="space-y-2 rounded-[22px] border border-[var(--line)] bg-[#f8f6ef] p-4 text-sm">
-                      {sale.items.slice(0, 3).map((item) => (
-                        <p key={item.id}>
-                          {item.productName} x {item.quantity}
-                        </p>
+                      {groupSaleItems(sale.items).slice(0, 3).map((group) => (
+                        <p key={group.key}>{describeGroup(group)}</p>
                       ))}
-                      {sale.items.length > 3 ? (
+                      {groupSaleItems(sale.items).length > 3 ? (
                         <p className="text-xs text-[var(--muted)]">
-                          +{sale.items.length - 3} items mas
+                          +{groupSaleItems(sale.items).length - 3} items mas
                         </p>
                       ) : null}
                     </div>
 
                     <div className="grid gap-2 sm:grid-cols-2">
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        className="w-full justify-center sm:col-span-2"
+                        onClick={() => setDetailSaleId(sale.id)}
+                      >
+                        <Eye className="h-4 w-4" />
+                        Ver detalle
+                      </Button>
                       <Button
                         type="button"
                         variant="secondary"
@@ -387,16 +556,18 @@ export function SalesShell({ sales, contacts, products, channels }: SalesShellPr
                       >
                         Editar cobro
                       </Button>
-                      <Button
-                        type="button"
-                        variant="danger"
-                        className="w-full justify-center"
-                        disabled={sale.isVoided}
-                        onClick={() => setReverseSaleId(sale.id)}
-                      >
-                        <RotateCcw className="h-4 w-4" />
-                        Anular
-                      </Button>
+                      {isAdmin ? (
+                        <Button
+                          type="button"
+                          variant="danger"
+                          className="w-full justify-center"
+                          disabled={sale.isVoided}
+                          onClick={() => setReverseSaleId(sale.id)}
+                        >
+                          <RotateCcw className="h-4 w-4" />
+                          Anular
+                        </Button>
+                      ) : null}
                     </div>
                   </article>
                 ))}
@@ -425,14 +596,14 @@ export function SalesShell({ sales, contacts, products, channels }: SalesShellPr
                         </td>
                         <td className="px-4 py-4">
                           <div className="space-y-1">
-                            {sale.items.slice(0, 2).map((item) => (
-                              <p key={item.id} className="text-sm">
-                                {item.productName} x {item.quantity}
+                            {groupSaleItems(sale.items).slice(0, 2).map((group) => (
+                              <p key={group.key} className="text-sm">
+                                {describeGroup(group)}
                               </p>
                             ))}
-                            {sale.items.length > 2 ? (
+                            {groupSaleItems(sale.items).length > 2 ? (
                               <p className="text-xs text-[var(--muted)]">
-                                +{sale.items.length - 2} items mas
+                                +{groupSaleItems(sale.items).length - 2} items mas
                               </p>
                             ) : null}
                           </div>
@@ -451,20 +622,30 @@ export function SalesShell({ sales, contacts, products, channels }: SalesShellPr
                           <Button
                             type="button"
                             variant="ghost"
-                            disabled={sale.isVoided}
-                            onClick={() => setSelectedSaleId(sale.id)}
+                            onClick={() => setDetailSaleId(sale.id)}
                           >
-                            Editar cobro
+                            <Eye className="h-4 w-4" />
+                            Detalle
                           </Button>
                           <Button
                             type="button"
                             variant="ghost"
                             disabled={sale.isVoided}
-                            onClick={() => setReverseSaleId(sale.id)}
+                            onClick={() => setSelectedSaleId(sale.id)}
                           >
-                            <RotateCcw className="h-4 w-4" />
-                            Anular
+                            Editar cobro
                           </Button>
+                          {isAdmin ? (
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              disabled={sale.isVoided}
+                              onClick={() => setReverseSaleId(sale.id)}
+                            >
+                              <RotateCcw className="h-4 w-4" />
+                              Anular
+                            </Button>
+                          ) : null}
                         </td>
                       </tr>
                     ))}
@@ -484,6 +665,9 @@ export function SalesShell({ sales, contacts, products, channels }: SalesShellPr
             setSaleRecords((current) => upsertSale(current, updatedSale));
           }}
         />
+      ) : null}
+      {detailSale ? (
+        <SaleDetailModal sale={detailSale} onClose={() => setDetailSaleId(null)} />
       ) : null}
       {reverseSale ? (
         <ReverseSaleModal

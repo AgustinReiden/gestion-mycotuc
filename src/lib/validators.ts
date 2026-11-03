@@ -55,7 +55,7 @@ export const contactFormSchema = z.object({
 export const productFormSchema = z.object({
   id: z.string().uuid().optional(),
   name: z.string().trim().min(2, "El nombre es obligatorio."),
-  category: z.string().trim().min(2, "La categoria es obligatoria."),
+  category: z.string().trim().min(1, "Selecciona una categoria."),
   unit: z.string().trim().min(1, "La unidad es obligatoria."),
   salePrice: z.coerce.number().nonnegative("El precio no puede ser negativo."),
   minStock: z.coerce.number().nonnegative("El stock minimo no puede ser negativo."),
@@ -88,10 +88,104 @@ export const expenseFormSchema = z.object({
   notes: optionalTrimmedString,
 });
 
-export const saleItemSchema = z.object({
-  productId: z.string().uuid("Selecciona un producto."),
-  quantity: z.coerce.number().positive("La cantidad debe ser mayor a cero."),
+const optionalUuid = z
+  .union([z.string().uuid(), z.literal("")])
+  .nullish()
+  .transform((value) => value || undefined);
+
+const optionalPositiveNumber = z.preprocess(
+  (value) => (value === "" || value === null ? undefined : value),
+  z.coerce.number().positive("El precio unitario debe ser mayor a cero.").optional(),
+);
+
+export const saleItemSchema = z
+  .object({
+    productId: optionalUuid,
+    bundleId: optionalUuid,
+    quantity: z.coerce.number().positive("La cantidad debe ser mayor a cero."),
+    unitPrice: optionalPositiveNumber,
+  })
+  .superRefine((data, ctx) => {
+    if (!data.productId && !data.bundleId) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["productId"],
+        message: "Selecciona un producto o un combo.",
+      });
+    }
+
+    if (data.productId && data.bundleId) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["productId"],
+        message: "Cada linea es un producto o un combo, no ambos.",
+      });
+    }
+  });
+
+export const priceTierSchema = z.object({
+  minQty: z.coerce.number().positive("La cantidad minima debe ser mayor a cero."),
   unitPrice: z.coerce.number().positive("El precio unitario debe ser mayor a cero."),
+});
+
+export const priceTiersFormSchema = z
+  .object({
+    productId: z.string().uuid("Selecciona un producto."),
+    tiers: z.array(priceTierSchema).default([]),
+  })
+  .superRefine((data, ctx) => {
+    const seen = new Set<number>();
+
+    data.tiers.forEach((tier, index) => {
+      if (seen.has(tier.minQty)) {
+        ctx.addIssue({
+          code: "custom",
+          path: ["tiers", index, "minQty"],
+          message: "No puede haber dos escalas con la misma cantidad minima.",
+        });
+      }
+
+      seen.add(tier.minQty);
+    });
+  })
+  .transform((data) => ({
+    ...data,
+    tiers: [...data.tiers].sort((left, right) => left.minQty - right.minQty),
+  }));
+
+export const bundleItemSchema = z.object({
+  productId: z.string().uuid("Selecciona un producto."),
+  quantity: z.coerce.number().min(1, "La cantidad debe ser al menos 1."),
+});
+
+export const bundleFormSchema = z
+  .object({
+    id: z.string().uuid().optional(),
+    name: z.string().trim().min(2, "El nombre del combo es obligatorio."),
+    salePrice: z.coerce.number().positive("El precio del combo debe ser mayor a cero."),
+    notes: optionalTrimmedString,
+    isActive: z.boolean().default(true),
+    items: z.array(bundleItemSchema).min(1, "El combo debe tener al menos un producto."),
+  })
+  .superRefine((data, ctx) => {
+    const seen = new Set<string>();
+
+    data.items.forEach((item, index) => {
+      if (seen.has(item.productId)) {
+        ctx.addIssue({
+          code: "custom",
+          path: ["items", index, "productId"],
+          message: "No repitas productos dentro del combo.",
+        });
+      }
+
+      seen.add(item.productId);
+    });
+  });
+
+export const bundleStatusSchema = z.object({
+  id: z.string().uuid(),
+  isActive: z.boolean(),
 });
 
 export const saleOrderFormSchema = z
