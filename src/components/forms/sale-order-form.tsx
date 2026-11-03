@@ -5,7 +5,7 @@ import { Plus, Trash2 } from "lucide-react";
 import { useEffect, useState, useTransition } from "react";
 import { Controller, useFieldArray, useForm, useWatch } from "react-hook-form";
 import type { z } from "zod";
-import { createSaleOrderAction } from "@/actions/core";
+import { createSaleOrderAction } from "@/actions/sales";
 import { ANONYMOUS_CUSTOMER_NAME, PAYMENT_STATUSES } from "@/lib/constants";
 import type {
   AppRole,

@@ -4,7 +4,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useEffect, useState, useTransition } from "react";
 import { Controller, useForm, useWatch } from "react-hook-form";
 import type { z } from "zod";
-import { createExpenseAction } from "@/actions/core";
+import { createExpenseAction } from "@/actions/expenses";
 import { ActionNotice } from "@/components/forms/action-notice";
 import { Button } from "@/components/ui/button";
 import { Field, SelectInput, TextInput, TextareaInput } from "@/components/ui/fields";

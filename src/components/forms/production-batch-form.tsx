@@ -5,7 +5,7 @@ import { Plus, Trash2 } from "lucide-react";
 import { useEffect, useState, useTransition } from "react";
 import { Controller, useFieldArray, useForm, useWatch } from "react-hook-form";
 import type { z } from "zod";
-import { saveProductionBatchAction } from "@/actions/core";
+import { saveProductionBatchAction } from "@/actions/production";
 import { ActionNotice } from "@/components/forms/action-notice";
 import { Button } from "@/components/ui/button";
 import { Field, SelectInput, TextInput, TextareaInput } from "@/components/ui/fields";

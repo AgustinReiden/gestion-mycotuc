@@ -2,7 +2,7 @@
 
 import { useDeferredValue, useEffect, useState, useTransition } from "react";
 import { CircleDollarSign, Eye, Filter, Plus, RotateCcw, Search } from "lucide-react";
-import { reverseSaleOrderAction } from "@/actions/core";
+import { reverseSaleOrderAction } from "@/actions/sales";
 import { ActionNotice } from "@/components/forms/action-notice";
 import { PaymentStatusForm } from "@/components/forms/payment-status-form";
 import { SaleOrderForm } from "@/components/forms/sale-order-form";

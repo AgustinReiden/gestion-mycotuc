@@ -3,7 +3,7 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useEffect, useState, useTransition } from "react";
 import { Controller, useForm } from "react-hook-form";
-import { saveContactAction } from "@/actions/core";
+import { saveContactAction } from "@/actions/contacts";
 import { CONTACT_TYPES } from "@/lib/constants";
 import type { ContactRecord } from "@/lib/domain";
 import { contactFormSchema } from "@/lib/validators";

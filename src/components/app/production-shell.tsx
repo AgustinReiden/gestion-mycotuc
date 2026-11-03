@@ -2,7 +2,7 @@
 
 import { useDeferredValue, useEffect, useState, useTransition } from "react";
 import { Plus, RotateCcw, Sprout, Warehouse } from "lucide-react";
-import { reverseProductionBatchAction } from "@/actions/core";
+import { reverseProductionBatchAction } from "@/actions/production";
 import { ProductionBatchForm } from "@/components/forms/production-batch-form";
 import { ActionNotice } from "@/components/forms/action-notice";
 import { Badge } from "@/components/ui/badge";

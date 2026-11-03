@@ -6,302 +6,40 @@ import { dedupeTags, CACHE_TAGS } from "@/lib/cache";
 import type { Database } from "@/lib/database.types";
 import type {
   AppRole,
-  BundleRecord,
-  ContactRecord,
   DashboardData,
-  ExpenseRecord,
-  InventoryMovementRecord,
-  LookupOption,
-  PriceTierRecord,
-  ProductCategoryRecord,
   ProductRecord,
   ProductionBatchRecord,
   ProfileSummary,
-  PurchaseRecord,
-  SaleOrderItemRecord,
   SaleOrderRecord,
-  SalePaymentRecord,
   StockAlertRecord,
   SupplyRecord,
 } from "@/lib/domain";
 import { getSupabaseEnv } from "@/lib/env";
 import { getSaleBalance, summarizeMargin } from "@/lib/finance";
+import {
+  mapBatch,
+  mapBundle,
+  mapContact,
+  mapExpense,
+  mapInventoryMovement,
+  mapLookup,
+  mapPriceTier,
+  mapProduct,
+  mapProductCategory,
+  mapPurchase,
+  mapSale,
+  mapSupply,
+} from "@/lib/mappers";
 import { ensureProfileForUser } from "@/lib/profile-sync";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { sumBy, toNumber } from "@/lib/utils";
 
-type RawRecord = Record<string, unknown>;
 type QueryClient = SupabaseClient<Database>;
 type AuthContext = {
   accessToken: string | null;
   email: string | null;
   userId: string;
 };
-
-function asRecord(value: unknown): RawRecord {
-  return value && typeof value === "object" ? (value as RawRecord) : {};
-}
-
-function asArray(value: unknown) {
-  return Array.isArray(value) ? value.map((entry) => asRecord(entry)) : [];
-}
-
-function toNullableNumber(value: unknown) {
-  return value === null || value === undefined ? null : toNumber(value);
-}
-
-function mapLookup(record: RawRecord): LookupOption {
-  return {
-    id: String(record.id ?? ""),
-    name: String(record.name ?? ""),
-  };
-}
-
-function mapContact(record: RawRecord): ContactRecord {
-  return {
-    id: String(record.id ?? ""),
-    type: (record.type as ContactRecord["type"]) ?? "client",
-    name: String(record.name ?? ""),
-    phone: (record.phone as string | null | undefined) ?? null,
-    email: (record.email as string | null | undefined) ?? null,
-    notes: (record.notes as string | null | undefined) ?? null,
-    isActive: Boolean(record.is_active),
-    createdAt: String(record.created_at ?? ""),
-  };
-}
-
-function mapProduct(record: RawRecord): ProductRecord {
-  return {
-    id: String(record.id ?? ""),
-    name: String(record.name ?? ""),
-    category: String(record.category ?? ""),
-    unit: String(record.unit ?? ""),
-    salePrice: toNumber(record.sale_price),
-    minStock: toNumber(record.min_stock),
-    notes: (record.notes as string | null | undefined) ?? null,
-    isActive: Boolean(record.is_active),
-    currentStock: toNumber(record.current_stock),
-    avgCost: null,
-    createdAt: String(record.created_at ?? ""),
-  };
-}
-
-function mapSupply(record: RawRecord): SupplyRecord {
-  return {
-    id: String(record.id ?? ""),
-    name: String(record.name ?? ""),
-    unit: String(record.unit ?? ""),
-    minStock: toNumber(record.min_stock),
-    notes: (record.notes as string | null | undefined) ?? null,
-    isActive: Boolean(record.is_active),
-    currentStock: toNumber(record.current_stock),
-    lastPurchaseAt: (record.last_purchase_at as string | null | undefined) ?? null,
-    avgCost: null,
-    createdAt: String(record.created_at ?? ""),
-  };
-}
-
-function mapSaleItem(record: RawRecord): SaleOrderItemRecord {
-  const product = asRecord(record.products);
-  const bundle = asRecord(record.product_bundles);
-
-  return {
-    id: String(record.id ?? ""),
-    productId: String(record.product_id ?? ""),
-    productName: String(product.name ?? "Producto"),
-    quantity: toNumber(record.quantity),
-    unitPrice: toNumber(record.unit_price),
-    lineTotal: toNumber(record.line_total),
-    listPrice:
-      record.list_price === null || record.list_price === undefined
-        ? null
-        : toNumber(record.list_price),
-    bundleId: (record.bundle_id as string | null | undefined) ?? null,
-    bundleName: (bundle.name as string | null | undefined) ?? null,
-    unitCost: toNullableNumber(record.unit_cost),
-  };
-}
-
-function mapSalePayment(record: RawRecord): SalePaymentRecord {
-  return {
-    id: String(record.id ?? ""),
-    amount: toNumber(record.amount),
-    paymentMethod: (record.payment_method as string | null | undefined) ?? null,
-    paidAt: (record.paid_at as string | null | undefined) ?? null,
-    createdAt: String(record.created_at ?? ""),
-  };
-}
-
-function mapProductCategory(record: RawRecord): ProductCategoryRecord {
-  return {
-    id: String(record.id ?? ""),
-    name: String(record.name ?? ""),
-    isActive: Boolean(record.is_active),
-  };
-}
-
-function mapPriceTier(record: RawRecord): PriceTierRecord {
-  return {
-    id: String(record.id ?? ""),
-    productId: String(record.product_id ?? ""),
-    minQty: toNumber(record.min_qty),
-    unitPrice: toNumber(record.unit_price),
-  };
-}
-
-function mapBundle(record: RawRecord): BundleRecord {
-  return {
-    id: String(record.id ?? ""),
-    name: String(record.name ?? ""),
-    salePrice: toNumber(record.sale_price),
-    notes: (record.notes as string | null | undefined) ?? null,
-    isActive: Boolean(record.is_active),
-    createdAt: String(record.created_at ?? ""),
-    items: asArray(record.product_bundle_items)
-      .map((item) => {
-        const product = asRecord(item.products);
-
-        return {
-          id: String(item.id ?? ""),
-          productId: String(item.product_id ?? ""),
-          productName: String(product.name ?? "Producto"),
-          quantity: toNumber(item.quantity),
-        };
-      })
-      .sort((left, right) => left.productName.localeCompare(right.productName, "es")),
-  };
-}
-
-function mapSale(record: RawRecord): SaleOrderRecord {
-  const items = asArray(record.sales_order_items).map(mapSaleItem);
-  const contact = asRecord(record.contacts);
-  const channel = asRecord(record.sales_channels);
-
-  return {
-    id: String(record.id ?? ""),
-    saleDate: String(record.sale_date ?? ""),
-    contactName: (contact.name as string | null | undefined) ?? null,
-    channelName: (channel.name as string | null | undefined) ?? null,
-    totalAmount: toNumber(record.total_amount),
-    amountPaid: toNumber(record.amount_paid),
-    paymentStatus: (record.payment_status as SaleOrderRecord["paymentStatus"]) ?? "pending",
-    paymentMethod: (record.payment_method as string | null | undefined) ?? null,
-    paidAt: (record.paid_at as string | null | undefined) ?? null,
-    notes: (record.notes as string | null | undefined) ?? null,
-    isVoided: Boolean(record.voided_at),
-    voidedAt: (record.voided_at as string | null | undefined) ?? null,
-    voidReason: (record.void_reason as string | null | undefined) ?? null,
-    totalUnits: sumBy(items, (item) => item.quantity),
-    createdAt: String(record.created_at ?? ""),
-    items,
-    payments: asArray(record.sale_payments)
-      .map(mapSalePayment)
-      .sort((left, right) =>
-        `${left.paidAt ?? ""}${left.createdAt}`.localeCompare(`${right.paidAt ?? ""}${right.createdAt}`),
-      ),
-  };
-}
-
-function mapExpense(record: RawRecord): ExpenseRecord {
-  const category = asRecord(record.expense_categories);
-  const purchase = asRecord(record.purchases);
-  const supplier = asRecord(purchase.contacts);
-
-  return {
-    id: String(record.id ?? ""),
-    expenseDate: String(record.expense_date ?? ""),
-    concept: String(record.concept ?? ""),
-    categoryName: (category.name as string | null | undefined) ?? null,
-    amount: toNumber(record.amount),
-    source: (record.source as ExpenseRecord["source"]) ?? "manual",
-    notes: (record.notes as string | null | undefined) ?? null,
-    supplierName: (supplier.name as string | null | undefined) ?? null,
-    linkedPurchaseId: (record.linked_purchase_id as string | null | undefined) ?? null,
-    isVoided: Boolean(record.voided_at),
-    voidedAt: (record.voided_at as string | null | undefined) ?? null,
-    voidReason: (record.void_reason as string | null | undefined) ?? null,
-    createdAt: String(record.created_at ?? ""),
-  };
-}
-
-function mapPurchase(record: RawRecord): PurchaseRecord {
-  const contact = asRecord(record.contacts);
-
-  return {
-    id: String(record.id ?? ""),
-    purchaseDate: String(record.purchase_date ?? ""),
-    supplierName: (contact.name as string | null | undefined) ?? null,
-    totalAmount: toNumber(record.total_amount),
-    notes: (record.notes as string | null | undefined) ?? null,
-    isVoided: Boolean(record.voided_at),
-    voidedAt: (record.voided_at as string | null | undefined) ?? null,
-    voidReason: (record.void_reason as string | null | undefined) ?? null,
-    createdAt: String(record.created_at ?? ""),
-  };
-}
-
-function mapInventoryMovement(record: RawRecord): InventoryMovementRecord {
-  return {
-    id: String(record.id ?? ""),
-    entityType: (record.entity_type as InventoryMovementRecord["entityType"]) ?? "product",
-    entityId: String(record.entity_id ?? ""),
-    entityName: String(record.entity_name ?? "Sin entidad"),
-    entityUnit: (record.entity_unit as string | null | undefined) ?? null,
-    movementType:
-      (record.movement_type as InventoryMovementRecord["movementType"]) ?? "adjustment",
-    quantity: toNumber(record.quantity),
-    movementDate: String(record.movement_date ?? ""),
-    referenceType: String(record.reference_type ?? ""),
-    referenceId: (record.reference_id as string | null | undefined) ?? null,
-    notes: (record.notes as string | null | undefined) ?? null,
-    createdAt: String(record.created_at ?? ""),
-    createdByName: (record.created_by_name as string | null | undefined) ?? null,
-  };
-}
-
-function mapBatch(record: RawRecord): ProductionBatchRecord {
-  const product = asRecord(record.products);
-
-  return {
-    id: String(record.id ?? ""),
-    productId: String(record.product_id ?? ""),
-    productName: String(product.name ?? "Producto"),
-    status: (record.status as ProductionBatchRecord["status"]) ?? "draft",
-    startedAt: String(record.started_at ?? ""),
-    completedAt: (record.completed_at as string | null | undefined) ?? null,
-    expectedQty: record.expected_qty === null ? null : toNumber(record.expected_qty),
-    actualQty: record.actual_qty === null ? null : toNumber(record.actual_qty),
-    notes: (record.notes as string | null | undefined) ?? null,
-    inventoryPostedAt: (record.inventory_posted_at as string | null | undefined) ?? null,
-    totalCost: toNullableNumber(record.total_cost),
-    unitCost: toNullableNumber(record.unit_cost),
-    isVoided: Boolean(record.voided_at),
-    voidedAt: (record.voided_at as string | null | undefined) ?? null,
-    voidReason: (record.void_reason as string | null | undefined) ?? null,
-    createdAt: String(record.created_at ?? ""),
-    inputs: asArray(record.production_batch_inputs).map((input) => {
-      const supply = asRecord(input.supplies);
-
-      return {
-        id: String(input.id ?? ""),
-        supplyId: String(input.supply_id ?? ""),
-        supplyName: String(supply.name ?? "Insumo"),
-        quantity: toNumber(input.quantity),
-        unitCost: toNullableNumber(input.unit_cost),
-      };
-    }),
-    outputs: asArray(record.production_batch_outputs).map((output) => {
-      const outputProduct = asRecord(output.products);
-
-      return {
-        id: String(output.id ?? ""),
-        productId: String(output.product_id ?? ""),
-        productName: String(outputProduct.name ?? "Producto"),
-        quantity: toNumber(output.quantity),
-      };
-    }),
-  };
-}
 
 function toStockAlert(record: ProductRecord | SupplyRecord, type: "product" | "supply"): StockAlertRecord {
   return {
@@ -590,7 +328,7 @@ export const getProductCategoriesData = cache(async () =>
         .select("id, name, is_active")
         .order("name");
       if (error) throw error;
-      return (data ?? []).map((record) => mapProductCategory(asRecord(record)));
+      return (data ?? []).map((record) => mapProductCategory(record));
     },
     revalidate: 900,
     tags: [CACHE_TAGS.categories],
@@ -607,7 +345,7 @@ export const getPriceTiersData = cache(async () =>
         .order("product_id")
         .order("min_qty");
       if (error) throw error;
-      return (data ?? []).map((record) => mapPriceTier(asRecord(record)));
+      return (data ?? []).map((record) => mapPriceTier(record));
     },
     revalidate: 300,
     tags: [CACHE_TAGS.priceTiers],
@@ -625,7 +363,7 @@ export const getBundlesData = cache(async () =>
         )
         .order("name");
       if (error) throw error;
-      return (data ?? []).map((record) => mapBundle(asRecord(record)));
+      return (data ?? []).map((record) => mapBundle(record));
     },
     revalidate: 300,
     tags: [CACHE_TAGS.bundles, CACHE_TAGS.products],
@@ -689,7 +427,7 @@ export const getInventoryMovementsData = cache(
 
         const { data, error } = await query;
         if (error) throw error;
-        return (data ?? []).map((record) => mapInventoryMovement(asRecord(record)));
+        return (data ?? []).map((record) => mapInventoryMovement(record));
       },
       revalidate: 60,
       tags: dedupeTags(
@@ -711,7 +449,7 @@ export const getPurchasesData = cache(async (limit = 8) =>
         .limit(limit);
       if (error) throw error;
 
-      return (data ?? []).map((record) => mapPurchase(asRecord(record)));
+      return (data ?? []).map((record) => mapPurchase(record));
     },
     revalidate: 120,
     tags: [CACHE_TAGS.purchases],

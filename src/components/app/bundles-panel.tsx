@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { Boxes, Edit3, Plus, Power } from "lucide-react";
-import { setBundleStatusAction } from "@/actions/core";
+import { setBundleStatusAction } from "@/actions/catalog";
 import { ActionNotice } from "@/components/forms/action-notice";
 import { BundleForm } from "@/components/forms/bundle-form";
 import { Badge } from "@/components/ui/badge";

@@ -4,7 +4,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useEffect, useState, useTransition } from "react";
 import { Controller, useForm, useWatch } from "react-hook-form";
 import type { z } from "zod";
-import { updateSalePaymentStatusAction } from "@/actions/core";
+import { updateSalePaymentStatusAction } from "@/actions/sales";
 import { PAYMENT_STATUSES } from "@/lib/constants";
 import type { AppRole, PaymentStatus, SaleOrderRecord } from "@/lib/domain";
 import { getPartialAmountError, getSaleBalance } from "@/lib/finance";

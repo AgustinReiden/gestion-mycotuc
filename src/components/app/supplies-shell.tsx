@@ -2,7 +2,7 @@
 
 import { useDeferredValue, useEffect, useState, useTransition } from "react";
 import { Archive, Edit3, Plus, RotateCcw, Search, Settings2, ShoppingBasket } from "lucide-react";
-import { reverseSupplyPurchaseAction } from "@/actions/core";
+import { reverseSupplyPurchaseAction } from "@/actions/supplies";
 import { PurchaseHistoryPanel } from "@/components/app/purchase-history-panel";
 import { StockHistoryPanel } from "@/components/app/stock-history-panel";
 import { ActionNotice } from "@/components/forms/action-notice";
