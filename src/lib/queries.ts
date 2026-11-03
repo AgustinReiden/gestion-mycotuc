@@ -604,7 +604,7 @@ export async function getDashboardData(): Promise<DashboardData> {
 
   const expenseTotals = new Map<string, number>();
   monthlyExpenses.forEach((expense) => {
-    const key = expense.categoryName ?? "Sin categoria";
+    const key = expense.categoryName ?? "Sin categoría";
     expenseTotals.set(key, (expenseTotals.get(key) ?? 0) + expense.amount);
   });
 

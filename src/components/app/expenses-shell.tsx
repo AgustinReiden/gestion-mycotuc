@@ -134,7 +134,7 @@ export function ExpensesShell({ expenses, categories }: ExpensesShellProps) {
           <input
             value={search}
             onChange={(event) => setSearch(event.target.value)}
-            placeholder="Buscar por concepto, categoria o proveedor..."
+            placeholder="Buscar por concepto, categoría o proveedor..."
             aria-label="Buscar gastos"
             className="flex-1 bg-transparent text-sm placeholder:text-[#7e867e]"
           />
@@ -144,10 +144,10 @@ export function ExpensesShell({ expenses, categories }: ExpensesShellProps) {
           {filteredExpenses.length === 0 ? (
             <div className="p-6">
               <EmptyState
-                title={hasSearchQuery ? "No encontramos gastos" : "Todavia no hay gastos"}
+                title={hasSearchQuery ? "No encontramos gastos" : "Todavía no hay gastos"}
                 description={
                   hasSearchQuery
-                    ? "Prueba otro termino de busqueda o registra un nuevo gasto."
+                    ? "Prueba otro término de búsqueda o registra un nuevo gasto."
                     : "Carga un gasto manual o registra una compra de insumos para empezar a ver movimientos."
                 }
                 icon={ReceiptText}
@@ -174,7 +174,7 @@ export function ExpensesShell({ expenses, categories }: ExpensesShellProps) {
                     </div>
 
                     <div className="flex flex-wrap gap-2">
-                      <Badge>{expense.categoryName ?? "Sin categoria"}</Badge>
+                      <Badge>{expense.categoryName ?? "Sin categoría"}</Badge>
                       <Badge tone={expense.source === "purchase" ? "accent" : "neutral"}>
                         {expense.source === "purchase" ? "Compra" : "Manual"}
                       </Badge>
@@ -194,7 +194,7 @@ export function ExpensesShell({ expenses, categories }: ExpensesShellProps) {
                     <tr>
                       <th className="px-4 py-3 font-medium">Fecha</th>
                       <th className="px-4 py-3 font-medium">Concepto</th>
-                      <th className="px-4 py-3 font-medium">Categoria</th>
+                      <th className="px-4 py-3 font-medium">Categoría</th>
                       <th className="px-4 py-3 font-medium">Origen</th>
                       <th className="px-4 py-3 font-medium">Proveedor</th>
                       <th className="px-4 py-3 font-medium">Monto</th>
@@ -211,7 +211,7 @@ export function ExpensesShell({ expenses, categories }: ExpensesShellProps) {
                           ) : null}
                         </td>
                         <td className="px-4 py-4">
-                          <Badge>{expense.categoryName ?? "Sin categoria"}</Badge>
+                          <Badge>{expense.categoryName ?? "Sin categoría"}</Badge>
                         </td>
                         <td className="px-4 py-4">
                           <Badge tone={expense.source === "purchase" ? "accent" : "neutral"}>

@@ -19,7 +19,7 @@ import {
   summarizeReceivables,
 } from "@/lib/finance";
 import { formatQuantity } from "@/lib/pricing";
-import { formatCurrency, sumBy } from "@/lib/utils";
+import { formatCurrency, sumBy, todayISO } from "@/lib/utils";
 
 type ReportsShellProps = {
   sales: SaleOrderRecord[];
@@ -60,8 +60,8 @@ export function ReportsShell({
 }: ReportsShellProps) {
   const isAdmin = role === "admin";
   const [range, setRange] = useState<RangeFilter>({
-    from: new Date(new Date().setDate(new Date().getDate() - 30)).toISOString().slice(0, 10),
-    to: new Date().toISOString().slice(0, 10),
+    from: todayISO(new Date(new Date().setDate(new Date().getDate() - 30))),
+    to: todayISO(),
   });
   const hasInvalidRange = range.from > range.to;
   const effectiveRange = normalizeRange(range);
@@ -90,7 +90,7 @@ export function ReportsShell({
 
   const expensesByCategory = new Map<string, number>();
   filteredExpenses.forEach((expense) => {
-    expensesByCategory.set(expense.categoryName ?? "Sin categoria", (expensesByCategory.get(expense.categoryName ?? "Sin categoria") ?? 0) + expense.amount);
+    expensesByCategory.set(expense.categoryName ?? "Sin categoría", (expensesByCategory.get(expense.categoryName ?? "Sin categoría") ?? 0) + expense.amount);
   });
 
   // Cobrado usa lo efectivamente cobrado (incluye parciales); el saldo es total menos cobrado.
@@ -123,9 +123,9 @@ export function ReportsShell({
         <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
           <div>
             <p className="text-sm font-semibold uppercase tracking-[0.18em] text-[#55755e]">Reportes</p>
-            <h2 className="mt-2 text-3xl font-semibold">Analitica operativa</h2>
+            <h2 className="mt-2 text-3xl font-semibold">Analítica operativa</h2>
             <p className="mt-2 text-sm text-[var(--muted)]">
-              Cruza ventas, gastos, lotes e inventario para leer el negocio por periodo.
+              Cruza ventas, gastos, lotes e inventario para leer el negocio por período.
             </p>
           </div>
           <div className="grid gap-3 md:grid-cols-2">
@@ -204,7 +204,7 @@ export function ReportsShell({
           </div>
           {totalMargin && totalMargin.missingCostLines > 0 ? (
             <p className="mt-2 text-sm text-[var(--muted)]">
-              {totalMargin.missingCostLines} linea(s) de venta sin costo registrado no entran al margen.
+              {totalMargin.missingCostLines} línea(s) de venta sin costo registrado no entran al margen.
             </p>
           ) : null}
           {marginByProduct.length === 0 ? (
@@ -275,7 +275,7 @@ export function ReportsShell({
         <Panel>
           <div className="flex items-center gap-3">
             <BarChart3 className="h-5 w-5 text-[#934534]" />
-            <h3 className="text-2xl font-semibold">Gastos por categoria</h3>
+            <h3 className="text-2xl font-semibold">Gastos por categoría</h3>
           </div>
           <div className="mt-5 space-y-4">
             {topExpensesByCategory.length === 0 ? (
@@ -306,12 +306,12 @@ export function ReportsShell({
         <Panel>
           <div className="flex items-center gap-3">
             <Package className="h-5 w-5 text-[#8c5b17]" />
-            <h3 className="text-2xl font-semibold">Stock critico</h3>
+            <h3 className="text-2xl font-semibold">Stock crítico</h3>
           </div>
           <div className="mt-5 space-y-3">
             {criticalStock.length === 0 ? (
               <div className="rounded-[24px] border border-[var(--line)] bg-white/80 p-4 text-sm text-[var(--muted)]">
-                No hay productos ni insumos activos en stock critico.
+                No hay productos ni insumos activos en stock crítico.
               </div>
             ) : (
               criticalStock.map((item) => (
@@ -320,7 +320,7 @@ export function ReportsShell({
                     <div>
                       <p className="font-semibold">{item.name}</p>
                       <p className="text-sm text-[var(--muted)]">
-                        {item.currentStock} / minimo {item.minStock}
+                        {item.currentStock} / mínimo {item.minStock}
                       </p>
                     </div>
                     <CircleAlert className="h-5 w-5 text-[#d89b39]" />

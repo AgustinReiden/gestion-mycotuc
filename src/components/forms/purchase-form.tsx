@@ -18,7 +18,7 @@ import type {
   SupplyRecord,
 } from "@/lib/domain";
 import { purchaseFormSchema } from "@/lib/validators";
-import { formatCurrency } from "@/lib/utils";
+import { formatCurrency, todayISO } from "@/lib/utils";
 
 type PurchaseFormValues = z.input<typeof purchaseFormSchema>;
 
@@ -48,7 +48,7 @@ export function PurchaseForm({ suppliers, supplies, onSuccess }: PurchaseFormPro
     resolver: zodResolver(purchaseFormSchema),
     defaultValues: {
       supplierId: suppliers[0]?.id ?? "",
-      purchaseDate: new Date().toISOString().slice(0, 10),
+      purchaseDate: todayISO(),
       notes: "",
       items: [getInitialItem(supplies)],
     },
@@ -75,7 +75,7 @@ export function PurchaseForm({ suppliers, supplies, onSuccess }: PurchaseFormPro
   useEffect(() => {
     form.reset({
       supplierId: suppliers[0]?.id ?? "",
-      purchaseDate: new Date().toISOString().slice(0, 10),
+      purchaseDate: todayISO(),
       notes: "",
       items: [getInitialItem(supplies)],
     });
@@ -89,7 +89,7 @@ export function PurchaseForm({ suppliers, supplies, onSuccess }: PurchaseFormPro
           if (!canSubmitPurchase) {
             setFeedback({
               tone: "error",
-              message: `No podemos registrar la compra todavia: falta ${missingDependencies.join(" y ")}.`,
+              message: `No podemos registrar la compra todavía: falta ${missingDependencies.join(" y ")}.`,
             });
             return;
           }
@@ -101,7 +101,7 @@ export function PurchaseForm({ suppliers, supplies, onSuccess }: PurchaseFormPro
               onSuccess(result.data);
               form.reset({
                 supplierId: suppliers[0]?.id ?? "",
-                purchaseDate: new Date().toISOString().slice(0, 10),
+                purchaseDate: todayISO(),
                 notes: "",
                 items: [getInitialItem(supplies)],
               });
@@ -157,7 +157,7 @@ export function PurchaseForm({ suppliers, supplies, onSuccess }: PurchaseFormPro
         <div className="mb-4 flex items-center justify-between">
           <div>
             <h4 className="text-lg font-semibold">Items comprados</h4>
-            <p className="text-sm text-[var(--muted)]">Cada linea aumenta stock y genera el gasto asociado.</p>
+            <p className="text-sm text-[var(--muted)]">Cada línea aumenta stock y genera el gasto asociado.</p>
           </div>
           <Button
             type="button"
@@ -166,7 +166,7 @@ export function PurchaseForm({ suppliers, supplies, onSuccess }: PurchaseFormPro
             onClick={() => items.append(getInitialItem(supplies))}
           >
             <Plus className="h-4 w-4" />
-            Agregar item
+            Agregar ítem
           </Button>
         </div>
 

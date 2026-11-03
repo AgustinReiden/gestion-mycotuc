@@ -9,7 +9,7 @@ import { PAYMENT_STATUSES } from "@/lib/constants";
 import type { AppRole, PaymentStatus, SaleOrderRecord } from "@/lib/domain";
 import { getPartialAmountError, getSaleBalance } from "@/lib/finance";
 import { paymentStatusUpdateSchema } from "@/lib/validators";
-import { formatCurrency } from "@/lib/utils";
+import { formatCurrency, todayISO } from "@/lib/utils";
 import { ActionNotice } from "@/components/forms/action-notice";
 import { Button } from "@/components/ui/button";
 import { Field, SelectInput, TextInput } from "@/components/ui/fields";
@@ -50,7 +50,7 @@ function getDefaultValues({
     saleOrderId,
     paymentStatus: paymentStatus === "pending" ? "paid" : paymentStatus,
     paymentMethod: paymentMethod ?? "",
-    paidAt: new Date().toISOString().slice(0, 10),
+    paidAt: todayISO(),
     amount: "",
   };
 }
@@ -195,7 +195,7 @@ export function PaymentStatusForm({
       ) : null}
 
       <div className="grid gap-4 md:grid-cols-2">
-        <Field label="Metodo">
+        <Field label="Método">
           <Controller
             control={form.control}
             name="paymentMethod"

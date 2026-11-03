@@ -6,15 +6,15 @@ export const dynamic = "force-dynamic";
 
 function getLoginNotice(reason: string | string[] | undefined) {
   if (reason === "session-expired") {
-    return "Tu sesion expiro. Vuelve a iniciar sesion para seguir usando la app.";
+    return "Tu sesión expiró. Vuelve a iniciar sesión para seguir usando la app.";
   }
 
   if (reason === "profile-missing") {
-    return "No pudimos recuperar tu perfil. Inicia sesion de nuevo para reintentar.";
+    return "No pudimos recuperar tu perfil. Inicia sesión de nuevo para reintentar.";
   }
 
   if (reason === "signed-out") {
-    return "Cerraste sesion correctamente.";
+    return "Cerraste sesión correctamente.";
   }
 
   return null;
@@ -43,21 +43,21 @@ export default async function LoginPage({
         <section className="glass-panel shadow-soft hidden rounded-[34px] border border-white/70 p-10 lg:flex lg:flex-col lg:justify-between">
           <div className="max-w-xl">
             <p className="inline-flex rounded-full bg-[#dce8db] px-3 py-1 text-sm font-semibold text-[#15553e]">
-              Mycotuc Gestion
+              Mycotuc Gestión
             </p>
             <h1 className="mt-6 text-5xl font-semibold leading-tight text-[var(--foreground)]">
-              Tu operacion completa en un solo tablero.
+              Tu operación completa en un solo tablero.
             </h1>
             <p className="mt-5 text-lg leading-8 text-[var(--muted)]">
-              Controla ventas, gastos, produccion, inventario y contactos desde una app pensada para
-              el ritmo real de tu emprendimiento de hongos adaptogenos.
+              Controla ventas, gastos, producción, inventario y contactos desde una app pensada para
+              el ritmo real de tu emprendimiento de hongos adaptógenos.
             </p>
           </div>
 
           <div className="grid gap-4 md:grid-cols-3">
             {[
-              ["Ventas", "Pedidos multi-item y estados de cobro."],
-              ["Produccion", "Lotes simples con consumo y rendimiento."],
+              ["Ventas", "Pedidos multi-ítem y estados de cobro."],
+              ["Producción", "Lotes simples con consumo y rendimiento."],
               ["Inventario", "Stock centralizado por movimientos auditables."],
             ].map(([title, copy]) => (
               <article key={title} className="rounded-[26px] border border-white/70 bg-white/80 p-5">
@@ -71,7 +71,7 @@ export default async function LoginPage({
         <section className="glass-panel shadow-soft rounded-[34px] border border-white/70 p-6 sm:p-8 lg:p-10">
           <div className="mb-8">
             <p className="text-sm font-semibold uppercase tracking-[0.24em] text-[#55755e]">Acceso</p>
-            <h2 className="mt-3 text-4xl font-semibold">Iniciar sesion</h2>
+            <h2 className="mt-3 text-4xl font-semibold">Iniciar sesión</h2>
             <p className="mt-3 text-sm leading-6 text-[var(--muted)]">
               Usa una cuenta creada manualmente en Supabase Auth para entrar al panel interno.
             </p>

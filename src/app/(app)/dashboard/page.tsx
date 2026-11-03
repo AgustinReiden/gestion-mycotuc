@@ -42,13 +42,13 @@ export default async function DashboardPage() {
         <MetricCard
           label="Facturado del mes"
           value={formatCurrency(data.monthlyBilled)}
-          helper="Ventas registradas en el periodo actual."
+          helper="Ventas registradas en el período actual."
           icon={TrendingUp}
         />
         <MetricCard
           label="Cobrado del mes"
           value={formatCurrency(data.monthlyCollected)}
-          helper="Cobrado de las ventas del periodo actual, incluye cobros parciales."
+          helper="Cobrado de las ventas del período actual, incluye cobros parciales."
           icon={DollarSign}
           tone="accent"
         />
@@ -62,14 +62,14 @@ export default async function DashboardPage() {
         <MetricCard
           label="Margen devengado"
           value={formatCurrency(data.accrualProfit)}
-          helper="Facturacion menos gastos, aun si hay cobros pendientes."
+          helper="Facturación menos gastos, aun si hay cobros pendientes."
           icon={BarChart3}
           tone={data.accrualProfit >= 0 ? "accent" : "danger"}
         />
         <MetricCard
           label="Pendiente de cobro"
           value={formatCurrency(data.pendingReceivables)}
-          helper="Saldo historico: facturado menos lo ya cobrado."
+          helper="Saldo histórico: facturado menos lo ya cobrado."
           icon={Package}
           tone="info"
         />
@@ -79,7 +79,7 @@ export default async function DashboardPage() {
             value={formatCurrency(data.monthlyGrossMargin.margin)}
             helper={`${formatPercent(data.monthlyGrossMargin.marginPercent)} sobre ventas, a costo congelado al vender.${
               data.monthlyGrossMargin.missingCostLines > 0
-                ? ` ${data.monthlyGrossMargin.missingCostLines} linea(s) sin costo no cuentan.`
+                ? ` ${data.monthlyGrossMargin.missingCostLines} línea(s) sin costo no cuentan.`
                 : ""
             }`}
             icon={Percent}
@@ -93,7 +93,7 @@ export default async function DashboardPage() {
           <div className="flex items-center justify-between gap-3">
             <div>
               <p className="text-sm font-semibold uppercase tracking-[0.18em] text-[#55755e]">Actividad</p>
-              <h2 className="mt-2 text-3xl font-semibold">Ultimas ventas</h2>
+              <h2 className="mt-2 text-3xl font-semibold">Últimas ventas</h2>
             </div>
             <Button variant="secondary" asChild>
               <Link href="/ventas">Ver todas</Link>
@@ -103,7 +103,7 @@ export default async function DashboardPage() {
           <div className="mt-5 space-y-3">
             {data.recentSales.length === 0 ? (
               <div className="rounded-[24px] border border-[var(--line)] bg-white/80 p-4 text-sm text-[var(--muted)]">
-                Todavia no hay ventas registradas.
+                Todavía no hay ventas registradas.
               </div>
             ) : (
               data.recentSales.map((sale) => (
@@ -142,7 +142,7 @@ export default async function DashboardPage() {
 
         <div className="grid gap-4">
           <Panel>
-            <h3 className="text-2xl font-semibold">Acciones rapidas</h3>
+            <h3 className="text-2xl font-semibold">Acciones rápidas</h3>
             <div className="mt-4 grid gap-3">
               <Button asChild>
                 <Link href="/ventas">Registrar venta</Link>
@@ -166,7 +166,7 @@ export default async function DashboardPage() {
             <div className="space-y-3">
               {data.channelShare.length === 0 ? (
                 <div className="rounded-[24px] border border-[var(--line)] bg-white/80 p-4 text-sm text-[var(--muted)]">
-                  Todavia no hay ventas del mes para distribuir por canal.
+                  Todavía no hay ventas del mes para distribuir por canal.
                 </div>
               ) : (
                 data.channelShare.map((entry, i) => {
@@ -202,7 +202,7 @@ export default async function DashboardPage() {
             <div>
               <h3 className="text-2xl font-semibold">Alertas de stock bajo</h3>
               <p className="text-sm text-[var(--muted)]">
-                Productos e insumos por debajo del minimo operativo.
+                Productos e insumos por debajo del mínimo operativo.
               </p>
             </div>
           </div>
@@ -238,9 +238,9 @@ export default async function DashboardPage() {
               <BarChart3 className="h-5 w-5" />
             </div>
             <div>
-              <h3 className="text-2xl font-semibold">Gastos por categoria</h3>
+              <h3 className="text-2xl font-semibold">Gastos por categoría</h3>
               <p className="text-sm text-[var(--muted)]">
-                Distribucion mensual para lectura rapida.
+                Distribución mensual para lectura rápida.
               </p>
             </div>
           </div>
@@ -252,7 +252,7 @@ export default async function DashboardPage() {
             <div className="space-y-3">
               {data.expenseShare.length === 0 ? (
                 <div className="rounded-[24px] border border-[var(--line)] bg-white/80 p-4 text-sm text-[var(--muted)]">
-                  Todavia no hay gastos del mes para distribuir por categoria.
+                  Todavía no hay gastos del mes para distribuir por categoría.
                 </div>
               ) : (
                 data.expenseShare.map((entry, i) => {

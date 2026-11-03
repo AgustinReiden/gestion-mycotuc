@@ -32,7 +32,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Field, SelectInput, TextInput, TextareaInput } from "@/components/ui/fields";
 import { getFirstFormError, toInputValue, toNumberValue } from "@/components/forms/value-helpers";
-import { formatCurrency } from "@/lib/utils";
+import { formatCurrency, todayISO } from "@/lib/utils";
 
 type SaleOrderValues = z.input<typeof saleOrderFormSchema>;
 type SaleOrderOutput = z.output<typeof saleOrderFormSchema>;
@@ -158,7 +158,7 @@ function getDefaultValues(products: ProductRecord[], channels: LookupOption[]): 
     customerName: "",
     customerPhone: "",
     customerEmail: "",
-    saleDate: new Date().toISOString().slice(0, 10),
+    saleDate: todayISO(),
     channelId: channels[0]?.id ?? "",
     paymentStatus: "pending",
     paymentMethod: "",
@@ -183,14 +183,14 @@ function sortContactsByRecent(list: ContactRecord[]) {
 
 function getCustomerHint(mode: SaleCustomerMode, hasSelectedContact: boolean) {
   if (mode === "anonymous") {
-    return "La venta se guardara con un cliente generico para no frenar la carga.";
+    return "La venta se guardará con un cliente genérico para no frenar la carga.";
   }
 
   if (hasSelectedContact) {
-    return "Se reutiliza un cliente existente y puedes completar telefono o mail si hace falta.";
+    return "Se reutiliza un cliente existente y puedes completar teléfono o mail si hace falta.";
   }
 
-  return "Escribe nombre, telefono o mail para ver sugerencias. Si no coincide nadie, se crea al guardar.";
+  return "Escribe nombre, teléfono o mail para ver sugerencias. Si no coincide nadie, se crea al guardar.";
 }
 
 export function SaleOrderForm({
@@ -353,7 +353,7 @@ export function SaleOrderForm({
           if (!canSubmitSale) {
             setFeedback({
               tone: "error",
-              message: `No podemos guardar la venta todavia: falta ${missingDependencies.join(" y ")}.`,
+              message: `No podemos guardar la venta todavía: falta ${missingDependencies.join(" y ")}.`,
             });
             return;
           }
@@ -370,7 +370,7 @@ export function SaleOrderForm({
           if (invalidLine >= 0) {
             setFeedback({
               tone: "error",
-              message: `La linea ${invalidLine + 1} no tiene un precio unitario valido.`,
+              message: `La línea ${invalidLine + 1} no tiene un precio unitario válido.`,
             });
             return;
           }
@@ -445,7 +445,7 @@ export function SaleOrderForm({
                     name={field.name}
                     ref={field.ref}
                     value={toInputValue(field.value)}
-                    placeholder="Nombre, telefono o mail del cliente"
+                    placeholder="Nombre, teléfono o mail del cliente"
                     autoComplete="off"
                     onFocus={() => {
                       if (customerMode !== "anonymous") {
@@ -502,7 +502,7 @@ export function SaleOrderForm({
 
             {showSuggestions && customerTerms.length > 0 && suggestedContacts.length === 0 ? (
               <p className="text-xs text-[var(--muted)]">
-                No encontramos coincidencias. Si sigues con este nombre, se guardara como cliente nuevo.
+                No encontramos coincidencias. Si sigues con este nombre, se guardará como cliente nuevo.
               </p>
             ) : null}
 
@@ -541,7 +541,7 @@ export function SaleOrderForm({
 
       {customerMode !== "anonymous" ? (
         <div className="grid gap-4 md:grid-cols-2">
-          <Field label="Telefono" error={form.formState.errors.customerPhone?.message}>
+          <Field label="Teléfono" error={form.formState.errors.customerPhone?.message}>
             <Controller
               control={form.control}
               name="customerPhone"
@@ -592,7 +592,7 @@ export function SaleOrderForm({
             )}
           />
         </Field>
-        <Field label="Metodo de pago" error={form.formState.errors.paymentMethod?.message}>
+        <Field label="Método de pago" error={form.formState.errors.paymentMethod?.message}>
           <Controller
             control={form.control}
             name="paymentMethod"
@@ -656,7 +656,7 @@ export function SaleOrderForm({
           <div>
             <h4 className="text-lg font-semibold">Items del pedido</h4>
             <p className="text-sm text-[var(--muted)]">
-              Cada linea es un producto o un combo y descuenta stock al confirmar la venta.
+              Cada línea es un producto o un combo y descuenta stock al confirmar la venta.
             </p>
           </div>
           <Button
@@ -666,7 +666,7 @@ export function SaleOrderForm({
             onClick={() => items.append(getInitialItem(products))}
           >
             <Plus className="h-4 w-4" />
-            Agregar item
+            Agregar ítem
           </Button>
         </div>
 

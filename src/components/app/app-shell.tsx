@@ -17,7 +17,7 @@ type AppShellProps = {
 };
 
 function getPageMeta(pathname: string) {
-  return APP_NAVIGATION.find((item) => pathname === item.href)?.title ?? "Operacion Mycotuc";
+  return APP_NAVIGATION.find((item) => pathname === item.href)?.title ?? "Operación Mycotuc";
 }
 
 export function AppShell({ profile, children }: AppShellProps) {
@@ -34,7 +34,7 @@ export function AppShell({ profile, children }: AppShellProps) {
       const result = await signOutAction();
 
       if (!result?.success) {
-        setSignOutFeedback(result?.error ?? result?.message ?? "No pudimos cerrar la sesion.");
+        setSignOutFeedback(result?.error ?? result?.message ?? "No pudimos cerrar la sesión.");
       }
     });
   };
@@ -56,14 +56,14 @@ export function AppShell({ profile, children }: AppShellProps) {
               </div>
               <div>
                 <p className="text-xl font-semibold">MYCOTUC</p>
-                <p className="text-sm text-[#a9c7b5]">Sistema de gestion</p>
+                <p className="text-sm text-[#a9c7b5]">Sistema de gestión</p>
               </div>
             </div>
             <button
               type="button"
               className="rounded-full p-2 text-[#a9c7b5] transition hover:bg-white/10 md:hidden"
               onClick={closeMobile}
-              aria-label="Cerrar menu lateral"
+              aria-label="Cerrar menú lateral"
             >
               <X className="h-5 w-5" />
             </button>
@@ -108,7 +108,7 @@ export function AppShell({ profile, children }: AppShellProps) {
               onClick={handleSignOut}
             >
               <LogOut className="h-4 w-4" />
-              Cerrar sesion
+              Cerrar sesión
             </Button>
           </div>
         </aside>
@@ -118,7 +118,7 @@ export function AppShell({ profile, children }: AppShellProps) {
             type="button"
             className="fixed inset-0 z-40 bg-[#122116]/55 md:hidden"
             onClick={closeMobile}
-            aria-label="Cerrar menu lateral"
+            aria-label="Cerrar menú lateral"
           />
         ) : null}
 
@@ -129,7 +129,7 @@ export function AppShell({ profile, children }: AppShellProps) {
                 type="button"
                 className="rounded-full p-2 text-[var(--foreground)] transition hover:bg-white/80 md:hidden"
                 onClick={() => setMobileOpen(true)}
-                aria-label="Abrir menu lateral"
+                aria-label="Abrir menú lateral"
                 aria-expanded={mobileOpen}
                 aria-controls="app-navigation"
               >
@@ -143,7 +143,7 @@ export function AppShell({ profile, children }: AppShellProps) {
 
             <div className="flex w-full items-center justify-end gap-3 sm:w-auto">
               <div className="hidden rounded-full border border-[var(--line)] bg-white/70 px-4 py-2 text-sm text-[var(--muted)] md:block">
-                Operacion del mes en ARS
+                Operación del mes en ARS
               </div>
               <div className="rounded-full border border-[var(--line)] bg-white/70 px-4 py-2 text-sm text-[var(--muted)]">
                 Sin alertas nuevas

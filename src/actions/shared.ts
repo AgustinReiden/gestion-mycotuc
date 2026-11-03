@@ -54,7 +54,7 @@ export async function getAuthenticatedClient() {
   } = await supabase.auth.getUser();
 
   if (!user) {
-    throw new Error("Tu sesion expiro. Volve a iniciar sesion.");
+    throw new Error("Tu sesión expiró. Volvé a iniciar sesión.");
   }
 
   return { supabase, user };
@@ -65,7 +65,7 @@ function getErrorMessage(error: unknown) {
     return error.message;
   }
 
-  return "Ocurrio un error inesperado.";
+  return "Ocurrió un error inesperado.";
 }
 
 /** Id de la fila que devuelve una RPC (o null si no vino). */

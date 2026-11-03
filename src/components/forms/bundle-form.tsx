@@ -199,7 +199,7 @@ export function BundleForm({ bundle, products, onSuccess }: BundleFormProps) {
               {...field}
               value={toInputValue(field.value)}
               rows={3}
-              placeholder="Presentacion, promocion o condiciones del combo."
+              placeholder="Presentación, promoción o condiciones del combo."
             />
           )}
         />

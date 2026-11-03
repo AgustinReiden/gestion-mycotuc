@@ -41,12 +41,12 @@ export function LoginForm({ notice = null }: LoginFormProps) {
         />
       </Field>
 
-      <Field label="Contrasena">
+      <Field label="Contraseña">
         <TextInput
           type="password"
           value={password}
           onChange={(event) => setPassword(event.target.value)}
-          placeholder="Tu contrasena"
+          placeholder="Tu contraseña"
           autoComplete="current-password"
         />
       </Field>

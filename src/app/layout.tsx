@@ -13,8 +13,8 @@ const bodyFont = Manrope({
 });
 
 export const metadata: Metadata = {
-  title: "Mycotuc Gestion",
-  description: "Sistema de gestion para el emprendimiento Mycotuc.",
+  title: "Mycotuc Gestión",
+  description: "Sistema de gestión para el emprendimiento Mycotuc.",
 };
 
 export default function RootLayout({

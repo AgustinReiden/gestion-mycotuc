@@ -18,6 +18,7 @@ import {
 import { BATCH_STATUSES } from "@/lib/constants";
 import type { ProductRecord, ProductionBatchRecord, SupplyRecord } from "@/lib/domain";
 import { productionBatchFormSchema } from "@/lib/validators";
+import { todayISO } from "@/lib/utils";
 
 type ProductionBatchValues = z.input<typeof productionBatchFormSchema>;
 type ProductionBatchSubmitValues = z.output<typeof productionBatchFormSchema>;
@@ -75,7 +76,7 @@ function getDefaultValues(
     id: batch?.id,
     productId: batch?.productId ?? products[0]?.id ?? "",
     status: batch?.status ?? "draft",
-    startedAt: batch?.startedAt ?? new Date().toISOString().slice(0, 10),
+    startedAt: batch?.startedAt ?? todayISO(),
     completedAt: batch?.completedAt ?? "",
     expectedQty: batch?.expectedQty ?? null,
     actualQty: batch?.actualQty ?? null,
@@ -160,7 +161,7 @@ export function ProductionBatchForm({ batch, products, supplies, onSuccess }: Pr
           if (!hasProductOptions) {
             setFeedback({
               tone: "error",
-              message: "No podemos guardar el lote todavia: falta al menos un producto disponible.",
+              message: "No podemos guardar el lote todavía: falta al menos un producto disponible.",
             });
             return;
           }
@@ -191,7 +192,7 @@ export function ProductionBatchForm({ batch, products, supplies, onSuccess }: Pr
       {hasHistoricalReferences ? (
         <ActionNotice
           tone="warning"
-          message="Este lote incluye referencias historicas a productos o insumos no activos. Se mantendran para evitar perder trazabilidad."
+          message="Este lote incluye referencias históricas a productos o insumos no activos. Se mantendrán para evitar perder trazabilidad."
         />
       ) : null}
 

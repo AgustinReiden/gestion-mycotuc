@@ -29,7 +29,7 @@ function validatePaymentFields(
     ctx.addIssue({
       code: "custom",
       path: ["paymentStatus"],
-      message: "Una venta pendiente no debe tener metodo ni fecha de cobro.",
+      message: "Una venta pendiente no debe tener método ni fecha de cobro.",
     });
   }
 
@@ -37,14 +37,14 @@ function validatePaymentFields(
     ctx.addIssue({
       code: "custom",
       path: ["paymentMethod"],
-      message: "Las ventas cobradas o parciales requieren metodo y fecha de cobro.",
+      message: "Las ventas cobradas o parciales requieren método y fecha de cobro.",
     });
   }
 }
 
 export const loginSchema = z.object({
-  email: z.email("Ingresa un email valido."),
-  password: z.string().min(6, "La contrasena debe tener al menos 6 caracteres."),
+  email: z.email("Ingresa un email válido."),
+  password: z.string().min(6, "La contraseña debe tener al menos 6 caracteres."),
 });
 
 export const contactFormSchema = z.object({
@@ -60,10 +60,10 @@ export const contactFormSchema = z.object({
 export const productFormSchema = z.object({
   id: z.string().uuid().optional(),
   name: z.string().trim().min(2, "El nombre es obligatorio."),
-  category: z.string().trim().min(1, "Selecciona una categoria."),
+  category: z.string().trim().min(1, "Selecciona una categoría."),
   unit: z.string().trim().min(1, "La unidad es obligatoria."),
   salePrice: z.coerce.number().nonnegative("El precio no puede ser negativo."),
-  minStock: z.coerce.number().nonnegative("El stock minimo no puede ser negativo."),
+  minStock: z.coerce.number().nonnegative("El stock mínimo no puede ser negativo."),
   notes: optionalTrimmedString,
   isActive: z.boolean().default(true),
 });
@@ -72,7 +72,7 @@ export const supplyFormSchema = z.object({
   id: z.string().uuid().optional(),
   name: z.string().trim().min(2, "El nombre es obligatorio."),
   unit: z.string().trim().min(1, "La unidad es obligatoria."),
-  minStock: z.coerce.number().nonnegative("El stock minimo no puede ser negativo."),
+  minStock: z.coerce.number().nonnegative("El stock mínimo no puede ser negativo."),
   notes: optionalTrimmedString,
   isActive: z.boolean().default(true),
 });
@@ -80,7 +80,7 @@ export const supplyFormSchema = z.object({
 export const stockAdjustmentSchema = z.object({
   entityType: z.enum(["product", "supply"]),
   entityId: z.string().uuid(),
-  quantity: z.coerce.number().refine((value) => value !== 0, "La variacion no puede ser 0."),
+  quantity: z.coerce.number().refine((value) => value !== 0, "La variación no puede ser 0."),
   notes: z.string().trim().min(3, "El motivo del ajuste es obligatorio."),
   movementDate: z.string().min(1, "La fecha es obligatoria."),
 });
@@ -88,7 +88,7 @@ export const stockAdjustmentSchema = z.object({
 export const expenseFormSchema = z.object({
   concept: z.string().trim().min(2, "El concepto es obligatorio."),
   expenseDate: z.string().min(1, "La fecha es obligatoria."),
-  categoryId: z.string().uuid("Selecciona una categoria."),
+  categoryId: z.string().uuid("Selecciona una categoría."),
   amount: z.coerce.number().positive("El monto debe ser mayor a cero."),
   notes: optionalTrimmedString,
 });
@@ -123,13 +123,13 @@ export const saleItemSchema = z
       ctx.addIssue({
         code: "custom",
         path: ["productId"],
-        message: "Cada linea es un producto o un combo, no ambos.",
+        message: "Cada línea es un producto o un combo, no ambos.",
       });
     }
   });
 
 export const priceTierSchema = z.object({
-  minQty: z.coerce.number().positive("La cantidad minima debe ser mayor a cero."),
+  minQty: z.coerce.number().positive("La cantidad mínima debe ser mayor a cero."),
   unitPrice: z.coerce.number().positive("El precio unitario debe ser mayor a cero."),
 });
 
@@ -146,7 +146,7 @@ export const priceTiersFormSchema = z
         ctx.addIssue({
           code: "custom",
           path: ["tiers", index, "minQty"],
-          message: "No puede haber dos escalas con la misma cantidad minima.",
+          message: "No puede haber dos escalas con la misma cantidad mínima.",
         });
       }
 
@@ -207,7 +207,7 @@ export const saleOrderFormSchema = z
     paidAt: optionalTrimmedString,
     amountPaid: optionalAmount,
     notes: optionalTrimmedString,
-    items: z.array(saleItemSchema).min(1, "Agrega al menos un item."),
+    items: z.array(saleItemSchema).min(1, "Agrega al menos un ítem."),
   })
   .superRefine((data, ctx) => {
     validatePaymentFields(data, ctx);
@@ -247,7 +247,7 @@ export const purchaseFormSchema = z.object({
   supplierId: z.string().uuid("Selecciona un proveedor."),
   purchaseDate: z.string().min(1, "La fecha es obligatoria."),
   notes: optionalTrimmedString,
-  items: z.array(purchaseItemSchema).min(1, "Agrega al menos un item."),
+  items: z.array(purchaseItemSchema).min(1, "Agrega al menos un ítem."),
 });
 
 export const productionInputSchema = z.object({
@@ -331,5 +331,5 @@ export const paymentStatusUpdateSchema = z
 
 export const reversalSchema = z.object({
   id: z.string().uuid(),
-  reason: z.string().trim().min(3, "El motivo de la anulacion es obligatorio."),
+  reason: z.string().trim().min(3, "El motivo de la anulación es obligatorio."),
 });

@@ -10,7 +10,7 @@ export default function NotFound() {
         <div className="mb-6 flex h-16 w-16 items-center justify-center rounded-2xl bg-[#fcf0d9] text-[#b77f28]">
           <AlertCircle className="h-8 w-8" />
         </div>
-        <h2 className="text-3xl font-semibold">Pagina no encontrada</h2>
+        <h2 className="text-3xl font-semibold">Página no encontrada</h2>
         <p className="mt-3 text-[var(--muted)]">
           La ruta a la que intentas acceder no existe o fue movida.
         </p>

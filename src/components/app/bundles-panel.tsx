@@ -73,11 +73,11 @@ export function BundlesPanel({ bundles, products, isAdmin, onBundleSaved }: Bund
       {bundles.length === 0 ? (
         <div className="mt-5">
           <EmptyState
-            title="Todavia no hay combos"
+            title="Todavía no hay combos"
             description={
               isAdmin
                 ? "Crea un combo para vender varios productos con un precio fijo."
-                : "Cuando un administrador cree combos, vas a verlos aca."
+                : "Cuando un administrador cree combos, vas a verlos acá."
             }
             icon={Boxes}
           />

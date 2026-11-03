@@ -5,6 +5,7 @@ import { CACHE_TAGS } from "@/lib/cache";
 import { ANONYMOUS_CUSTOMER_NAME } from "@/lib/constants";
 import type { ActionResponse, ContactRecord, SaleOrderRecord } from "@/lib/domain";
 import { mapContact } from "@/lib/mappers";
+import { escapeLikePattern } from "@/lib/search";
 import {
   paymentStatusUpdateSchema,
   reversalSchema,
@@ -29,6 +30,14 @@ import {
 } from "./shared";
 
 type SaleOrderInput = z.output<typeof saleOrderFormSchema>;
+
+function fillIfEmpty(current: string | null, incoming: string | null | undefined) {
+  if (current && current.trim() !== "") {
+    return current;
+  }
+
+  return incoming ?? current ?? null;
+}
 
 async function updateContactRecord(
   supabase: SupabaseServerClient,
@@ -69,7 +78,7 @@ async function ensureAnonymousCustomer(supabase: SupabaseServerClient) {
     .select("*")
     .eq("type", "client")
     .eq("is_active", true)
-    .ilike("name", ANONYMOUS_CUSTOMER_NAME)
+    .ilike("name", escapeLikePattern(ANONYMOUS_CUSTOMER_NAME))
     .order("created_at", { ascending: true })
     .limit(1)
     .maybeSingle();
@@ -112,10 +121,11 @@ async function resolveSaleContact(
       throw new Error("No encontramos el cliente seleccionado.");
     }
 
+    // No se pisan datos existentes: solo se completan teléfono/email que falten.
     return updateContactRecord(supabase, existingContact, {
-      name: input.customerName ?? existingContact.name,
-      phone: input.customerPhone ?? existingContact.phone,
-      email: input.customerEmail ?? existingContact.email,
+      name: existingContact.name,
+      phone: fillIfEmpty(existingContact.phone, input.customerPhone),
+      email: fillIfEmpty(existingContact.email, input.customerEmail),
     });
   }
 
@@ -130,7 +140,7 @@ async function resolveSaleContact(
     .select("*")
     .eq("type", "client")
     .eq("is_active", true)
-    .ilike("name", customerName)
+    .ilike("name", escapeLikePattern(customerName))
     .order("created_at", { ascending: true })
     .limit(1)
     .maybeSingle();
@@ -140,10 +150,11 @@ async function resolveSaleContact(
   }
 
   if (data) {
+    // Cliente ya existente: se conserva su nombre y se completan solo los datos vacíos.
     return updateContactRecord(supabase, mapContact(data), {
-      name: customerName,
-      phone: input.customerPhone ?? data.phone,
-      email: input.customerEmail ?? data.email,
+      name: data.name,
+      phone: fillIfEmpty(data.phone, input.customerPhone),
+      email: fillIfEmpty(data.email, input.customerEmail),
     });
   }
 
@@ -200,7 +211,7 @@ export async function createSaleOrderAction(
     const sale = saleId ? await getSaleOrderRecord(supabase, saleId) : null;
 
     if (!sale) {
-      throw new Error("La venta se guardo, pero no pudimos recuperar el detalle actualizado.");
+      throw new Error("La venta se guardó, pero no pudimos recuperar el detalle actualizado.");
     }
 
     refreshTags(

@@ -65,11 +65,11 @@ export type NavItem = {
 
 export const APP_NAVIGATION: NavItem[] = [
   { href: "/dashboard", label: "Dashboard", title: "Resumen operativo", icon: Home },
-  { href: "/ventas", label: "Ventas", title: "Gestion de ventas", icon: ShoppingCart },
+  { href: "/ventas", label: "Ventas", title: "Gestión de ventas", icon: ShoppingCart },
   { href: "/gastos", label: "Gastos", title: "Control de gastos", icon: Wallet },
   { href: "/productos", label: "Productos", title: "Inventario de productos", icon: Package },
   { href: "/insumos", label: "Insumos", title: "Stock de insumos", icon: Archive },
-  { href: "/produccion", label: "Produccion", title: "Lotes y rendimiento", icon: Sprout },
+  { href: "/produccion", label: "Producción", title: "Lotes y rendimiento", icon: Sprout },
   { href: "/contactos", label: "Contactos", title: "Clientes y proveedores", icon: ClipboardList },
-  { href: "/reportes", label: "Reportes", title: "Analisis y metricas", icon: BarChart3 },
+  { href: "/reportes", label: "Reportes", title: "Análisis y métricas", icon: BarChart3 },
 ];
