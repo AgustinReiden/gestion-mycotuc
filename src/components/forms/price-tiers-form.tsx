@@ -25,6 +25,8 @@ type PriceTiersFormProps = {
 };
 
 export function PriceTiersForm({ product, tiers, onSuccess }: PriceTiersFormProps) {
+  "use no memo";
+
   const [pending, startTransition] = useTransition();
   const [feedback, setFeedback] = useState<{ tone: "success" | "error"; message: string } | null>(null);
   const form = useForm<PriceTiersFormValues, unknown, PriceTiersFormOutput>({
@@ -64,9 +66,9 @@ export function PriceTiersForm({ product, tiers, onSuccess }: PriceTiersFormProp
         },
       )}
     >
-      <div className="rounded-2xl border border-[var(--line)] bg-[#f7f5ef] px-4 py-3 text-sm text-[var(--muted)]">
+      <div className="rounded-[var(--radius-control)] border border-[var(--line)] bg-[var(--surface-2)] px-3.5 py-3 text-sm text-[var(--muted)]">
         Precio base de {product.name}: <strong>{formatCurrency(product.salePrice)}</strong>. Se aplica la
-        escala mas alta alcanzada por la cantidad total del producto en la venta; si no se alcanza
+        escala más alta alcanzada por la cantidad total del producto en la venta; si no se alcanza
         ninguna, se usa el precio base.
       </div>
 
@@ -79,7 +81,7 @@ export function PriceTiersForm({ product, tiers, onSuccess }: PriceTiersFormProp
         {rows.fields.map((field, index) => (
           <div
             key={field.id}
-            className="grid gap-3 rounded-[24px] border border-[var(--line)] bg-white/90 p-4 md:grid-cols-[1fr_1fr_auto]"
+            className="grid gap-3 rounded-[var(--radius-card)] border border-[var(--line)] bg-[var(--surface)] p-3.5 sm:grid-cols-[1fr_1fr_auto]"
           >
             <Field
               label="Cantidad mínima"
@@ -96,6 +98,7 @@ export function PriceTiersForm({ product, tiers, onSuccess }: PriceTiersFormProp
                     onBlur={rowField.onBlur}
                     onChange={(event) => rowField.onChange(toNumberValue(event.target.value))}
                     type="number"
+                    inputMode="decimal"
                     min="0.01"
                     step="0.01"
                   />
@@ -117,6 +120,7 @@ export function PriceTiersForm({ product, tiers, onSuccess }: PriceTiersFormProp
                     onBlur={rowField.onBlur}
                     onChange={(event) => rowField.onChange(toNumberValue(event.target.value))}
                     type="number"
+                    inputMode="decimal"
                     min="0.01"
                     step="0.01"
                   />
@@ -127,6 +131,7 @@ export function PriceTiersForm({ product, tiers, onSuccess }: PriceTiersFormProp
               <Button
                 type="button"
                 variant="ghost"
+                className="text-[var(--danger)]"
                 aria-label={`Quitar escala ${index + 1}`}
                 onClick={() => rows.remove(index)}
               >
@@ -147,7 +152,7 @@ export function PriceTiersForm({ product, tiers, onSuccess }: PriceTiersFormProp
       </Button>
 
       {preview.length > 0 ? (
-        <div className="rounded-2xl border border-[var(--line)] bg-[#eef4ea] px-4 py-3 text-sm text-[#1e5f44]">
+        <div className="rounded-[var(--radius-control)] border border-[var(--line)] bg-[var(--moss-soft)] px-3.5 py-3 text-sm text-[var(--moss)]">
           <p className="font-semibold">Así quedan ordenadas</p>
           <ul className="mt-1 space-y-1">
             {preview.map((tier, index) => (
@@ -161,8 +166,8 @@ export function PriceTiersForm({ product, tiers, onSuccess }: PriceTiersFormProp
 
       {feedback ? <ActionNotice tone={feedback.tone} message={feedback.message} /> : null}
 
-      <div className="flex justify-end">
-        <Button type="submit" busy={pending}>
+      <div className="sheet-actions flex items-center justify-end gap-2">
+        <Button type="submit" size="lg" busy={pending}>
           Guardar escalas
         </Button>
       </div>

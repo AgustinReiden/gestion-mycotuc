@@ -43,8 +43,6 @@ export type SaleOrderItemRow = Pick<
   Tables["sales_order_items"]["Row"],
   "id" | "product_id" | "bundle_id" | "quantity" | "unit_price" | "list_price" | "line_total"
 > & {
-  /** Solo viaja en las consultas de lectura; las acciones no lo seleccionan. */
-  unit_cost?: number | null;
   products: NameEmbed;
   product_bundles: NameEmbed;
 };
@@ -124,13 +122,9 @@ export type ProductionBatchRow = Pick<
   | "void_reason"
   | "created_at"
 > & {
-  /** Los costos solo viajan en las consultas de lectura; las acciones no los seleccionan. */
-  total_cost?: number | null;
-  unit_cost?: number | null;
   products: NameEmbed;
   production_batch_inputs: Array<
     Pick<Tables["production_batch_inputs"]["Row"], "id" | "supply_id" | "quantity"> & {
-      unit_cost?: number | null;
       supplies: NameEmbed;
     }
   >;
@@ -210,7 +204,9 @@ export function mapSaleItem(record: SaleOrderItemRow): SaleOrderItemRecord {
         : toNumber(record.list_price),
     bundleId: record.bundle_id ?? null,
     bundleName: record.product_bundles?.name ?? null,
-    unitCost: toNullableNumber(record.unit_cost),
+    // Los costos no se leen de la tabla (authenticated no tiene SELECT de esa columna):
+    // queries.ts los completa para admin con get_sale_item_costs().
+    unitCost: null,
   };
 }
 
@@ -350,8 +346,9 @@ export function mapBatch(record: ProductionBatchRow): ProductionBatchRecord {
     actualQty: record.actual_qty === null ? null : toNumber(record.actual_qty),
     notes: record.notes ?? null,
     inventoryPostedAt: record.inventory_posted_at ?? null,
-    totalCost: toNullableNumber(record.total_cost),
-    unitCost: toNullableNumber(record.unit_cost),
+    // Costos en null: queries.ts los completa para admin con get_batch_costs().
+    totalCost: null,
+    unitCost: null,
     isVoided: Boolean(record.voided_at),
     voidedAt: record.voided_at ?? null,
     voidReason: record.void_reason ?? null,
@@ -361,7 +358,7 @@ export function mapBatch(record: ProductionBatchRow): ProductionBatchRecord {
       supplyId: String(input.supply_id ?? ""),
       supplyName: String(input.supplies?.name ?? "Insumo"),
       quantity: toNumber(input.quantity),
-      unitCost: toNullableNumber(input.unit_cost),
+      unitCost: null,
     })),
     outputs: record.production_batch_outputs.map((output) => ({
       id: String(output.id ?? ""),

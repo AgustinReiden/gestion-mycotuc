@@ -7,14 +7,14 @@ export default function NotFound() {
   return (
     <div className="flex min-h-[70vh] items-center justify-center p-4">
       <Panel className="flex max-w-md flex-col items-center justify-center text-center">
-        <div className="mb-6 flex h-16 w-16 items-center justify-center rounded-2xl bg-[#fcf0d9] text-[#b77f28]">
+        <div className="mb-5 flex h-16 w-16 items-center justify-center rounded-[var(--radius-card)] bg-[var(--amber-soft)] text-[var(--amber-ink)]">
           <AlertCircle className="h-8 w-8" />
         </div>
-        <h2 className="text-3xl font-semibold">Página no encontrada</h2>
+        <h2 className="text-2xl font-semibold">Página no encontrada</h2>
         <p className="mt-3 text-[var(--muted)]">
-          La ruta a la que intentas acceder no existe o fue movida.
+          La ruta a la que intentás acceder no existe o fue movida.
         </p>
-        <Button asChild className="mt-8">
+        <Button asChild size="lg" className="mt-6 w-full sm:w-auto">
           <Link href="/">Volver al inicio</Link>
         </Button>
       </Panel>

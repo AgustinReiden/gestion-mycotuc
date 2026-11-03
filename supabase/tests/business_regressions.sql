@@ -1,4 +1,5 @@
--- Pruebas de regresion de la base (roles, catalogo, precios, stock, costos, cobros, anulaciones).
+-- Pruebas de regresion de la base (roles, catalogo, precios, stock, costos, cobros, anulaciones,
+-- costos solo para admin y stock inicial con costo).
 --
 -- Como correrlo: en el SQL Editor de Supabase (o psql) de una base con TODAS las migraciones
 -- aplicadas. No deja datos: todo ocurre en una sola transaccion que termina con una excepcion
@@ -32,6 +33,34 @@ exception when others then
 end;
 $$;
 
+-- Intento real de lectura como el rol "authenticated" (lo que hace PostgREST).
+-- Devuelve 'allowed', 'denied' o 'skip: ...' cuando el entorno no permite SET ROLE
+-- (p. ej. si la suite corre dentro de una funcion SECURITY DEFINER como run_sql).
+-- La subtransaccion siempre se revierte, asi que el rol vuelve al original.
+create or replace function pg_temp.select_as_authenticated(p_sql text)
+returns text
+language plpgsql
+as $$
+begin
+  -- el SET ROLE va aparte: dentro de SECURITY DEFINER falla tambien con insufficient_privilege
+  begin
+    set local role authenticated;
+  exception when others then
+    return 'skip: ' || sqlerrm;
+  end;
+  execute p_sql;
+  raise exception 'SELECT_OK';
+exception
+  when insufficient_privilege then
+    return 'denied';
+  when others then
+    if sqlerrm = 'SELECT_OK' then
+      return 'allowed';
+    end if;
+    return 'skip: ' || sqlerrm;
+end;
+$$;
+
 create or replace function pg_temp.as_user(p_user uuid)
 returns void
 language sql
@@ -59,6 +88,11 @@ declare
   v_val numeric;
   v_val2 numeric;
   v_cnt integer;
+  v_s_ajuste uuid;
+  v_fresco uuid;
+  v_product public.products;
+  v_text text;
+  v_col record;
 begin
   -- ---------------------------------------------------------------- roles
   insert into auth.users (id, email, aud, role) values (v_admin, 'admin-test@example.com', 'authenticated', 'authenticated');
@@ -197,6 +231,121 @@ begin
   perform pg_temp.check_that(pg_temp.fails(format($q$ select public.reverse_supply_purchase(jsonb_build_object('purchaseId',%L,'reason','x1')) $q$, v_purchase.id)),
     'no se anula una compra cuyo insumo ya se consumio'); n := n + 1;
 
-  raise exception 'PASS: % verificaciones OK (transaccion revertida, no queda nada)', n;
+  -- ---------------------------------------------------------------- costos solo para admin (B2)
+  for v_col in
+    select * from (values
+      ('public.products', 'avg_cost'), ('public.supplies', 'avg_cost'),
+      ('public.sales_order_items', 'unit_cost'), ('public.purchase_items', 'unit_cost'),
+      ('public.purchase_items', 'line_total'), ('public.production_batches', 'total_cost'),
+      ('public.production_batches', 'unit_cost'), ('public.production_batch_inputs', 'unit_cost'),
+      ('public.production_batch_outputs', 'unit_cost')
+    ) t (tbl, col)
+  loop
+    perform pg_temp.check_that(not has_column_privilege('authenticated', v_col.tbl, v_col.col, 'select'),
+      format('authenticated no lee %s.%s', v_col.tbl, v_col.col)); n := n + 1;
+    perform pg_temp.check_that(not has_table_privilege('authenticated', v_col.tbl, 'select'),
+      format('authenticated no tiene SELECT de tabla en %s', v_col.tbl));
+  end loop;
+  perform pg_temp.check_that(has_column_privilege('authenticated', 'public.products', 'name', 'select')
+    and has_column_privilege('authenticated', 'public.sales_order_items', 'unit_price', 'select')
+    and has_column_privilege('authenticated', 'public.production_batches', 'status', 'select'),
+    'authenticated sigue leyendo las columnas que no son costo'); n := n + 1;
+  perform pg_temp.check_that(not has_table_privilege('anon', 'public.products', 'select'),
+    'anon no lee productos'); n := n + 1;
+  perform pg_temp.check_that(not has_function_privilege('anon', 'public.get_product_costs()', 'execute'),
+    'anon no ejecuta get_product_costs'); n := n + 1;
+  perform pg_temp.check_that(not has_function_privilege('authenticated', 'public.upsert_product_core(jsonb)', 'execute'),
+    'authenticated no ejecuta upsert_product_core'); n := n + 1;
+
+  -- intento real como authenticated (se omite si el entorno no deja hacer SET ROLE)
+  v_text := pg_temp.select_as_authenticated('select avg_cost from public.products limit 1');
+  if v_text like 'skip:%' then
+    raise notice 'Intento real como authenticated omitido (%)', v_text;
+  else
+    perform pg_temp.check_that(v_text = 'denied', 'authenticated no puede select avg_cost (intento real)'); n := n + 1;
+    perform pg_temp.check_that(pg_temp.select_as_authenticated('select * from public.sales_order_items limit 1') = 'denied',
+      'select * sobre una tabla con costos falla para authenticated'); n := n + 1;
+    perform pg_temp.check_that(pg_temp.select_as_authenticated('select id, name, sale_price from public.products limit 1') = 'allowed',
+      'authenticated lee columnas sin costo (intento real)'); n := n + 1;
+    perform pg_temp.check_that(pg_temp.select_as_authenticated('select * from public.product_inventory_overview limit 1') = 'allowed',
+      'la vista de inventario sigue funcionando para authenticated'); n := n + 1;
+  end if;
+
+  perform pg_temp.as_user(v_oper);
+  perform pg_temp.check_that(pg_temp.fails('select * from public.get_product_costs()'),
+    'operador no puede leer costos de productos por funcion'); n := n + 1;
+  perform pg_temp.check_that(pg_temp.fails('select * from public.get_sale_item_costs()'),
+    'operador no puede leer costos de ventas por funcion'); n := n + 1;
+  v_product := public.upsert_product(jsonb_build_object('id', v_sal, 'name', 'Sal Test', 'category', 'Sales',
+    'unit', 'bolsa', 'salePrice', 500, 'minStock', 0));
+  perform pg_temp.check_that(v_product.id = v_sal and v_product.avg_cost is null,
+    'upsert_product no devuelve avg_cost al operador'); n := n + 1;
+
+  perform pg_temp.as_user(v_admin);
+  select avg_cost into v_val from public.get_product_costs() where id = v_sal;
+  perform pg_temp.check_that(v_val = 70, 'admin lee el costo promedio por funcion'); n := n + 1;
+  select count(*) into v_cnt from public.get_batch_costs() where id = v_batch.id and total_cost = 700;
+  perform pg_temp.check_that(v_cnt = 1, 'admin lee el costo del lote por funcion'); n := n + 1;
+  v_product := public.upsert_product(jsonb_build_object('id', v_sal, 'name', 'Sal Test', 'category', 'Sales',
+    'unit', 'bolsa', 'salePrice', 500, 'minStock', 0));
+  perform pg_temp.check_that(v_product.avg_cost = 70, 'upsert_product devuelve avg_cost al admin'); n := n + 1;
+
+  -- ---------------------------------------------------------------- stock inicial con costo (B6)
+  insert into public.supplies (name, unit) values ('Insumo ajuste Test', 'u') returning id into v_s_ajuste;
+  perform public.apply_stock_adjustment(jsonb_build_object('entityType', 'supply', 'entityId', v_s_ajuste,
+    'quantity', 10, 'notes', 'stock inicial sin costo'));
+  select avg_cost into v_val from public.supplies where id = v_s_ajuste;
+  perform pg_temp.check_that(v_val = 0, 'ajuste sin costo no fija promedio'); n := n + 1;
+  perform public.register_supply_purchase(jsonb_build_object('supplierId', v_supplier, 'items', jsonb_build_array(
+    jsonb_build_object('supplyId', v_s_ajuste, 'quantity', 10, 'unitCost', 100))));
+  select avg_cost into v_val from public.supplies where id = v_s_ajuste;
+  perform pg_temp.check_that(v_val = 100, 'ajuste sin costo no diluye: 10 u sin costo + compra 10 @ 100 -> avg 100'); n := n + 1;
+  perform public.apply_stock_adjustment(jsonb_build_object('entityType', 'supply', 'entityId', v_s_ajuste,
+    'quantity', 10, 'unitCost', 200, 'notes', 'stock encontrado con factura'));
+  select avg_cost into v_val from public.supplies where id = v_s_ajuste;
+  perform pg_temp.check_that(v_val = 133.3333, 'ajuste con costo pondera: (20 x 100 + 10 x 200) / 30'); n := n + 1;
+  perform public.apply_stock_adjustment(jsonb_build_object('entityType', 'supply', 'entityId', v_s_ajuste,
+    'quantity', 5, 'notes', 'sobrante sin costo'));
+  select avg_cost into v_val from public.supplies where id = v_s_ajuste;
+  perform pg_temp.check_that(v_val = 133.3333, 'ajuste sin costo con promedio vigente no lo cambia'); n := n + 1;
+  select count(*) into v_cnt from public.average_cost_changes
+  where entity_id = v_s_ajuste and source = 'stock_adjustment' and previous_avg_cost = 100 and new_avg_cost = 133.3333;
+  perform pg_temp.check_that(v_cnt = 1, 'el ajuste con costo queda auditado'); n := n + 1;
+
+  insert into public.products (name, category, unit, sale_price) values ('Hongo fresco Test', 'Hongos Frescos', 'kg', 300)
+  returning id into v_fresco;
+  perform public.apply_stock_adjustment(jsonb_build_object('entityType', 'product', 'entityId', v_fresco,
+    'quantity', 10, 'unitCost', 50, 'notes', 'stock inicial'));
+  select avg_cost into v_val from public.products where id = v_fresco;
+  perform pg_temp.check_that(v_val = 50, 'ajuste con costo fija el promedio del producto'); n := n + 1;
+  perform pg_temp.check_that(pg_temp.fails(format($q$ select public.apply_stock_adjustment(jsonb_build_object('entityType','product','entityId',%L,'quantity',-1,'unitCost',10,'notes','x')) $q$, v_fresco)),
+    'costo unitario en ajuste negativo se rechaza'); n := n + 1;
+  perform pg_temp.check_that(pg_temp.fails(format($q$ select public.apply_stock_adjustment(jsonb_build_object('entityType','product','entityId',%L,'quantity',1,'unitCost',0,'notes','x')) $q$, v_fresco)),
+    'costo unitario cero se rechaza'); n := n + 1;
+
+  -- ---------------------------------------------------------------- correccion manual del promedio
+  perform pg_temp.as_user(v_oper);
+  perform pg_temp.check_that(pg_temp.fails(format($q$ select public.set_average_cost(jsonb_build_object('entityType','product','entityId',%L,'avgCost',10,'reason','x')) $q$, v_fresco)),
+    'operador no puede corregir el costo promedio'); n := n + 1;
+  perform pg_temp.as_user(v_admin);
+  perform pg_temp.check_that(pg_temp.fails(format($q$ select public.set_average_cost(jsonb_build_object('entityType','product','entityId',%L,'avgCost',10,'reason','  ')) $q$, v_fresco)),
+    'corregir el costo sin motivo se rechaza'); n := n + 1;
+  perform public.set_average_cost(jsonb_build_object('entityType', 'product', 'entityId', v_fresco, 'avgCost', 60, 'reason', 'costo real del proveedor'));
+  select avg_cost into v_val from public.products where id = v_fresco;
+  select count(*) into v_cnt from public.average_cost_changes
+  where entity_id = v_fresco and source = 'manual_correction' and previous_avg_cost = 50 and new_avg_cost = 60;
+  perform pg_temp.check_that(v_val = 60 and v_cnt = 1, 'set_average_cost corrige y deja registro'); n := n + 1;
+
+  -- ---------------------------------------------------------------- venta de producto sin costo
+  select avg_cost into v_val from public.products where id = v_ext;
+  perform pg_temp.check_that(v_val = 0, 'el extracto de prueba no tiene costo cargado'); n := n + 1;
+  v_order := public.create_sale_order(jsonb_build_object('contactId', v_client, 'channelId', v_channel, 'items', jsonb_build_array(
+    jsonb_build_object('productId', v_ext, 'quantity', 1), jsonb_build_object('productId', v_fresco, 'quantity', 1))));
+  select count(*) into v_cnt from public.sales_order_items where sales_order_id = v_order.id and product_id = v_ext and unit_cost is null;
+  perform pg_temp.check_that(v_cnt = 1, 'venta de producto sin costo guarda unit_cost null (no 0)'); n := n + 1;
+  select unit_cost into v_val from public.sales_order_items where sales_order_id = v_order.id and product_id = v_fresco;
+  perform pg_temp.check_that(v_val = 60, 'venta de producto con costo congela el promedio'); n := n + 1;
+
+  raise exception 'PASS: % verificaciones OK (transaccion revertida, no queda nada) [intento real: %]', n, v_text;
 end
 $$;

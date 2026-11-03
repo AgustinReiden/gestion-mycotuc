@@ -119,37 +119,26 @@ export function ReportsShell({
 
   return (
     <div className="page-grid">
-      <Panel>
-        <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
-          <div>
-            <p className="text-sm font-semibold uppercase tracking-[0.18em] text-[#55755e]">Reportes</p>
-            <h2 className="mt-2 text-3xl font-semibold">Analítica operativa</h2>
-            <p className="mt-2 text-sm text-[var(--muted)]">
-              Cruza ventas, gastos, lotes e inventario para leer el negocio por período.
-            </p>
-          </div>
-          <div className="grid gap-3 md:grid-cols-2">
-            <label className="space-y-2 text-sm font-semibold">
-              Desde
-              <input
-                type="date"
-                value={range.from}
-                onChange={(event) => setRange((current) => ({ ...current, from: event.target.value }))}
-                className="w-full rounded-2xl border border-[var(--line)] bg-white/80 px-4 py-3 font-normal"
-              />
-            </label>
-            <label className="space-y-2 text-sm font-semibold">
-              Hasta
-              <input
-                type="date"
-                value={range.to}
-                onChange={(event) => setRange((current) => ({ ...current, to: event.target.value }))}
-                className="w-full rounded-2xl border border-[var(--line)] bg-white/80 px-4 py-3 font-normal"
-              />
-            </label>
-          </div>
-        </div>
-      </Panel>
+      <div className="grid grid-cols-2 gap-3 md:max-w-xl">
+        <label className="grid gap-1.5 text-sm font-semibold text-[var(--ink-2)]">
+          Desde
+          <input
+            type="date"
+            value={range.from}
+            onChange={(event) => setRange((current) => ({ ...current, from: event.target.value }))}
+            className="min-h-12 w-full rounded-[var(--radius-control)] border border-[var(--line-strong)] bg-[var(--surface)] px-3 text-base font-normal text-[var(--foreground)] focus:border-[var(--foreground)]"
+          />
+        </label>
+        <label className="grid gap-1.5 text-sm font-semibold text-[var(--ink-2)]">
+          Hasta
+          <input
+            type="date"
+            value={range.to}
+            onChange={(event) => setRange((current) => ({ ...current, to: event.target.value }))}
+            className="min-h-12 w-full rounded-[var(--radius-control)] border border-[var(--line-strong)] bg-[var(--surface)] px-3 text-base font-normal text-[var(--foreground)] focus:border-[var(--foreground)]"
+          />
+        </label>
+      </div>
 
       {hasInvalidRange ? (
         <ActionNotice
@@ -158,35 +147,35 @@ export function ReportsShell({
         />
       ) : null}
 
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <Panel>
-          <p className="text-sm text-[var(--muted)]">Facturado</p>
-          <p className="mt-2 text-3xl font-semibold">{formatCurrency(totalSales)}</p>
+      <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
+        <Panel className="p-3.5 sm:p-4">
+          <p className="text-[13px] font-medium text-[var(--ink-2)]">Facturado</p>
+          <p className="font-[family-name:var(--font-heading)] text-2xl font-semibold tabular-nums">{formatCurrency(totalSales)}</p>
         </Panel>
-        <Panel>
-          <p className="text-sm text-[var(--muted)]">Cobrado</p>
-          <p className="mt-2 text-3xl font-semibold text-[#15553e]">
+        <Panel className="p-3.5 sm:p-4">
+          <p className="text-[13px] font-medium text-[var(--ink-2)]">Cobrado</p>
+          <p className="font-[family-name:var(--font-heading)] text-2xl font-semibold tabular-nums text-[var(--moss)]">
             {formatCurrency(totalCollected)}
           </p>
         </Panel>
-        <Panel>
-          <p className="text-sm text-[var(--muted)]">Gastos</p>
-          <p className="mt-2 text-3xl font-semibold text-[#934534]">{formatCurrency(totalExpenses)}</p>
+        <Panel className="p-3.5 sm:p-4">
+          <p className="text-[13px] font-medium text-[var(--ink-2)]">Gastos</p>
+          <p className="font-[family-name:var(--font-heading)] text-2xl font-semibold tabular-nums">{formatCurrency(totalExpenses)}</p>
         </Panel>
-        <Panel>
-          <p className="text-sm text-[var(--muted)]">Margen devengado</p>
-          <p className="mt-2 text-3xl font-semibold">{formatCurrency(totalSales - totalExpenses)}</p>
+        <Panel className="p-3.5 sm:p-4">
+          <p className="text-[13px] font-medium text-[var(--ink-2)]">Margen devengado</p>
+          <p className="font-[family-name:var(--font-heading)] text-2xl font-semibold tabular-nums">{formatCurrency(totalSales - totalExpenses)}</p>
         </Panel>
-        <Panel>
-          <p className="text-sm text-[var(--muted)]">Pendiente de cobro</p>
-          <p className="mt-2 text-3xl font-semibold text-[#8c5b17]">
+        <Panel className="p-3.5 sm:p-4">
+          <p className="text-[13px] font-medium text-[var(--ink-2)]">Pendiente de cobro</p>
+          <p className="font-[family-name:var(--font-heading)] text-2xl font-semibold tabular-nums text-[var(--amber-ink)]">
             {formatCurrency(pendingReceivables)}
           </p>
         </Panel>
         {totalMargin ? (
-          <Panel>
-            <p className="text-sm text-[var(--muted)]">Margen bruto (ventas - costo)</p>
-            <p className="mt-2 text-3xl font-semibold text-[#15553e]">
+          <Panel className="col-span-2 p-3.5 sm:p-4 xl:col-span-1">
+            <p className="text-[13px] font-medium text-[var(--ink-2)]">Margen bruto (ventas - costo)</p>
+            <p className="font-[family-name:var(--font-heading)] text-2xl font-semibold tabular-nums text-[var(--moss)]">
               {formatCurrency(totalMargin.margin)}
             </p>
             <p className="mt-1 text-sm text-[var(--muted)]">
@@ -199,8 +188,8 @@ export function ReportsShell({
       {isAdmin ? (
         <Panel>
           <div className="flex items-center gap-3">
-            <BarChart3 className="h-5 w-5 text-[#15553e]" />
-            <h3 className="text-2xl font-semibold">Margen por producto</h3>
+            <BarChart3 className="h-5 w-5 text-[var(--moss)]" />
+            <h3 className="text-xl font-semibold">Margen por producto</h3>
           </div>
           {totalMargin && totalMargin.missingCostLines > 0 ? (
             <p className="mt-2 text-sm text-[var(--muted)]">
@@ -208,13 +197,28 @@ export function ReportsShell({
             </p>
           ) : null}
           {marginByProduct.length === 0 ? (
-            <div className="mt-5 rounded-[24px] border border-[var(--line)] bg-white/80 p-4 text-sm text-[var(--muted)]">
+            <div className="mt-5 rounded-[var(--radius-card)] border border-[var(--line)] bg-[var(--surface)] p-3.5 text-sm text-[var(--muted)]">
               No hay ventas en el rango seleccionado.
             </div>
           ) : (
-            <div className="mt-5 overflow-x-auto rounded-[24px] border border-[var(--line)]">
+            <>
+            <ul className="mt-4 grid gap-2 md:hidden">
+              {marginByProduct.map((row) => (
+                <li key={row.productName} className="rounded-[var(--radius-card)] border border-[var(--line)] bg-[var(--surface)] p-3.5 text-sm">
+                  <div className="flex items-start justify-between gap-3">
+                    <p className="text-base font-semibold">{row.productName}</p>
+                    <p className="shrink-0 font-semibold text-[var(--moss)]">{formatPercent(row.marginPercent)}</p>
+                  </div>
+                  <p className="mt-1 text-[var(--muted)]">
+                    {formatQuantity(row.quantity)} un. · Ventas {formatCurrency(row.revenue)} · Costo {formatCurrency(row.cost)}
+                  </p>
+                  <p className="mt-1 font-semibold">Margen {formatCurrency(row.margin)}</p>
+                </li>
+              ))}
+            </ul>
+            <div className="mt-4 hidden overflow-x-auto rounded-[var(--radius-card)] border border-[var(--line)] md:block">
               <table className="min-w-full text-left text-sm">
-                <thead className="bg-[#f4f1e8] text-[var(--muted)]">
+                <thead className="bg-[var(--surface-2)] text-[var(--muted)]">
                   <tr>
                     <th className="px-4 py-3 font-medium">Producto</th>
                     <th className="px-4 py-3 font-medium">Unidades</th>
@@ -226,7 +230,7 @@ export function ReportsShell({
                 </thead>
                 <tbody>
                   {marginByProduct.map((row) => (
-                    <tr key={row.productName} className="border-t border-[var(--line)] bg-white/80">
+                    <tr key={row.productName} className="border-t border-[var(--line)] bg-[var(--surface)]">
                       <td className="px-4 py-3 font-semibold">{row.productName}</td>
                       <td className="px-4 py-3">{formatQuantity(row.quantity)}</td>
                       <td className="px-4 py-3">{formatCurrency(row.revenue)}</td>
@@ -238,19 +242,20 @@ export function ReportsShell({
                 </tbody>
               </table>
             </div>
+            </>
           )}
         </Panel>
       ) : null}
 
-      <div className="grid gap-4 xl:grid-cols-2">
+      <div className="grid gap-3 xl:grid-cols-2">
         <Panel>
           <div className="flex items-center gap-3">
-            <BarChart3 className="h-5 w-5 text-[#15553e]" />
-            <h3 className="text-2xl font-semibold">Ventas por producto</h3>
+            <BarChart3 className="h-5 w-5 text-[var(--moss)]" />
+            <h3 className="text-xl font-semibold">Ventas por producto</h3>
           </div>
-          <div className="mt-5 space-y-4">
+          <div className="mt-4 space-y-4">
             {topSalesByProduct.length === 0 ? (
-              <div className="rounded-[24px] border border-[var(--line)] bg-white/80 p-4 text-sm text-[var(--muted)]">
+              <div className="rounded-[var(--radius-card)] border border-[var(--line)] bg-[var(--surface)] p-3.5 text-sm text-[var(--muted)]">
                 No hay ventas en el rango seleccionado.
               </div>
             ) : (
@@ -260,9 +265,9 @@ export function ReportsShell({
                     <span>{name}</span>
                     <span className="font-semibold">{formatCurrency(amount)}</span>
                   </div>
-                  <div className="h-2 rounded-full bg-[#e8e3d7]">
+                  <div className="h-2 rounded-full bg-[var(--surface-2)] ring-1 ring-inset ring-[var(--line)]">
                     <div
-                      className="h-2 rounded-full bg-[#2f8d62]"
+                      className="h-2 rounded-full bg-[var(--moss)]"
                       style={{ width: `${totalSales > 0 ? Math.round((amount / totalSales) * 100) : 0}%` }}
                     />
                   </div>
@@ -274,12 +279,12 @@ export function ReportsShell({
 
         <Panel>
           <div className="flex items-center gap-3">
-            <BarChart3 className="h-5 w-5 text-[#934534]" />
-            <h3 className="text-2xl font-semibold">Gastos por categoría</h3>
+            <BarChart3 className="h-5 w-5 text-[var(--danger)]" />
+            <h3 className="text-xl font-semibold">Gastos por categoría</h3>
           </div>
-          <div className="mt-5 space-y-4">
+          <div className="mt-4 space-y-4">
             {topExpensesByCategory.length === 0 ? (
-              <div className="rounded-[24px] border border-[var(--line)] bg-white/80 p-4 text-sm text-[var(--muted)]">
+              <div className="rounded-[var(--radius-card)] border border-[var(--line)] bg-[var(--surface)] p-3.5 text-sm text-[var(--muted)]">
                 No hay gastos en el rango seleccionado.
               </div>
             ) : (
@@ -289,9 +294,9 @@ export function ReportsShell({
                     <span>{name}</span>
                     <span className="font-semibold">{formatCurrency(amount)}</span>
                   </div>
-                  <div className="h-2 rounded-full bg-[#e8e3d7]">
+                  <div className="h-2 rounded-full bg-[var(--surface-2)] ring-1 ring-inset ring-[var(--line)]">
                     <div
-                      className="h-2 rounded-full bg-[#c45d49]"
+                      className="h-2 rounded-full bg-[var(--amber)]"
                       style={{ width: `${totalExpenses > 0 ? Math.round((amount / totalExpenses) * 100) : 0}%` }}
                     />
                   </div>
@@ -302,20 +307,20 @@ export function ReportsShell({
         </Panel>
       </div>
 
-      <div className="grid gap-4 xl:grid-cols-[1.2fr_1fr]">
+      <div className="grid gap-3 xl:grid-cols-[1.2fr_1fr]">
         <Panel>
           <div className="flex items-center gap-3">
-            <Package className="h-5 w-5 text-[#8c5b17]" />
-            <h3 className="text-2xl font-semibold">Stock crítico</h3>
+            <Package className="h-5 w-5 text-[var(--amber-ink)]" />
+            <h3 className="text-xl font-semibold">Stock crítico</h3>
           </div>
-          <div className="mt-5 space-y-3">
+          <div className="mt-4 space-y-2">
             {criticalStock.length === 0 ? (
-              <div className="rounded-[24px] border border-[var(--line)] bg-white/80 p-4 text-sm text-[var(--muted)]">
+              <div className="rounded-[var(--radius-card)] border border-[var(--line)] bg-[var(--surface)] p-3.5 text-sm text-[var(--muted)]">
                 No hay productos ni insumos activos en stock crítico.
               </div>
             ) : (
               criticalStock.map((item) => (
-                <div key={item.id} className="rounded-[24px] border border-[var(--line)] bg-white/80 p-4">
+                <div key={item.id} className="rounded-[var(--radius-card)] border border-[var(--line)] bg-[var(--surface)] p-3.5">
                   <div className="flex items-center justify-between">
                     <div>
                       <p className="font-semibold">{item.name}</p>
@@ -323,7 +328,7 @@ export function ReportsShell({
                         {item.currentStock} / mínimo {item.minStock}
                       </p>
                     </div>
-                    <CircleAlert className="h-5 w-5 text-[#d89b39]" />
+                    <CircleAlert className="h-5 w-5 text-[var(--amber-ink)]" />
                   </div>
                 </div>
               ))
@@ -333,12 +338,12 @@ export function ReportsShell({
 
         <Panel>
           <div className="flex items-center gap-3">
-            <Sprout className="h-5 w-5 text-[#15553e]" />
-            <h3 className="text-2xl font-semibold">Rendimiento de lotes</h3>
+            <Sprout className="h-5 w-5 text-[var(--moss)]" />
+            <h3 className="text-xl font-semibold">Rendimiento de lotes</h3>
           </div>
-          <div className="mt-5 space-y-3">
+          <div className="mt-4 space-y-2">
             {batchPerformance.length === 0 ? (
-              <div className="rounded-[24px] border border-[var(--line)] bg-white/80 p-4 text-sm text-[var(--muted)]">
+              <div className="rounded-[var(--radius-card)] border border-[var(--line)] bg-[var(--surface)] p-3.5 text-sm text-[var(--muted)]">
                 No hay lotes dentro del rango seleccionado.
               </div>
             ) : (
@@ -349,7 +354,7 @@ export function ReportsShell({
                   : null;
 
               return (
-                <div key={batch.id} className="rounded-[24px] border border-[var(--line)] bg-white/80 p-4">
+                <div key={batch.id} className="rounded-[var(--radius-card)] border border-[var(--line)] bg-[var(--surface)] p-3.5">
                   <div className="flex items-center justify-between">
                     <div>
                       <p className="font-semibold">{batch.productName}</p>
@@ -368,17 +373,17 @@ export function ReportsShell({
       </div>
 
       <Panel>
-        <h3 className="text-2xl font-semibold">Ventas por canal</h3>
-        <div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+        <h3 className="text-xl font-semibold">Ventas por canal</h3>
+        <div className="mt-4 grid grid-cols-2 gap-3 xl:grid-cols-4">
           {salesByChannelCards.length === 0 ? (
-            <div className="rounded-[24px] border border-[var(--line)] bg-white/80 p-4 text-sm text-[var(--muted)] md:col-span-2 xl:col-span-4">
+            <div className="rounded-[var(--radius-card)] border border-[var(--line)] bg-[var(--surface)] p-3.5 text-sm text-[var(--muted)] col-span-2 xl:col-span-4">
               No hay ventas por canal para mostrar en este rango.
             </div>
           ) : (
             salesByChannelCards.map(([name, amount]) => (
-              <div key={name} className="rounded-[24px] border border-[var(--line)] bg-white/80 p-4">
+              <div key={name} className="rounded-[var(--radius-card)] border border-[var(--line)] bg-[var(--surface)] p-3.5">
                 <p className="text-sm text-[var(--muted)]">{name}</p>
-                <p className="mt-2 text-2xl font-semibold">{formatCurrency(amount)}</p>
+                <p className="mt-1 font-[family-name:var(--font-heading)] text-xl font-semibold tabular-nums">{formatCurrency(amount)}</p>
               </div>
             ))
           )}

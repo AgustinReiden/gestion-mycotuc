@@ -90,7 +90,7 @@ export function ExpenseForm({ categories, onSuccess }: ExpenseFormProps) {
       {!hasCategories ? (
         <ActionNotice
           tone="warning"
-          message="Antes de registrar un gasto manual, crea al menos una categoría activa."
+          message="Antes de registrar un gasto manual, creá al menos una categoría activa."
         />
       ) : null}
 
@@ -104,7 +104,7 @@ export function ExpenseForm({ categories, onSuccess }: ExpenseFormProps) {
         />
       </Field>
 
-      <div className="grid gap-4 md:grid-cols-3">
+      <div className="grid gap-3 sm:grid-cols-3">
         <Field label="Monto" error={form.formState.errors.amount?.message}>
           <Controller
             control={form.control}
@@ -117,6 +117,7 @@ export function ExpenseForm({ categories, onSuccess }: ExpenseFormProps) {
                 onBlur={field.onBlur}
                 onChange={(event) => field.onChange(toNumberValue(event.target.value))}
                 type="number"
+                inputMode="decimal"
                 min="0.01"
                 step="0.01"
               />
@@ -167,8 +168,8 @@ export function ExpenseForm({ categories, onSuccess }: ExpenseFormProps) {
 
       {feedback ? <ActionNotice tone={feedback.tone} message={feedback.message} /> : null}
 
-      <div className="flex justify-end">
-        <Button type="submit" busy={pending} disabled={!hasCategories}>
+      <div className="sheet-actions flex items-center justify-end gap-2">
+        <Button type="submit" size="lg" busy={pending} disabled={!hasCategories}>
           Registrar gasto
         </Button>
       </div>

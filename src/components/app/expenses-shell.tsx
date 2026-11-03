@@ -1,6 +1,6 @@
 "use client";
 
-import { useDeferredValue, useEffect, useState } from "react";
+import { useDeferredValue, useState } from "react";
 import { Plus, ReceiptText, Search } from "lucide-react";
 import { ExpenseForm } from "@/components/forms/expense-form";
 import { Badge } from "@/components/ui/badge";
@@ -9,6 +9,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { Modal } from "@/components/ui/modal";
 import { Panel } from "@/components/ui/panel";
 import type { ExpenseRecord, LookupOption } from "@/lib/domain";
+import { useQuickCreate } from "@/lib/hooks/use-quick-create";
 import { formatCurrency, formatDate, sumBy } from "@/lib/utils";
 
 type ExpensesShellProps = {
@@ -39,12 +40,12 @@ function NewExpenseModal({
   categories: LookupOption[];
   onExpenseCreated: (expense: ExpenseRecord) => void;
 }) {
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useQuickCreate("gasto");
 
   return (
     <>
-      <Button type="button" className="w-full sm:w-auto" onClick={() => setOpen(true)}>
-        <Plus className="h-4 w-4" />
+      <Button type="button" size="lg" className="w-full sm:w-auto" onClick={() => setOpen(true)}>
+        <Plus className="h-5 w-5" />
         Nuevo gasto
       </Button>
       <Modal
@@ -71,9 +72,12 @@ export function ExpensesShell({ expenses, categories }: ExpensesShellProps) {
   const deferredSearch = useDeferredValue(search);
   const hasSearchQuery = deferredSearch.trim().length > 0;
 
-  useEffect(() => {
+  // Cuando el servidor manda datos nuevos (router.refresh), reemplazan a los locales.
+  const [syncedExpenses, setSyncedExpenses] = useState(expenses);
+  if (syncedExpenses !== expenses) {
+    setSyncedExpenses(expenses);
     setExpenseRecords(sortExpenses(expenses));
-  }, [expenses]);
+  }
 
   const filteredExpenses = expenseRecords.filter((expense) => {
     const query = deferredSearch.toLowerCase();
@@ -87,88 +91,76 @@ export function ExpensesShell({ expenses, categories }: ExpensesShellProps) {
 
   return (
     <div className="page-grid">
-      <div className="grid gap-4 xl:grid-cols-[1.6fr_1fr]">
-        <Panel>
-          <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
-            <div>
-              <p className="text-sm font-semibold uppercase tracking-[0.18em] text-[#55755e]">Gastos</p>
-              <h2 className="mt-2 text-3xl font-semibold">Flujo financiero de salida</h2>
-              <p className="mt-2 text-sm text-[var(--muted)]">
-                Combina gastos manuales y compras de insumos con una sola lectura financiera.
-              </p>
-            </div>
-            <NewExpenseModal
-              categories={categories}
-              onExpenseCreated={(expense) => {
-                setExpenseRecords((current) => upsertExpense(current, expense));
-              }}
-            />
-          </div>
-        </Panel>
-
-        <Panel className="grid gap-4 md:grid-cols-3 xl:grid-cols-1">
-          <div>
-            <p className="text-sm text-[var(--muted)]">Total registrado</p>
-            <p className="mt-2 text-3xl font-semibold text-[#934534]">
+      <div className="grid gap-3 md:grid-cols-[1fr_auto] md:items-end">
+        <div className="grid grid-cols-2 gap-3 md:max-w-xl">
+          <Panel className="col-span-2 p-3.5 sm:p-4">
+            <p className="text-[13px] font-medium text-[var(--ink-2)]">Total registrado</p>
+            <p className="font-[family-name:var(--font-heading)] text-2xl font-semibold tabular-nums">
               {formatCurrency(sumBy(activeExpenses, (expense) => expense.amount))}
             </p>
-          </div>
-          <div>
-            <p className="text-sm text-[var(--muted)]">Compras de insumos</p>
-            <p className="mt-2 text-2xl font-semibold">
+          </Panel>
+          <Panel className="p-3.5 sm:p-4">
+            <p className="text-[13px] font-medium text-[var(--ink-2)]">Compras de insumos</p>
+            <p className="font-[family-name:var(--font-heading)] text-2xl font-semibold tabular-nums">
               {activeExpenses.filter((expense) => expense.source === "purchase").length}
             </p>
-          </div>
-          <div>
-            <p className="text-sm text-[var(--muted)]">Gastos manuales</p>
-            <p className="mt-2 text-2xl font-semibold">
+          </Panel>
+          <Panel className="p-3.5 sm:p-4">
+            <p className="text-[13px] font-medium text-[var(--ink-2)]">Gastos manuales</p>
+            <p className="font-[family-name:var(--font-heading)] text-2xl font-semibold tabular-nums">
               {activeExpenses.filter((expense) => expense.source === "manual").length}
             </p>
-          </div>
-        </Panel>
+          </Panel>
+        </div>
+        <NewExpenseModal
+          categories={categories}
+          onExpenseCreated={(expense) => {
+            setExpenseRecords((current) => upsertExpense(current, expense));
+          }}
+        />
       </div>
 
-      <Panel>
-        <label className="flex w-full items-center gap-3 rounded-2xl border border-[var(--line)] bg-white/80 px-4 py-3">
-          <Search className="h-4 w-4 text-[var(--muted)]" />
+      <div className="grid gap-3">
+        <label className="flex min-h-12 items-center gap-2 rounded-[var(--radius-control)] border border-[var(--line-strong)] bg-[var(--surface)] px-3.5 focus-within:border-[var(--foreground)]">
+          <Search className="h-4 w-4 shrink-0 text-[var(--muted)]" aria-hidden />
           <input
             value={search}
             onChange={(event) => setSearch(event.target.value)}
-            placeholder="Buscar por concepto, categoría o proveedor..."
+            placeholder="Buscar concepto, categoría o proveedor"
             aria-label="Buscar gastos"
-            className="flex-1 bg-transparent text-sm placeholder:text-[#7e867e]"
+            className="min-w-0 flex-1 bg-transparent text-base placeholder:text-[#958d84]"
           />
         </label>
 
-        <div className="mt-5 overflow-hidden rounded-[26px] border border-[var(--line)]">
+        <div>
           {filteredExpenses.length === 0 ? (
-            <div className="p-6">
+            <div>
               <EmptyState
                 title={hasSearchQuery ? "No encontramos gastos" : "Todavía no hay gastos"}
                 description={
                   hasSearchQuery
-                    ? "Prueba otro término de búsqueda o registra un nuevo gasto."
-                    : "Carga un gasto manual o registra una compra de insumos para empezar a ver movimientos."
+                    ? "Probá con otro término de búsqueda o registrá un nuevo gasto."
+                    : "Cargá un gasto manual o registrá una compra de insumos para empezar a ver movimientos."
                 }
                 icon={ReceiptText}
               />
             </div>
           ) : (
             <>
-              <div className="divide-y divide-[var(--line)] md:hidden">
+              <div className="grid gap-2 md:hidden">
                 {filteredExpenses.map((expense) => (
-                  <article key={expense.id} className="space-y-4 bg-white/80 p-4">
+                  <article key={expense.id} className="space-y-2 rounded-[var(--radius-card)] border border-[var(--line)] bg-[var(--surface)] p-3.5">
                     <div className="flex items-start justify-between gap-3">
                       <div>
-                        <p className="text-xs uppercase tracking-[0.18em] text-[#55755e]">
+                        <p className="text-[13px] font-medium text-[var(--muted)]">
                           {formatDate(expense.expenseDate)}
                         </p>
-                        <h3 className="mt-2 font-semibold">{expense.concept}</h3>
+                        <h3 className="mt-0.5 text-base font-semibold">{expense.concept}</h3>
                         {expense.notes ? (
                           <p className="mt-1 text-sm text-[var(--muted)]">{expense.notes}</p>
                         ) : null}
                       </div>
-                      <p className="text-lg font-semibold text-[#934534]">
+                      <p className="shrink-0 font-[family-name:var(--font-heading)] text-lg font-semibold tabular-nums">
                         {formatCurrency(expense.amount)}
                       </p>
                     </div>
@@ -181,16 +173,16 @@ export function ExpensesShell({ expenses, categories }: ExpensesShellProps) {
                       {expense.isVoided ? <Badge tone="danger">Anulado</Badge> : null}
                     </div>
 
-                    <div className="rounded-[22px] border border-[var(--line)] bg-[#f8f6ef] p-4 text-sm text-[var(--muted)]">
-                      <p>Proveedor: {expense.supplierName ?? "-"}</p>
-                    </div>
+                    {expense.supplierName ? (
+                      <p className="text-sm text-[var(--muted)]">Proveedor: {expense.supplierName}</p>
+                    ) : null}
                   </article>
                 ))}
               </div>
 
-              <div className="hidden overflow-x-auto md:block">
+              <div className="hidden overflow-x-auto rounded-[var(--radius-card)] border border-[var(--line)] md:block">
                 <table className="min-w-full text-left text-sm">
-                  <thead className="bg-[#f4f1e8] text-[var(--muted)]">
+                  <thead className="bg-[var(--surface-2)] text-[var(--muted)]">
                     <tr>
                       <th className="px-4 py-3 font-medium">Fecha</th>
                       <th className="px-4 py-3 font-medium">Concepto</th>
@@ -202,7 +194,7 @@ export function ExpensesShell({ expenses, categories }: ExpensesShellProps) {
                   </thead>
                   <tbody>
                     {filteredExpenses.map((expense) => (
-                      <tr key={expense.id} className="border-t border-[var(--line)] bg-white/80">
+                      <tr key={expense.id} className="border-t border-[var(--line)] bg-[var(--surface)]">
                         <td className="px-4 py-4">{formatDate(expense.expenseDate)}</td>
                         <td className="px-4 py-4">
                           <p className="font-semibold">{expense.concept}</p>
@@ -220,7 +212,7 @@ export function ExpensesShell({ expenses, categories }: ExpensesShellProps) {
                           {expense.isVoided ? <Badge tone="danger">Anulado</Badge> : null}
                         </td>
                         <td className="px-4 py-4">{expense.supplierName ?? "-"}</td>
-                        <td className="px-4 py-4 font-semibold text-[#934534]">
+                        <td className="px-4 py-4 font-semibold tabular-nums">
                           {formatCurrency(expense.amount)}
                         </td>
                       </tr>
@@ -231,7 +223,7 @@ export function ExpensesShell({ expenses, categories }: ExpensesShellProps) {
             </>
           )}
         </div>
-      </Panel>
+      </div>
     </div>
   );
 }

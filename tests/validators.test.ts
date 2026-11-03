@@ -16,6 +16,7 @@ import {
   resolveProductListPrice,
 } from "../src/lib/pricing";
 import {
+  averageCostCorrectionSchema,
   bundleFormSchema,
   paymentStatusUpdateSchema,
   priceTiersFormSchema,
@@ -171,6 +172,33 @@ describe("stock, payment and reversal validation", () => {
         movementDate: "2026-04-27",
       }).success,
     ).toBe(false);
+  });
+
+  it("accepts an optional unit cost only on positive adjustments", () => {
+    const base = {
+      entityType: "supply",
+      entityId: ids.supply,
+      notes: "stock inicial",
+      movementDate: "2026-11-04",
+    };
+
+    const withCost = stockAdjustmentSchema.safeParse({ ...base, quantity: 10, unitCost: 120 });
+    expect(withCost.success && withCost.data.unitCost).toBe(120);
+
+    const withoutCost = stockAdjustmentSchema.safeParse({ ...base, quantity: 10, unitCost: "" });
+    expect(withoutCost.success && withoutCost.data.unitCost).toBeUndefined();
+
+    expect(stockAdjustmentSchema.safeParse({ ...base, quantity: -2, unitCost: 120 }).success).toBe(false);
+    expect(stockAdjustmentSchema.safeParse({ ...base, quantity: 10, unitCost: 0 }).success).toBe(false);
+    expect(stockAdjustmentSchema.safeParse({ ...base, quantity: -2, unitCost: "" }).success).toBe(true);
+  });
+
+  it("requires a reason to correct the average cost", () => {
+    const base = { entityType: "product", entityId: ids.product, avgCost: 50 };
+
+    expect(averageCostCorrectionSchema.safeParse({ ...base, reason: "costo real" }).success).toBe(true);
+    expect(averageCostCorrectionSchema.safeParse({ ...base, reason: " " }).success).toBe(false);
+    expect(averageCostCorrectionSchema.safeParse({ ...base, avgCost: -1, reason: "costo real" }).success).toBe(false);
   });
 
   it("accepts reversal payloads with a reason", () => {
@@ -493,9 +521,10 @@ describe("costs and margins", () => {
     expect(getStockValue(10, 2.5)).toBe(25);
     expect(getStockValue(-3, 2.5)).toBe(0);
     expect(getStockValue(10, null)).toBeNull();
+    expect(getStockValue(10, 0)).toBeNull();
   });
 
-  it("summarizes margin only over lines with a frozen cost", () => {
+  it("summarizes margin only over lines with a known cost (0 and null are 'sin costo')", () => {
     const summary = summarizeMargin([
       { quantity: 2, lineTotal: 200, unitCost: 40 },
       { quantity: 1, lineTotal: 150, unitCost: 0 },
@@ -503,12 +532,42 @@ describe("costs and margins", () => {
     ]);
 
     expect(summary).toEqual({
-      revenue: 350,
+      revenue: 200,
       cost: 80,
-      margin: 270,
-      marginPercent: (270 / 350) * 100,
-      missingCostLines: 1,
+      margin: 120,
+      marginPercent: 60,
+      missingCostLines: 2,
     });
+  });
+
+  it("does not report a 100% margin when no line has cost", () => {
+    const summary = summarizeMargin([
+      { quantity: 12, lineTotal: 216000, unitCost: null },
+      { quantity: 1, lineTotal: 1000, unitCost: 0 },
+    ]);
+
+    expect(summary.missingCostLines).toBe(2);
+    expect(summary.revenue).toBe(0);
+    expect(summary.marginPercent).toBeNull();
+    expect(getLineCost(12, null)).toBeNull();
+    expect(getLineCost(1, 0)).toBeNull();
+  });
+
+  it("counts sin-costo lines per product without inflating its margin", () => {
+    const [row] = getMarginByProduct([
+      {
+        isVoided: false,
+        items: [
+          { productName: "Reishi", quantity: 2, lineTotal: 200, unitCost: 50 },
+          { productName: "Reishi", quantity: 1, lineTotal: 100, unitCost: null },
+        ],
+      },
+    ]);
+
+    expect(row.quantity).toBe(3);
+    expect(row.revenue).toBe(200);
+    expect(row.marginPercent).toBe(50);
+    expect(row.missingCostLines).toBe(1);
   });
 
   it("groups margin by product for non voided sales", () => {

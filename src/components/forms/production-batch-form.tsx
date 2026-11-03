@@ -98,6 +98,8 @@ function getDefaultValues(
 }
 
 export function ProductionBatchForm({ batch, products, supplies, onSuccess }: ProductionBatchFormProps) {
+  "use no memo";
+
   const [pending, startTransition] = useTransition();
   const [feedback, setFeedback] = useState<{ tone: "success" | "error"; message: string } | null>(null);
   const form = useForm<ProductionBatchValues, unknown, ProductionBatchSubmitValues>({
@@ -155,7 +157,7 @@ export function ProductionBatchForm({ batch, products, supplies, onSuccess }: Pr
 
   return (
     <form
-      className="space-y-5"
+      className="space-y-4"
       onSubmit={form.handleSubmit(
         (values) => {
           if (!hasProductOptions) {
@@ -186,7 +188,7 @@ export function ProductionBatchForm({ batch, products, supplies, onSuccess }: Pr
       {!hasProductOptions ? (
         <ActionNotice
           tone="warning"
-          message="Antes de registrar un lote, crea al menos un producto disponible."
+          message="Antes de registrar un lote, creá al menos un producto disponible."
         />
       ) : null}
       {hasHistoricalReferences ? (
@@ -196,7 +198,7 @@ export function ProductionBatchForm({ batch, products, supplies, onSuccess }: Pr
         />
       ) : null}
 
-      <div className="grid gap-4 md:grid-cols-2">
+      <div className="grid gap-3 sm:grid-cols-2">
         <Field label="Producto objetivo" error={form.formState.errors.productId?.message}>
           <Controller
             control={form.control}
@@ -231,7 +233,7 @@ export function ProductionBatchForm({ batch, products, supplies, onSuccess }: Pr
         </Field>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
         <Field label="Inicio" error={form.formState.errors.startedAt?.message}>
           <Controller
             control={form.control}
@@ -262,6 +264,7 @@ export function ProductionBatchForm({ batch, products, supplies, onSuccess }: Pr
                 onBlur={field.onBlur}
                 onChange={(event) => field.onChange(toNullableNumberValue(event.target.value))}
                 type="number"
+                inputMode="decimal"
                 step="0.01"
                 min="0"
               />
@@ -280,6 +283,7 @@ export function ProductionBatchForm({ batch, products, supplies, onSuccess }: Pr
                 onBlur={field.onBlur}
                 onChange={(event) => field.onChange(toNullableNumberValue(event.target.value))}
                 type="number"
+                inputMode="decimal"
                 step="0.01"
                 min="0"
               />
@@ -288,9 +292,9 @@ export function ProductionBatchForm({ batch, products, supplies, onSuccess }: Pr
         </Field>
       </div>
 
-      <div className="grid gap-5 xl:grid-cols-2">
-        <div className="rounded-[26px] border border-[var(--line)] bg-[#f7f5ef] p-4">
-          <div className="mb-4 flex items-center justify-between">
+      <div className="grid gap-4 xl:grid-cols-2">
+        <div className="rounded-[var(--radius-card)] border border-[var(--line)] bg-[var(--surface-2)] p-3.5">
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
             <div>
               <h4 className="text-lg font-semibold">Consumos</h4>
               <p className="text-sm text-[var(--muted)]">Se descuentan al cerrar el lote.</p>
@@ -306,16 +310,16 @@ export function ProductionBatchForm({ batch, products, supplies, onSuccess }: Pr
             </Button>
           </div>
           {!hasActiveSupplies ? (
-            <div className="mb-4">
+            <div className="mb-3">
               <ActionNotice
                 tone="warning"
-                message="No hay insumos activos disponibles. Puedes crear el lote y cargar consumos cuando existan."
+                message="No hay insumos activos disponibles. Podés crear el lote y cargar consumos cuando existan."
               />
             </div>
           ) : null}
           <div className="space-y-3">
             {inputs.fields.map((field, index) => (
-              <div key={field.id} className="grid gap-3 rounded-[24px] border border-[var(--line)] bg-white/90 p-4 md:grid-cols-[1.6fr_0.8fr_auto]">
+              <div key={field.id} className="grid gap-3 rounded-[var(--radius-card)] border border-[var(--line)] bg-[var(--surface)] p-3.5 sm:grid-cols-[1.6fr_0.8fr_auto]">
                 <Field label="Insumo" error={form.formState.errors.inputs?.[index]?.supplyId?.message}>
                   <Controller
                     control={form.control}
@@ -352,6 +356,7 @@ export function ProductionBatchForm({ batch, products, supplies, onSuccess }: Pr
                         onBlur={inputField.onBlur}
                         onChange={(event) => inputField.onChange(toNumberValue(event.target.value))}
                         type="number"
+                        inputMode="decimal"
                         step="0.01"
                         min="0"
                       />
@@ -362,6 +367,7 @@ export function ProductionBatchForm({ batch, products, supplies, onSuccess }: Pr
                   <Button
                     type="button"
                     variant="ghost"
+                    className="text-[var(--danger)]"
                     aria-label={`Quitar insumo ${index + 1}`}
                     disabled={inputs.fields.length <= 1}
                     onClick={() => (inputs.fields.length > 1 ? inputs.remove(index) : null)}
@@ -374,8 +380,8 @@ export function ProductionBatchForm({ batch, products, supplies, onSuccess }: Pr
           </div>
         </div>
 
-        <div className="rounded-[26px] border border-[var(--line)] bg-[#f7f5ef] p-4">
-          <div className="mb-4 flex items-center justify-between">
+        <div className="rounded-[var(--radius-card)] border border-[var(--line)] bg-[var(--surface-2)] p-3.5">
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
             <div>
               <h4 className="text-lg font-semibold">Salidas</h4>
               <p className="text-sm text-[var(--muted)]">Se suman al stock cuando el lote se completa.</p>
@@ -392,7 +398,7 @@ export function ProductionBatchForm({ batch, products, supplies, onSuccess }: Pr
           </div>
           <div className="space-y-3">
             {outputs.fields.map((field, index) => (
-              <div key={field.id} className="grid gap-3 rounded-[24px] border border-[var(--line)] bg-white/90 p-4 md:grid-cols-[1.6fr_0.8fr_auto]">
+              <div key={field.id} className="grid gap-3 rounded-[var(--radius-card)] border border-[var(--line)] bg-[var(--surface)] p-3.5 sm:grid-cols-[1.6fr_0.8fr_auto]">
                 <Field label="Producto" error={form.formState.errors.outputs?.[index]?.productId?.message}>
                   <Controller
                     control={form.control}
@@ -429,6 +435,7 @@ export function ProductionBatchForm({ batch, products, supplies, onSuccess }: Pr
                         onBlur={outputField.onBlur}
                         onChange={(event) => outputField.onChange(toNumberValue(event.target.value))}
                         type="number"
+                        inputMode="decimal"
                         step="0.01"
                         min="0"
                       />
@@ -439,6 +446,7 @@ export function ProductionBatchForm({ batch, products, supplies, onSuccess }: Pr
                   <Button
                     type="button"
                     variant="ghost"
+                    className="text-[var(--danger)]"
                     aria-label={`Quitar salida ${index + 1}`}
                     disabled={outputs.fields.length <= 1}
                     onClick={() => (outputs.fields.length > 1 ? outputs.remove(index) : null)}
@@ -469,8 +477,8 @@ export function ProductionBatchForm({ batch, products, supplies, onSuccess }: Pr
 
       {feedback ? <ActionNotice tone={feedback.tone} message={feedback.message} /> : null}
 
-      <div className="flex justify-end">
-        <Button type="submit" busy={pending} disabled={!hasProductOptions}>
+      <div className="sheet-actions flex items-center justify-end gap-2">
+        <Button type="submit" size="lg" busy={pending} disabled={!hasProductOptions}>
           {batch ? "Guardar lote" : "Crear lote"}
         </Button>
       </div>

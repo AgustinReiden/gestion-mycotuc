@@ -1,6 +1,6 @@
 "use client";
 
-import { useDeferredValue, useEffect, useState } from "react";
+import { useDeferredValue, useState } from "react";
 import { Edit3, Layers, Package, Plus, Search, Settings2 } from "lucide-react";
 import { BundlesPanel } from "@/components/app/bundles-panel";
 import { StockHistoryPanel } from "@/components/app/stock-history-panel";
@@ -20,6 +20,7 @@ import type {
   ProductCategoryRecord,
   ProductRecord,
 } from "@/lib/domain";
+import { useQuickCreate } from "@/lib/hooks/use-quick-create";
 import { formatPercent, getMarginPercent } from "@/lib/finance";
 import { formatQuantity, groupTiersByProduct } from "@/lib/pricing";
 import { formatCurrency } from "@/lib/utils";
@@ -83,15 +84,15 @@ function NewProductModal({
   categories: ProductCategoryRecord[];
   onProductSaved: (product: ProductRecord) => void;
 }) {
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useQuickCreate("producto");
 
   return (
     <>
-      <Button type="button" className="w-full sm:w-auto" onClick={() => setOpen(true)}>
-        <Plus className="h-4 w-4" />
+      <Button type="button" size="lg" className="w-full sm:w-auto" onClick={() => setOpen(true)}>
+        <Plus className="h-5 w-5" />
         Nuevo producto
       </Button>
-      <Modal open={open} onClose={() => setOpen(false)} title="Nuevo producto" description="Actualiza catálogo, precio y stock mínimo.">
+      <Modal open={open} onClose={() => setOpen(false)} title="Nuevo producto" description="Actualizá catálogo, precio y stock mínimo.">
         <ProductForm product={null} categories={categories} onSuccess={(product) => { setOpen(false); onProductSaved(product); }} />
       </Modal>
     </>
@@ -110,7 +111,7 @@ function EditProductModal({
   onProductSaved: (product: ProductRecord) => void;
 }) {
   return (
-    <Modal open onClose={onClose} title="Editar producto" description="Actualiza catálogo, precio y stock mínimo.">
+    <Modal open onClose={onClose} title="Editar producto" description="Actualizá catálogo, precio y stock mínimo.">
       <ProductForm product={product} categories={categories} onSuccess={(updatedProduct) => { onProductSaved(updatedProduct); onClose(); }} />
     </Modal>
   );
@@ -154,7 +155,7 @@ function AdjustStockModal({
   }) => void;
 }) {
   return (
-    <Modal open onClose={onClose} title="Ajustar stock" description="Registra una corrección manual para mantener inventario trazable.">
+    <Modal open onClose={onClose} title="Ajustar stock" description="Registrá una corrección manual para mantener el inventario trazable.">
       <StockAdjustmentForm
         entityType="product"
         entityId={product.id}
@@ -189,21 +190,33 @@ export function ProductsShell({
   const hasSearchQuery = deferredSearch.trim().length > 0;
   const movementHistoryLimit = Math.max(movements.length, 12);
 
-  useEffect(() => {
+  // Cuando el servidor manda datos nuevos (router.refresh), reemplazan a los locales.
+  const [syncedProducts, setSyncedProducts] = useState(products);
+  if (syncedProducts !== products) {
+    setSyncedProducts(products);
     setProductRecords(sortProducts(products));
-  }, [products]);
+  }
 
-  useEffect(() => {
+  // Cuando el servidor manda datos nuevos (router.refresh), reemplazan a los locales.
+  const [syncedMovements, setSyncedMovements] = useState(movements);
+  if (syncedMovements !== movements) {
+    setSyncedMovements(movements);
     setMovementRecords(sortMovements(movements));
-  }, [movements]);
+  }
 
-  useEffect(() => {
+  // Cuando el servidor manda datos nuevos (router.refresh), reemplazan a los locales.
+  const [syncedPriceTiers, setSyncedPriceTiers] = useState(priceTiers);
+  if (syncedPriceTiers !== priceTiers) {
+    setSyncedPriceTiers(priceTiers);
     setTierRecords(priceTiers);
-  }, [priceTiers]);
+  }
 
-  useEffect(() => {
+  // Cuando el servidor manda datos nuevos (router.refresh), reemplazan a los locales.
+  const [syncedBundles, setSyncedBundles] = useState(bundles);
+  if (syncedBundles !== bundles) {
+    setSyncedBundles(bundles);
     setBundleRecords(sortBundles(bundles));
-  }, [bundles]);
+  }
 
   const tiersByProduct = groupTiersByProduct(tierRecords);
 
@@ -214,35 +227,24 @@ export function ProductsShell({
 
   return (
     <div className="page-grid">
-      <Panel>
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-          <div>
-            <p className="text-sm font-semibold uppercase tracking-[0.18em] text-[#55755e]">Productos</p>
-            <h2 className="mt-2 text-3xl font-semibold">Catálogo de venta</h2>
-            <p className="mt-2 text-sm text-[var(--muted)]">
-              Administra precios, stock mínimo y ajustes manuales de producto terminado.
-            </p>
-          </div>
-          <div className="flex flex-col gap-3 sm:flex-row">
-            <label className="flex w-full items-center gap-3 rounded-2xl border border-[var(--line)] bg-white/80 px-4 py-3 sm:min-w-[260px] sm:flex-1">
-              <Search className="h-4 w-4 text-[var(--muted)]" />
-              <input
-                value={search}
-                onChange={(event) => setSearch(event.target.value)}
-                placeholder="Buscar producto..."
-                aria-label="Buscar productos"
-                className="flex-1 bg-transparent text-sm placeholder:text-[#7e867e]"
-              />
-            </label>
-            <NewProductModal
-              categories={categories}
-              onProductSaved={(product) => {
-                setProductRecords((current) => upsertProduct(current, product));
-              }}
-            />
-          </div>
-        </div>
-      </Panel>
+      <div className="grid gap-3 md:grid-cols-[1fr_auto] md:items-center">
+        <label className="flex min-h-12 items-center gap-2 rounded-[var(--radius-control)] border border-[var(--line-strong)] bg-[var(--surface)] px-3.5 focus-within:border-[var(--foreground)]">
+          <Search className="h-4 w-4 shrink-0 text-[var(--muted)]" aria-hidden />
+          <input
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+            placeholder="Buscar producto"
+            aria-label="Buscar productos"
+            className="min-w-0 flex-1 bg-transparent text-base placeholder:text-[#958d84]"
+          />
+        </label>
+        <NewProductModal
+          categories={categories}
+          onProductSaved={(product) => {
+            setProductRecords((current) => upsertProduct(current, product));
+          }}
+        />
+      </div>
 
       {filteredProducts.length === 0 ? (
         <Panel>
@@ -250,18 +252,18 @@ export function ProductsShell({
             title={hasSearchQuery ? "No encontramos productos" : "No hay productos para mostrar"}
             description={
               hasSearchQuery
-                ? "Prueba otro término de búsqueda o crea un producto nuevo."
-                : "Crea tu primer producto o prueba otra búsqueda."
+                ? "Probá con otro término de búsqueda o creá un producto nuevo."
+                : "Creá tu primer producto o probá otra búsqueda."
             }
             icon={Package}
           />
         </Panel>
       ) : (
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
           {filteredProducts.map((product) => (
-            <Panel key={product.id} className="flex flex-col gap-4">
+            <Panel key={product.id} className="flex flex-col gap-3">
               <div className="flex items-start justify-between">
-                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[#dce8db] text-[#15553e]">
+                <div className="flex h-12 w-12 items-center justify-center rounded-[var(--radius-control)] bg-[var(--moss-soft)] text-[var(--moss)]">
                   <Package className="h-6 w-6" />
                 </div>
                 <div className="flex items-center gap-2">
@@ -271,39 +273,41 @@ export function ProductsShell({
               </div>
 
               <div>
-                <h3 className="text-2xl font-semibold">{product.name}</h3>
+                <h3 className="text-xl font-semibold">{product.name}</h3>
                 <p className="mt-1 text-sm text-[var(--muted)]">{product.category}</p>
               </div>
 
-              <div className="grid gap-3 rounded-[24px] border border-[var(--line)] bg-[#f7f5ef] p-4 md:grid-cols-2">
+              <div className="grid gap-3 rounded-[var(--radius-card)] border border-[var(--line)] bg-[var(--surface-2)] p-3.5 grid-cols-2">
                 <div>
-                  <p className="text-xs uppercase tracking-[0.18em] text-[#55755e]">Stock actual</p>
-                  <p className="mt-2 text-2xl font-semibold">
+                  <p className="text-[13px] font-medium text-[var(--muted)]">Stock actual</p>
+                  <p className="mt-1 text-xl font-semibold">
                     {product.currentStock} {product.unit}
                   </p>
                 </div>
                 <div>
-                  <p className="text-xs uppercase tracking-[0.18em] text-[#55755e]">Precio</p>
-                  <p className="mt-2 text-2xl font-semibold text-[#15553e]">{formatCurrency(product.salePrice)}</p>
+                  <p className="text-[13px] font-medium text-[var(--muted)]">Precio</p>
+                  <p className="mt-1 text-xl font-semibold text-[var(--moss)]">{formatCurrency(product.salePrice)}</p>
                 </div>
                 {isAdmin && product.avgCost !== null ? (
                   <>
                     <div>
-                      <p className="text-xs uppercase tracking-[0.18em] text-[#55755e]">Costo promedio</p>
-                      <p className="mt-2 text-lg font-semibold">{formatCurrency(product.avgCost)}</p>
+                      <p className="text-[13px] font-medium text-[var(--muted)]">Costo promedio</p>
+                      <p className="mt-1 text-lg font-semibold">
+                        {product.avgCost > 0 ? formatCurrency(product.avgCost) : <span className="text-[var(--amber-ink)]">Sin costo</span>}
+                      </p>
                     </div>
                     <div>
-                      <p className="text-xs uppercase tracking-[0.18em] text-[#55755e]">Margen unitario</p>
-                      <p className="mt-2 text-lg font-semibold">
-                        {formatPercent(getMarginPercent(product.salePrice, product.avgCost))}
+                      <p className="text-[13px] font-medium text-[var(--muted)]">Margen unitario</p>
+                      <p className="mt-1 text-lg font-semibold">
+                        {product.avgCost > 0 ? formatPercent(getMarginPercent(product.salePrice, product.avgCost)) : "—"}
                       </p>
                     </div>
                   </>
                 ) : null}
               </div>
 
-              <div className="rounded-[20px] border border-[var(--line)] bg-white/70 px-4 py-3 text-sm">
-                <p className="text-xs uppercase tracking-[0.18em] text-[#55755e]">Escalas de precio</p>
+              <div className="rounded-[var(--radius-card)] border border-[var(--line)] bg-[var(--surface)] px-3.5 py-3 text-sm">
+                <p className="text-[13px] font-medium text-[var(--muted)]">Escalas de precio</p>
                 {(tiersByProduct.get(product.id) ?? []).length === 0 ? (
                   <p className="mt-1 text-[var(--muted)]">Sin escalas: siempre precio base.</p>
                 ) : (
@@ -320,19 +324,19 @@ export function ProductsShell({
 
               {product.notes ? <p className="text-sm text-[var(--muted)]">{product.notes}</p> : null}
 
-              <div className="mt-auto flex flex-col flex-wrap gap-3 sm:flex-row">
-                <Button type="button" variant="secondary" className="flex-1" onClick={() => setSelectedProduct(product)}>
+              <div className="mt-auto flex flex-wrap gap-2">
+                <Button type="button" variant="secondary" className="flex-1 whitespace-nowrap" onClick={() => setSelectedProduct(product)}>
                   <Edit3 className="h-4 w-4" />
                   Editar
                 </Button>
                 {isAdmin ? (
-                  <Button type="button" variant="ghost" className="flex-1" onClick={() => setTiersProduct(product)}>
+                  <Button type="button" variant="ghost" className="flex-1 whitespace-nowrap" onClick={() => setTiersProduct(product)}>
                     <Layers className="h-4 w-4" />
                     Escalas
                   </Button>
                 ) : null}
                 {isAdmin ? (
-                  <Button type="button" variant="ghost" className="flex-1" onClick={() => setAdjustmentProduct(product)}>
+                  <Button type="button" variant="ghost" className="flex-1 whitespace-nowrap" onClick={() => setAdjustmentProduct(product)}>
                     <Settings2 className="h-4 w-4" />
                     Ajustar stock
                   </Button>

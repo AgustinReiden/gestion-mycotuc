@@ -1,21 +1,60 @@
 @import "tailwindcss";
 
+/*
+  Mycotuc: se carga desde el celular, de pie, con una mano.
+  Fondo mineral frío (no crema), tinta de chaga para lo que se lee y se toca,
+  ámbar de frasco de tintura solo para lo seleccionado y lo que pide atención.
+  Controles de 48 px como mínimo, texto de campos a 16 px (iOS no hace zoom),
+  barra inferior en móvil y barra lateral en escritorio.
+*/
 :root {
-  --background: #fdfcf8;
-  --foreground: #2d3329;
-  --card: rgba(255, 255, 255, 0.65);
-  --muted: #798075;
-  --line: rgba(45, 51, 41, 0.12);
-  --accent: #3b5f42;
-  --accent-strong: #27432d;
-  --danger: #a54b3d;
-  --warning: #b77f28;
-  --highlight: #e8e6d2;
+  --background: #f1f2ee;
+  --surface: #ffffff;
+  --surface-2: #f7f7f4;
+  --foreground: #1e1915;
+  --ink-2: #4a423b;
+  --muted: #6c645c;
+  --line: #e0ded7;
+  --line-strong: #c9c5bb;
+
+  --accent: #1e1915;
+  --accent-strong: #000000;
+
+  --amber: #e0901f;
+  --amber-soft: #fcecd3;
+  --amber-ink: #7d4906;
+
+  --moss: #2f6b45;
+  --moss-soft: #e1eee4;
+
+  --danger: #b3261e;
+  --danger-soft: #fbe6e2;
+  --warning: #9a5b00;
+  --highlight: #fcecd3;
+
+  --select-chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%234a423b' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+
+  --radius-control: 12px;
+  --radius-card: 16px;
+  --bar-height: 64px;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-ink-2: var(--ink-2);
+  --color-muted: var(--muted);
+  --color-line: var(--line);
+  --color-line-strong: var(--line-strong);
+  --color-amber: var(--amber);
+  --color-amber-soft: var(--amber-soft);
+  --color-amber-ink: var(--amber-ink);
+  --color-moss: var(--moss);
+  --color-moss-soft: var(--moss-soft);
+  --color-danger: var(--danger);
+  --color-danger-soft: var(--danger-soft);
   --font-sans: var(--font-sans);
   --font-heading: var(--font-heading);
 }
@@ -25,19 +64,19 @@
 }
 
 html {
-  background:
-    radial-gradient(ellipse at top left, rgba(206, 222, 202, 0.6), transparent 50%),
-    radial-gradient(ellipse at bottom right, rgba(228, 209, 163, 0.45), transparent 55%),
-    linear-gradient(150deg, #fbfaf5 0%, #f4f2e9 100%);
-  min-height: 100vh;
+  background: var(--background);
+  min-height: 100%;
   overflow-x: hidden;
+  -webkit-text-size-adjust: 100%;
+  -webkit-tap-highlight-color: transparent;
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: var(--font-sans), sans-serif;
+  font-family: var(--font-sans), system-ui, sans-serif;
   overflow-x: hidden;
+  font-feature-settings: "tnum" 1;
 }
 
 h1,
@@ -46,45 +85,99 @@ h3,
 h4,
 h5,
 h6 {
-  font-family: var(--font-heading), serif;
-  letter-spacing: -0.03em;
+  font-family: var(--font-heading), var(--font-sans), sans-serif;
+  letter-spacing: -0.015em;
+  text-wrap: balance;
 }
 
 button,
-input,
-select,
-textarea {
+[role="button"],
+a,
+label,
+summary {
+  touch-action: manipulation;
+}
+
+:focus-visible {
+  outline: 3px solid var(--amber);
+  outline-offset: 2px;
+}
+
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
   outline: none;
 }
 
 ::selection {
-  background: rgba(15, 107, 74, 0.18);
+  background: var(--amber-soft);
 }
 
+input[type="number"]::-webkit-inner-spin-button,
+input[type="number"]::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+input[type="number"] {
+  -moz-appearance: textfield;
+}
+
+/* Compatibilidad con las clases anteriores: ahora son superficies planas. */
 .glass-panel {
-  background: rgba(255, 255, 255, 0.82);
+  background: var(--surface);
+}
+
+.shadow-soft {
+  box-shadow: 0 1px 0 rgba(30, 25, 21, 0.04);
 }
 
 .page-grid {
   display: grid;
-  gap: 1.25rem;
+  gap: 1rem;
 }
 
-.shadow-soft {
-  box-shadow:
-    0 4px 24px -6px rgba(45, 51, 41, 0.08),
-    0 1px 4px rgba(45, 51, 41, 0.03);
+/* Barra de acciones de un formulario: queda pegada abajo de la hoja. La hoja no tiene padding
+   inferior cuando contiene esta barra (ver Modal), así el sticky llega al borde real. */
+.sheet-actions {
+  position: sticky;
+  bottom: 0;
+  z-index: 5;
+  margin-inline: -1rem;
+  padding: 0.75rem 1rem calc(0.75rem + env(safe-area-inset-bottom, 0px));
+  background: var(--surface);
+  border-top: 1px solid var(--line);
+}
+
+@media (min-width: 640px) {
+  .sheet-actions {
+    margin-inline: -1.25rem;
+    padding: 1rem 1.25rem;
+  }
+}
+
+/* Fila de chips que se desliza de costado en pantallas chicas. */
+.chip-row {
+  display: flex;
+  gap: 0.5rem;
+  overflow-x: auto;
+  scrollbar-width: none;
+  scroll-snap-type: x proximity;
+  padding-bottom: 2px;
+}
+
+.chip-row::-webkit-scrollbar {
+  display: none;
+}
+
+.chip-row > * {
+  scroll-snap-align: start;
+  flex: 0 0 auto;
 }
 
 .skeleton-block {
-  border-radius: 1rem;
-  background:
-    linear-gradient(
-      90deg,
-      rgba(255, 255, 255, 0.64) 0%,
-      rgba(245, 242, 233, 0.96) 50%,
-      rgba(255, 255, 255, 0.64) 100%
-    );
+  border-radius: 8px;
+  background: linear-gradient(90deg, #eceae4 0%, #f6f5f1 50%, #eceae4 100%);
   background-size: 220% 100%;
   animation: shimmer 1.2s linear infinite;
 }
@@ -95,5 +188,30 @@ textarea {
   }
   to {
     background-position: -200% 0;
+  }
+}
+
+@keyframes sheet-up {
+  from {
+    transform: translateY(24px);
+    opacity: 0.6;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+.animate-sheet {
+  animation: sheet-up 180ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-sheet,
+  .skeleton-block {
+    animation: none;
+  }
+  * {
+    transition-duration: 0.01ms !important;
   }
 }

@@ -1,7 +1,7 @@
 "use client";
 
-import { useDeferredValue, useEffect, useState, useTransition } from "react";
-import { CircleDollarSign, Eye, Filter, Plus, RotateCcw, Search } from "lucide-react";
+import { useDeferredValue, useState, useTransition } from "react";
+import { ChevronRight, CircleDollarSign, Plus, RotateCcw, Search } from "lucide-react";
 import { reverseSaleOrderAction } from "@/actions/sales";
 import { ActionNotice } from "@/components/forms/action-notice";
 import { PaymentStatusForm } from "@/components/forms/payment-status-form";
@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Modal } from "@/components/ui/modal";
 import { Panel } from "@/components/ui/panel";
+import { useQuickCreate } from "@/lib/hooks/use-quick-create";
 import type {
   AppRole,
   BundleRecord,
@@ -29,7 +30,7 @@ import {
   summarizeMargin,
 } from "@/lib/finance";
 import { formatQuantity, roundMoney } from "@/lib/pricing";
-import { formatCurrency, formatDate, sumBy } from "@/lib/utils";
+import { cn, formatCurrency, formatDate, sumBy } from "@/lib/utils";
 
 type SalesShellProps = {
   sales: SaleOrderRecord[];
@@ -129,9 +130,9 @@ function getPaymentTone(status: SaleOrderRecord["paymentStatus"]) {
 }
 
 function getPaymentLabel(status: SaleOrderRecord["paymentStatus"]) {
-  if (status === "paid") return "Pagado";
+  if (status === "paid") return "Cobrada";
   if (status === "partial") return "Parcial";
-  return "Pendiente";
+  return "A cobrar";
 }
 
 function sortSales(list: SaleOrderRecord[]) {
@@ -199,19 +200,19 @@ function NewSaleModal({
   role: AppRole;
   onSaleCreated: (result: CreateSaleOrderResult) => void;
 }) {
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useQuickCreate("venta");
 
   return (
     <>
-      <Button type="button" className="w-full sm:w-auto" onClick={() => setOpen(true)}>
-        <Plus className="h-4 w-4" />
+      <Button type="button" size="lg" className="w-full sm:w-auto" onClick={() => setOpen(true)}>
+        <Plus className="h-5 w-5" />
         Nueva venta
       </Button>
       <Modal
         open={open}
         onClose={() => setOpen(false)}
         title="Nueva venta"
-        description="Registra un pedido y descuenta stock automáticamente."
+        description="Descuenta el stock al guardar."
         size="xl"
       >
         <SaleOrderForm
@@ -247,7 +248,7 @@ function PaymentModal({
       open
       onClose={onClose}
       title="Actualizar estado de cobro"
-      description="Registra un cobro parcial, salda el pedido o ajusta método y fecha de cobro."
+      description="Registrá un cobro parcial, saldá la venta o corregí método y fecha."
     >
       <PaymentStatusForm
         saleOrderId={sale.id}
@@ -270,10 +271,14 @@ function SaleDetailModal({
   sale,
   isAdmin,
   onClose,
+  onEditPayment,
+  onReverse,
 }: {
   sale: SaleOrderRecord;
   isAdmin: boolean;
   onClose: () => void;
+  onEditPayment: () => void;
+  onReverse: () => void;
 }) {
   const groups = groupSaleItems(sale.items);
   const margin = isAdmin ? summarizeMargin(sale.items) : null;
@@ -283,13 +288,14 @@ function SaleDetailModal({
       open
       onClose={onClose}
       title="Detalle de la venta"
-      description={`${sale.contactName ?? "Sin cliente"} - ${formatDate(sale.saleDate)}`}
+      description={`${sale.contactName ?? "Sin cliente"} · ${formatDate(sale.saleDate)}`}
     >
       <div className="space-y-3">
+        {sale.isVoided ? <ActionNotice tone="warning" message="Venta anulada: no cuenta en el tablero ni en los reportes." /> : null}
         {groups.map((group) => (
           <div
             key={group.key}
-            className="rounded-[22px] border border-[var(--line)] bg-white/80 p-4 text-sm"
+            className="rounded-[14px] border border-[var(--line)] p-3.5 text-[15px]"
           >
             <div className="flex items-start justify-between gap-3">
               <div>
@@ -333,22 +339,22 @@ function SaleDetailModal({
             ) : null}
           </div>
         ))}
-        <div className="flex items-center justify-between rounded-[22px] border border-[var(--line)] bg-[#eef4ea] px-4 py-3">
-          <p className="text-sm text-[#55755e]">Total</p>
-          <p className="text-lg font-semibold text-[#15553e]">{formatCurrency(sale.totalAmount)}</p>
+        <div className="flex items-center justify-between rounded-[14px] bg-[var(--surface-2)] px-3.5 py-3">
+          <p className="text-[15px] font-semibold">Total</p>
+          <p className="font-[family-name:var(--font-heading)] text-xl font-semibold tabular-nums">{formatCurrency(sale.totalAmount)}</p>
         </div>
         {margin ? (
-          <div className="grid gap-3 rounded-[22px] border border-[var(--line)] bg-white/80 px-4 py-3 text-sm sm:grid-cols-3">
+          <div className="grid grid-cols-3 gap-3 rounded-[14px] border border-[var(--line)] px-3.5 py-3 text-[15px]">
             <div>
-              <p className="text-xs uppercase tracking-[0.18em] text-[#55755e]">Costo</p>
+              <p className="text-[13px] font-medium text-[var(--muted)]">Costo</p>
               <p className="mt-1 font-semibold">{formatCurrency(margin.cost)}</p>
             </div>
             <div>
-              <p className="text-xs uppercase tracking-[0.18em] text-[#55755e]">Margen</p>
-              <p className="mt-1 font-semibold text-[#15553e]">{formatCurrency(margin.margin)}</p>
+              <p className="text-[13px] font-medium text-[var(--muted)]">Margen</p>
+              <p className="mt-1 font-semibold text-[var(--moss)]">{formatCurrency(margin.margin)}</p>
             </div>
             <div>
-              <p className="text-xs uppercase tracking-[0.18em] text-[#55755e]">Margen %</p>
+              <p className="text-[13px] font-medium text-[var(--muted)]">Margen %</p>
               <p className="mt-1 font-semibold">{formatPercent(margin.marginPercent)}</p>
             </div>
             {margin.missingCostLines > 0 ? (
@@ -358,22 +364,22 @@ function SaleDetailModal({
             ) : null}
           </div>
         ) : null}
-        <div className="grid gap-3 rounded-[22px] border border-[var(--line)] bg-[#f7f5ef] px-4 py-3 text-sm sm:grid-cols-2">
+        <div className="grid grid-cols-2 gap-3 rounded-[14px] border border-[var(--line)] px-3.5 py-3 text-[15px]">
           <div>
-            <p className="text-xs uppercase tracking-[0.18em] text-[#55755e]">Cobrado</p>
-            <p className="mt-1 font-semibold text-[#15553e]">{formatCurrency(sale.amountPaid)}</p>
+            <p className="text-[13px] font-medium text-[var(--muted)]">Cobrado</p>
+            <p className="mt-1 font-semibold text-[var(--moss)]">{formatCurrency(sale.amountPaid)}</p>
           </div>
           <div>
-            <p className="text-xs uppercase tracking-[0.18em] text-[#55755e]">Saldo pendiente</p>
-            <p className="mt-1 font-semibold text-[#8c5b17]">
+            <p className="text-[13px] font-medium text-[var(--muted)]">Saldo pendiente</p>
+            <p className="mt-1 font-semibold text-[var(--amber-ink)]">
               {formatCurrency(getSaleBalance(sale.totalAmount, sale.amountPaid))}
             </p>
           </div>
         </div>
-        <div className="rounded-[22px] border border-[var(--line)] bg-white/80 p-4 text-sm">
+        <div className="rounded-[14px] border border-[var(--line)] p-3.5 text-[15px]">
           <p className="font-semibold">Historial de cobros</p>
           {sale.payments.length === 0 ? (
-            <p className="mt-2 text-xs text-[var(--muted)]">Todavía no hay cobros registrados.</p>
+            <p className="mt-2 text-xs text-[var(--muted)]">Todavía no hay cobros.</p>
           ) : (
             <ul className="mt-2 space-y-2">
               {sale.payments.map((payment) => (
@@ -387,6 +393,21 @@ function SaleDetailModal({
             </ul>
           )}
         </div>
+        {!sale.isVoided ? (
+          <div className="sheet-actions flex flex-wrap items-center justify-between gap-2">
+            {isAdmin ? (
+              <Button type="button" variant="ghost" className="text-[var(--danger)]" onClick={onReverse}>
+                <RotateCcw className="h-4 w-4" />
+                Anular venta
+              </Button>
+            ) : (
+              <span />
+            )}
+            <Button type="button" variant={sale.paymentStatus === "paid" ? "secondary" : "primary"} onClick={onEditPayment}>
+              {sale.paymentStatus === "paid" ? "Editar cobro" : "Registrar cobro"}
+            </Button>
+          </div>
+        ) : null}
       </div>
     </Modal>
   );
@@ -413,22 +434,22 @@ function ReverseSaleModal({
       description="Genera movimientos de reversa y conserva la venta como registro histórico."
     >
       <div className="space-y-4">
-        <div className="rounded-2xl border border-[var(--line)] bg-[#f7f5ef] px-4 py-3 text-sm text-[var(--muted)]">
-          Se reintegrará stock por {sale.contactName ?? "cliente sin nombre"} y la venta dejará de
-          contar en dashboard y reportes.
+        <div className="rounded-[var(--radius-control)] bg-[var(--surface-2)] px-3.5 py-3 text-[15px] text-[var(--ink-2)]">
+          Vuelve el stock de la venta a {sale.contactName ?? "cliente sin nombre"} y deja de contar en el tablero y
+          los reportes.
         </div>
-        <label className="space-y-2 text-sm font-semibold">
+        <label className="grid gap-1.5 text-sm font-semibold text-[var(--ink-2)]">
           Motivo
           <textarea
             value={reason}
             onChange={(event) => setReason(event.target.value)}
-            className="w-full rounded-2xl border border-[var(--line)] bg-white/90 px-4 py-3 text-sm font-normal"
+            className="min-h-24 w-full rounded-[var(--radius-control)] border border-[var(--line-strong)] bg-[var(--surface)] px-3.5 py-2.5 text-base font-normal focus:border-[var(--foreground)]"
             rows={4}
-            placeholder="Error de carga, devolución o cancelación."
+            placeholder="Error de carga, devolución o cancelación"
           />
         </label>
         {feedback ? <ActionNotice tone="error" message={feedback} /> : null}
-        <div className="flex justify-end gap-2">
+        <div className="sheet-actions flex justify-end gap-2">
           <Button type="button" variant="ghost" onClick={onClose}>
             Cancelar
           </Button>
@@ -489,13 +510,19 @@ export function SalesShell({
     ? saleRecords.find((sale) => sale.id === detailSaleId) ?? null
     : null;
 
-  useEffect(() => {
+  // Cuando el servidor manda datos nuevos (router.refresh), reemplazan a los locales.
+  const [syncedSales, setSyncedSales] = useState(sales);
+  if (syncedSales !== sales) {
+    setSyncedSales(sales);
     setSaleRecords(sortSales(sales));
-  }, [sales]);
+  }
 
-  useEffect(() => {
+  // Cuando el servidor manda datos nuevos (router.refresh), reemplazan a los locales.
+  const [syncedContacts, setSyncedContacts] = useState(contacts);
+  if (syncedContacts !== contacts) {
+    setSyncedContacts(contacts);
     setContactRecords(contacts);
-  }, [contacts]);
+  }
 
   const filteredSales = saleRecords.filter((sale) => {
     const query = deferredSearch.toLowerCase();
@@ -519,259 +546,210 @@ export function SalesShell({
     getSaleBalance(sale.totalAmount, sale.amountPaid),
   );
 
+  const statusFilters: { value: typeof statusFilter; label: string }[] = [
+    { value: "all", label: "Todas" },
+    { value: "pending", label: "A cobrar" },
+    { value: "partial", label: "Parciales" },
+    { value: "paid", label: "Cobradas" },
+  ];
+
   return (
     <div className="page-grid">
-      <div className="grid gap-4 xl:grid-cols-[1.7fr_1fr]">
-        <Panel>
-          <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
-            <div>
-              <p className="text-sm font-semibold uppercase tracking-[0.18em] text-[#55755e]">Ventas</p>
-              <h2 className="mt-2 text-3xl font-semibold">Pedidos y cobros</h2>
-              <p className="mt-2 text-sm text-[var(--muted)]">
-                Gestiona ventas multi-ítem, control de stock y seguimiento de cobro en un solo flujo.
-              </p>
-            </div>
-
-            <NewSaleModal
-              contacts={contactRecords}
-              products={products}
-              channels={channels}
-              priceTiers={priceTiers}
-              bundles={bundles}
-              role={role}
-              onSaleCreated={(result) => {
-                setSaleRecords((current) => upsertSale(current, result.sale));
-                setContactRecords((current) => upsertContact(current, result.contact));
-              }}
-            />
-          </div>
-        </Panel>
-
-        <Panel className="grid gap-4 md:grid-cols-2 xl:grid-cols-1">
-          <div>
-            <p className="text-sm text-[var(--muted)]">Facturación acumulada</p>
-            <p className="mt-2 text-3xl font-semibold">
+      <div className="grid gap-3 md:grid-cols-[1fr_auto] md:items-end">
+        <div className="grid grid-cols-2 gap-3 md:max-w-xl">
+          <Panel className="p-3.5 sm:p-4">
+            <p className="text-[13px] font-medium text-[var(--ink-2)]">Por cobrar</p>
+            <p className="font-[family-name:var(--font-heading)] text-2xl font-semibold tabular-nums text-[var(--amber-ink)]">
+              {formatCurrency(pendingAmount)}
+            </p>
+          </Panel>
+          <Panel className="p-3.5 sm:p-4">
+            <p className="text-[13px] font-medium text-[var(--ink-2)]">Facturado</p>
+            <p className="font-[family-name:var(--font-heading)] text-2xl font-semibold tabular-nums">
               {formatCurrency(sumBy(activeSales, (sale) => sale.totalAmount))}
             </p>
-          </div>
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-1">
-            <div>
-              <p className="text-sm text-[var(--muted)]">Pedidos cobrados</p>
-              <p className="mt-2 text-2xl font-semibold">{paidCount}</p>
-            </div>
-            <div>
-              <p className="text-sm text-[var(--muted)]">Pendiente de cobro</p>
-              <p className="mt-2 text-2xl font-semibold text-[#8c5b17]">
-                {formatCurrency(pendingAmount)}
-              </p>
-            </div>
-          </div>
-        </Panel>
+            <p className="text-[13px] text-[var(--muted)]">{paidCount} {paidCount === 1 ? "cobrada" : "cobradas"}</p>
+          </Panel>
+        </div>
+        <NewSaleModal
+          contacts={contactRecords}
+          products={products}
+          channels={channels}
+          priceTiers={priceTiers}
+          bundles={bundles}
+          role={role}
+          onSaleCreated={(result) => {
+            setSaleRecords((current) => upsertSale(current, result.sale));
+            setContactRecords((current) => upsertContact(current, result.contact));
+          }}
+        />
       </div>
 
-      <Panel>
-        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-          <div className="flex w-full flex-col gap-3 lg:flex-row lg:items-center">
-            <label className="flex min-w-0 flex-1 items-center gap-3 rounded-2xl border border-[var(--line)] bg-white/80 px-4 py-3">
-              <Search className="h-4 w-4 text-[var(--muted)]" />
-              <input
-                value={search}
-                onChange={(event) => setSearch(event.target.value)}
-                placeholder="Buscar por cliente, canal, producto o combo..."
-                aria-label="Buscar ventas"
-                className="min-w-0 flex-1 bg-transparent text-sm placeholder:text-[#7e867e]"
-              />
-            </label>
-            <div className="flex w-full items-center gap-2 rounded-2xl border border-[var(--line)] bg-white/80 px-4 py-3 sm:w-auto">
-              <Filter className="h-4 w-4 text-[var(--muted)]" />
-              <select
-                value={statusFilter}
-                onChange={(event) => setStatusFilter(event.target.value as typeof statusFilter)}
-                aria-label="Filtrar ventas por estado de cobro"
-                className="min-w-0 flex-1 bg-transparent text-sm sm:min-w-[190px]"
-              >
-                <option value="all">Todos los estados</option>
-                <option value="pending">Pendiente</option>
-                <option value="partial">Parcial</option>
-                <option value="paid">Pagado</option>
-              </select>
-            </div>
-          </div>
+      <div className="grid gap-2">
+        <label className="flex min-h-12 items-center gap-2 rounded-[var(--radius-control)] border border-[var(--line-strong)] bg-[var(--surface)] px-3.5 focus-within:border-[var(--foreground)]">
+          <Search className="h-4 w-4 shrink-0 text-[var(--muted)]" aria-hidden />
+          <input
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+            placeholder="Buscar cliente, canal o producto"
+            aria-label="Buscar ventas"
+            className="min-w-0 flex-1 bg-transparent text-base placeholder:text-[#958d84]"
+          />
+        </label>
+        <div className="chip-row" role="radiogroup" aria-label="Filtrar por cobro">
+          {statusFilters.map((filter) => (
+            <button
+              key={filter.value}
+              type="button"
+              role="radio"
+              aria-checked={statusFilter === filter.value}
+              onClick={() => setStatusFilter(filter.value)}
+              className={cn(
+                "min-h-10 rounded-full border px-3.5 text-sm font-semibold",
+                statusFilter === filter.value
+                  ? "border-[var(--foreground)] bg-[var(--foreground)] text-white"
+                  : "border-[var(--line-strong)] bg-[var(--surface)] text-[var(--ink-2)]",
+              )}
+            >
+              {filter.label}
+            </button>
+          ))}
         </div>
+      </div>
 
-        <div className="mt-5 overflow-hidden rounded-[26px] border border-[var(--line)]">
-          {filteredSales.length === 0 ? (
-            <div className="p-6">
-              <EmptyState
-                title={
-                  hasSearchQuery || hasStatusFilter
-                    ? "No encontramos ventas"
-                    : "Todavía no hay ventas"
-                }
-                description={
-                  hasSearchQuery || hasStatusFilter
-                    ? "Prueba otro término de búsqueda, cambia el filtro o registra un nuevo pedido."
-                    : "Registra tu primera venta para empezar a seguir pedidos y cobros."
-                }
-                icon={CircleDollarSign}
-              />
-            </div>
-          ) : (
-            <>
-              <div className="divide-y divide-[var(--line)] md:hidden">
-                {filteredSales.map((sale) => (
-                  <article key={sale.id} className="space-y-4 bg-white/80 p-4">
-                    <div className="flex items-start justify-between gap-3">
-                      <div>
-                        <p className="text-xs uppercase tracking-[0.18em] text-[#55755e]">
-                          {formatDate(sale.saleDate)}
-                        </p>
-                        <h3 className="mt-2 font-semibold">{sale.contactName ?? "Sin cliente"}</h3>
-                        <p className="text-sm text-[var(--muted)]">{sale.totalUnits} unidades</p>
-                      </div>
-                      <p className="text-lg font-semibold">{formatCurrency(sale.totalAmount)}</p>
-                    </div>
+      {filteredSales.length === 0 ? (
+        <EmptyState
+          title={hasSearchQuery || hasStatusFilter ? "Ninguna venta coincide" : "Todavía no hay ventas"}
+          description={
+            hasSearchQuery || hasStatusFilter
+              ? "Probá con otra búsqueda o cambiá el filtro."
+              : "Tocá «Nueva venta» o el botón Cargar para registrar la primera."
+          }
+          icon={CircleDollarSign}
+        />
+      ) : (
+        <>
+          <ul className="grid gap-2 md:hidden">
+            {filteredSales.map((sale) => {
+              const groups = groupSaleItems(sale.items);
+              const balance = getSaleBalance(sale.totalAmount, sale.amountPaid);
 
-                    <div className="flex flex-wrap gap-2">
-                      <Badge tone="accent">{sale.channelName ?? "Sin canal"}</Badge>
-                      <Badge tone={getPaymentTone(sale.paymentStatus)}>
-                        {getPaymentLabel(sale.paymentStatus)}
-                      </Badge>
-                      {sale.isVoided ? <Badge tone="danger">Anulada</Badge> : null}
-                    </div>
-                    <PaymentSummary sale={sale} />
+              return (
+                <li key={sale.id}>
+                  <button
+                    type="button"
+                    onClick={() => setDetailSaleId(sale.id)}
+                    className={cn(
+                      "grid w-full gap-2 rounded-[var(--radius-card)] border border-[var(--line)] bg-[var(--surface)] p-3.5 text-left active:bg-[var(--surface-2)]",
+                      sale.isVoided && "opacity-60",
+                    )}
+                  >
+                    <span className="flex items-start justify-between gap-3">
+                      <span className="min-w-0">
+                        <span className={cn("block truncate text-base font-semibold", sale.isVoided && "line-through")}>
+                          {sale.contactName ?? "Sin cliente"}
+                        </span>
+                        <span className="block text-[13px] text-[var(--muted)]">
+                          {formatDate(sale.saleDate)} · {sale.channelName ?? "Sin canal"}
+                        </span>
+                      </span>
+                      <span className="shrink-0 text-right">
+                        <span className="block font-[family-name:var(--font-heading)] text-lg font-semibold tabular-nums">
+                          {formatCurrency(sale.totalAmount)}
+                        </span>
+                        {!sale.isVoided && sale.paymentStatus !== "paid" ? (
+                          <span className="block text-[13px] font-semibold text-[var(--amber-ink)] tabular-nums">
+                            Debe {formatCurrency(balance)}
+                          </span>
+                        ) : null}
+                      </span>
+                    </span>
+                    <span className="truncate text-sm text-[var(--ink-2)]">
+                      {groups.map((group) => describeGroup(group)).join(" · ")}
+                    </span>
+                    <span className="flex items-center justify-between gap-2">
+                      <span className="flex flex-wrap gap-1.5">
+                        {sale.isVoided ? (
+                          <Badge tone="danger">Anulada</Badge>
+                        ) : (
+                          <Badge tone={getPaymentTone(sale.paymentStatus)}>{getPaymentLabel(sale.paymentStatus)}</Badge>
+                        )}
+                      </span>
+                      <ChevronRight className="h-4 w-4 text-[var(--muted)]" aria-hidden />
+                    </span>
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
 
-                    <div className="space-y-2 rounded-[22px] border border-[var(--line)] bg-[#f8f6ef] p-4 text-sm">
-                      {groupSaleItems(sale.items).slice(0, 3).map((group) => (
-                        <p key={group.key}>{describeGroup(group)}</p>
-                      ))}
-                      {groupSaleItems(sale.items).length > 3 ? (
-                        <p className="text-xs text-[var(--muted)]">
-                          +{groupSaleItems(sale.items).length - 3} items mas
-                        </p>
-                      ) : null}
-                    </div>
-
-                    <div className="grid gap-2 sm:grid-cols-2">
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        className="w-full justify-center sm:col-span-2"
-                        onClick={() => setDetailSaleId(sale.id)}
-                      >
-                        <Eye className="h-4 w-4" />
-                        Ver detalle
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="secondary"
-                        className="w-full justify-center"
-                        disabled={sale.isVoided}
-                        onClick={() => setSelectedSaleId(sale.id)}
-                      >
-                        Editar cobro
-                      </Button>
-                      {isAdmin ? (
-                        <Button
-                          type="button"
-                          variant="danger"
-                          className="w-full justify-center"
-                          disabled={sale.isVoided}
-                          onClick={() => setReverseSaleId(sale.id)}
-                        >
-                          <RotateCcw className="h-4 w-4" />
-                          Anular
-                        </Button>
-                      ) : null}
-                    </div>
-                  </article>
-                ))}
-              </div>
-
-              <div className="hidden overflow-x-auto md:block">
-                <table className="min-w-full text-left text-sm">
-                  <thead className="bg-[#f4f1e8] text-[var(--muted)]">
-                    <tr>
-                      <th className="px-4 py-3 font-medium">Fecha</th>
-                      <th className="px-4 py-3 font-medium">Cliente</th>
-                      <th className="px-4 py-3 font-medium">Items</th>
-                      <th className="px-4 py-3 font-medium">Canal</th>
-                      <th className="px-4 py-3 font-medium">Cobro</th>
-                      <th className="px-4 py-3 font-medium">Total</th>
-                      <th className="px-4 py-3 font-medium text-right">Acción</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {filteredSales.map((sale) => (
-                      <tr key={sale.id} className="border-t border-[var(--line)] bg-white/80">
-                        <td className="px-4 py-4">{formatDate(sale.saleDate)}</td>
-                        <td className="px-4 py-4">
+          <Panel className="hidden overflow-hidden p-0 md:block">
+            <div className="overflow-x-auto">
+              <table className="min-w-full text-left text-[15px]">
+                <thead className="border-b border-[var(--line)] bg-[var(--surface-2)] text-[13px] text-[var(--muted)]">
+                  <tr>
+                    <th className="px-4 py-3 font-semibold">Fecha</th>
+                    <th className="px-4 py-3 font-semibold">Cliente</th>
+                    <th className="px-4 py-3 font-semibold">Productos</th>
+                    <th className="px-4 py-3 font-semibold">Canal</th>
+                    <th className="px-4 py-3 font-semibold">Cobro</th>
+                    <th className="px-4 py-3 text-right font-semibold">Total</th>
+                    <th className="px-4 py-3 text-right font-semibold">
+                      <span className="sr-only">Acciones</span>
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredSales.map((sale) => {
+                    const groups = groupSaleItems(sale.items);
+                    return (
+                      <tr key={sale.id} className={cn("border-t border-[var(--line)] align-top", sale.isVoided && "opacity-60")}>
+                        <td className="whitespace-nowrap px-4 py-3 tabular-nums">{formatDate(sale.saleDate)}</td>
+                        <td className="px-4 py-3">
                           <p className="font-semibold">{sale.contactName ?? "Sin cliente"}</p>
-                          <p className="text-xs text-[var(--muted)]">{sale.totalUnits} unidades</p>
+                          <p className="text-[13px] text-[var(--muted)]">{sale.totalUnits} unidades</p>
                         </td>
-                        <td className="px-4 py-4">
-                          <div className="space-y-1">
-                            {groupSaleItems(sale.items).slice(0, 2).map((group) => (
-                              <p key={group.key} className="text-sm">
-                                {describeGroup(group)}
-                              </p>
-                            ))}
-                            {groupSaleItems(sale.items).length > 2 ? (
-                              <p className="text-xs text-[var(--muted)]">
-                                +{groupSaleItems(sale.items).length - 2} items mas
-                              </p>
-                            ) : null}
-                          </div>
+                        <td className="max-w-[320px] px-4 py-3">
+                          {groups.slice(0, 2).map((group) => (
+                            <p key={group.key} className="truncate">
+                              {describeGroup(group)}
+                            </p>
+                          ))}
+                          {groups.length > 2 ? (
+                            <p className="text-[13px] text-[var(--muted)]">y {groups.length - 2} más</p>
+                          ) : null}
                         </td>
-                        <td className="px-4 py-4">
-                          <Badge tone="accent">{sale.channelName ?? "Sin canal"}</Badge>
-                        </td>
-                        <td className="px-4 py-4">
-                          <Badge tone={getPaymentTone(sale.paymentStatus)}>
-                            {getPaymentLabel(sale.paymentStatus)}
-                          </Badge>
-                          {sale.isVoided ? <Badge tone="danger">Anulada</Badge> : null}
+                        <td className="px-4 py-3 text-[var(--ink-2)]">{sale.channelName ?? "Sin canal"}</td>
+                        <td className="px-4 py-3">
+                          {sale.isVoided ? (
+                            <Badge tone="danger">Anulada</Badge>
+                          ) : (
+                            <Badge tone={getPaymentTone(sale.paymentStatus)}>{getPaymentLabel(sale.paymentStatus)}</Badge>
+                          )}
                           <PaymentSummary sale={sale} />
                         </td>
-                        <td className="px-4 py-4 font-semibold">{formatCurrency(sale.totalAmount)}</td>
-                        <td className="px-4 py-4 text-right">
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            onClick={() => setDetailSaleId(sale.id)}
-                          >
-                            <Eye className="h-4 w-4" />
-                            Detalle
+                        <td className="whitespace-nowrap px-4 py-3 text-right font-semibold tabular-nums">
+                          {formatCurrency(sale.totalAmount)}
+                        </td>
+                        <td className="whitespace-nowrap px-2 py-2 text-right">
+                          <Button type="button" variant="ghost" onClick={() => setDetailSaleId(sale.id)}>
+                            Ver
                           </Button>
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            disabled={sale.isVoided}
-                            onClick={() => setSelectedSaleId(sale.id)}
-                          >
-                            Editar cobro
-                          </Button>
-                          {isAdmin ? (
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              disabled={sale.isVoided}
-                              onClick={() => setReverseSaleId(sale.id)}
-                            >
-                              <RotateCcw className="h-4 w-4" />
-                              Anular
+                          {!sale.isVoided && sale.paymentStatus !== "paid" ? (
+                            <Button type="button" variant="secondary" onClick={() => setSelectedSaleId(sale.id)}>
+                              Cobrar
                             </Button>
                           ) : null}
                         </td>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </>
-          )}
-        </div>
-      </Panel>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </Panel>
+        </>
+      )}
 
       {selectedSale ? (
         <PaymentModal
@@ -783,11 +761,13 @@ export function SalesShell({
           }}
         />
       ) : null}
-      {detailSale ? (
+      {detailSale && !selectedSale && !reverseSale ? (
         <SaleDetailModal
           sale={detailSale}
           isAdmin={isAdmin}
           onClose={() => setDetailSaleId(null)}
+          onEditPayment={() => setSelectedSaleId(detailSale.id)}
+          onReverse={() => setReverseSaleId(detailSale.id)}
         />
       ) : null}
       {reverseSale ? (

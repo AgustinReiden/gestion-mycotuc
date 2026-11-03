@@ -46,19 +46,18 @@ export function BundlesPanel({ bundles, products, isAdmin, onBundleSaved }: Bund
 
   return (
     <Panel>
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <p className="text-sm font-semibold uppercase tracking-[0.18em] text-[#55755e]">Combos</p>
-          <h2 className="mt-2 text-2xl font-semibold">Combos de productos</h2>
-          <p className="mt-2 text-sm text-[var(--muted)]">
+          <h2 className="text-xl font-semibold">Combos</h2>
+          <p className="mt-1 text-sm text-[var(--muted)]">
             {isAdmin
-              ? "Arma combos con precio propio. Al venderlos se descuenta el stock de cada componente."
+              ? "Armá combos con precio propio. Al venderlos se descuenta el stock de cada componente."
               : "Combos disponibles y sus componentes. Solo un administrador puede modificarlos."}
           </p>
         </div>
         {isAdmin ? (
-          <Button type="button" className="w-full sm:w-auto" onClick={() => setEditing("new")}>
-            <Plus className="h-4 w-4" />
+          <Button type="button" size="lg" className="w-full sm:w-auto" onClick={() => setEditing("new")}>
+            <Plus className="h-5 w-5" />
             Nuevo combo
           </Button>
         ) : null}
@@ -71,32 +70,32 @@ export function BundlesPanel({ bundles, products, isAdmin, onBundleSaved }: Bund
       ) : null}
 
       {bundles.length === 0 ? (
-        <div className="mt-5">
+        <div className="mt-4">
           <EmptyState
             title="Todavía no hay combos"
             description={
               isAdmin
-                ? "Crea un combo para vender varios productos con un precio fijo."
+                ? "Creá un combo para vender varios productos con un precio fijo."
                 : "Cuando un administrador cree combos, vas a verlos acá."
             }
             icon={Boxes}
           />
         </div>
       ) : (
-        <div className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+        <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
           {bundles.map((bundle) => (
             <article
               key={bundle.id}
-              className="flex flex-col gap-3 rounded-[24px] border border-[var(--line)] bg-white/80 p-4"
+              className="flex flex-col gap-3 rounded-[var(--radius-card)] border border-[var(--line)] bg-[var(--surface)] p-3.5"
             >
               <div className="flex items-start justify-between gap-3">
                 <div>
                   <h3 className="text-lg font-semibold">{bundle.name}</h3>
-                  <p className="text-xl font-semibold text-[#15553e]">{formatCurrency(bundle.salePrice)}</p>
+                  <p className="text-xl font-semibold text-[var(--moss)]">{formatCurrency(bundle.salePrice)}</p>
                 </div>
                 {bundle.isActive ? <Badge tone="success">Activo</Badge> : <Badge>Inactivo</Badge>}
               </div>
-              <ul className="space-y-1 rounded-[20px] border border-[var(--line)] bg-[#f7f5ef] p-3 text-sm">
+              <ul className="space-y-1 rounded-[var(--radius-control)] border border-[var(--line)] bg-[var(--surface-2)] p-3 text-sm">
                 {bundle.items.map((item) => (
                   <li key={item.id}>
                     {item.productName} x {formatQuantity(item.quantity)}
@@ -105,7 +104,7 @@ export function BundlesPanel({ bundles, products, isAdmin, onBundleSaved }: Bund
               </ul>
               {bundle.notes ? <p className="text-sm text-[var(--muted)]">{bundle.notes}</p> : null}
               {isAdmin ? (
-                <div className="mt-auto flex flex-col gap-2 sm:flex-row">
+                <div className="mt-auto flex gap-2">
                   <Button
                     type="button"
                     variant="secondary"
@@ -138,7 +137,7 @@ export function BundlesPanel({ bundles, products, isAdmin, onBundleSaved }: Bund
           open
           onClose={() => setEditing(null)}
           title={editing === "new" ? "Nuevo combo" : "Editar combo"}
-          description="Define nombre, precio y productos que componen el combo."
+          description="Definí nombre, precio y productos que componen el combo."
         >
           <BundleForm
             bundle={editing === "new" ? null : editing}

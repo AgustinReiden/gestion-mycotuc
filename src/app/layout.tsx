@@ -1,13 +1,14 @@
-import type { Metadata } from "next";
-import { Fraunces, Manrope } from "next/font/google";
+import type { Metadata, Viewport } from "next";
+import { Bricolage_Grotesque, Figtree } from "next/font/google";
 import "./globals.css";
 
-const headingFont = Fraunces({
+const headingFont = Bricolage_Grotesque({
   variable: "--font-heading",
   subsets: ["latin"],
+  weight: ["500", "600", "700"],
 });
 
-const bodyFont = Manrope({
+const bodyFont = Figtree({
   variable: "--font-sans",
   subsets: ["latin"],
 });
@@ -15,6 +16,14 @@ const bodyFont = Manrope({
 export const metadata: Metadata = {
   title: "Mycotuc Gestión",
   description: "Sistema de gestión para el emprendimiento Mycotuc.",
+  appleWebApp: { capable: true, title: "Mycotuc", statusBarStyle: "default" },
+};
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
+  themeColor: "#f1f2ee",
 };
 
 export default function RootLayout({

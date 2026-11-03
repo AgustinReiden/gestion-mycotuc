@@ -57,26 +57,26 @@ export function StockHistoryPanel({ title, description, movements }: StockHistor
   return (
     <Panel>
       <div className="flex items-start gap-3">
-        <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[#dce7ef] text-[#235b72]">
+        <div className="flex h-11 w-11 items-center justify-center rounded-[var(--radius-control)] bg-[var(--surface-2)] text-[var(--ink-2)]">
           <PackageSearch className="h-5 w-5" />
         </div>
         <div>
-          <h3 className="text-2xl font-semibold">{title}</h3>
+          <h3 className="text-xl font-semibold">{title}</h3>
           <p className="text-sm text-[var(--muted)]">{description}</p>
         </div>
       </div>
 
-      <div className="mt-5 space-y-3">
+      <div className="mt-4 space-y-2">
         {movements.length === 0 ? (
-          <div className="rounded-[24px] border border-[var(--line)] bg-white/80 p-4 text-sm text-[var(--muted)]">
+          <div className="rounded-[var(--radius-card)] border border-[var(--line)] bg-[var(--surface)] p-3.5 text-sm text-[var(--muted)]">
             Todavía no hay movimientos registrados.
           </div>
         ) : (
           movements.map((movement) => (
-            <div key={movement.id} className="rounded-[24px] border border-[var(--line)] bg-white/80 p-4">
+            <div key={movement.id} className="rounded-[var(--radius-card)] border border-[var(--line)] bg-[var(--surface)] p-3.5">
               <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                 <div className="flex items-start gap-3">
-                  <div className="mt-1 flex h-10 w-10 items-center justify-center rounded-2xl bg-[#f4f1e8] text-[#617166]">
+                  <div className="mt-1 flex h-10 w-10 items-center justify-center rounded-[var(--radius-control)] bg-[var(--surface-2)] text-[var(--ink-2)]">
                     {movement.quantity >= 0 ? (
                       <ArrowUpCircle className="h-5 w-5" />
                     ) : (
@@ -94,7 +94,7 @@ export function StockHistoryPanel({ title, description, movements }: StockHistor
                   </div>
                 </div>
 
-                <div className="flex flex-col items-start gap-2 text-left md:items-end md:text-right">
+                <div className="flex flex-row items-center justify-between gap-2 md:flex-col md:items-end md:text-right">
                   <Badge tone={getMovementTone(movement)}>
                     {getMovementLabel(movement)}
                   </Badge>

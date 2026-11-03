@@ -14,23 +14,23 @@ export function PurchaseHistoryPanel({ purchases, onReversePurchase }: PurchaseH
   return (
     <Panel>
       <div className="flex items-start gap-3">
-        <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[#f7e7c6] text-[#8c5b17]">
+        <div className="flex h-11 w-11 items-center justify-center rounded-[var(--radius-control)] bg-[var(--amber-soft)] text-[var(--amber-ink)]">
           <ReceiptText className="h-5 w-5" />
         </div>
         <div>
-          <h3 className="text-2xl font-semibold">Últimas compras</h3>
-          <p className="text-sm text-[var(--muted)]">Historial reciente de reposiciones cargadas en el sistema.</p>
+          <h3 className="text-xl font-semibold">Últimas compras</h3>
+          <p className="text-sm text-[var(--muted)]">Reposiciones cargadas recientemente.</p>
         </div>
       </div>
 
-      <div className="mt-5 space-y-3">
+      <div className="mt-4 space-y-2">
         {purchases.length === 0 ? (
-          <div className="rounded-[24px] border border-[var(--line)] bg-white/80 p-4 text-sm text-[var(--muted)]">
+          <div className="rounded-[var(--radius-card)] border border-[var(--line)] bg-[var(--surface)] p-3.5 text-sm text-[var(--muted)]">
             Todavía no hay compras registradas.
           </div>
         ) : (
           purchases.map((purchase) => (
-            <div key={purchase.id} className="rounded-[24px] border border-[var(--line)] bg-white/80 p-4">
+            <div key={purchase.id} className="rounded-[var(--radius-card)] border border-[var(--line)] bg-[var(--surface)] p-3.5">
               <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
                 <div>
                   <div className="flex flex-wrap items-center gap-2">
@@ -40,14 +40,15 @@ export function PurchaseHistoryPanel({ purchases, onReversePurchase }: PurchaseH
                   <p className="text-sm text-[var(--muted)]">{formatDate(purchase.purchaseDate)}</p>
                   {purchase.notes ? <p className="mt-1 text-sm text-[var(--muted)]">{purchase.notes}</p> : null}
                 </div>
-                <div className="flex flex-col items-start gap-2 md:items-end">
-                  <p className="text-lg font-semibold text-[#15553e]">
+                <div className="flex flex-row items-center justify-between gap-2 md:flex-col md:items-end">
+                  <p className="text-lg font-semibold text-[var(--moss)]">
                     {formatCurrency(purchase.totalAmount)}
                   </p>
                   {onReversePurchase ? (
                     <Button
                       type="button"
                       variant="ghost"
+                      className="text-[var(--danger)]"
                       disabled={purchase.isVoided}
                       onClick={() => onReversePurchase(purchase)}
                     >
