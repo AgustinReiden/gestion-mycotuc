@@ -2,7 +2,7 @@
 
 import { useDeferredValue, useEffect, useState, useTransition } from "react";
 import { Archive, Edit3, Plus, RotateCcw, Search, Settings2, ShoppingBasket } from "lucide-react";
-import { reverseSupplyPurchaseAction } from "@/actions/core";
+import { reverseSupplyPurchaseAction } from "@/actions/supplies";
 import { PurchaseHistoryPanel } from "@/components/app/purchase-history-panel";
 import { StockHistoryPanel } from "@/components/app/stock-history-panel";
 import { ActionNotice } from "@/components/forms/action-notice";
@@ -132,7 +132,7 @@ function NewSupplyModal({ onSupplySaved }: { onSupplySaved: (supply: SupplyRecor
         open={open}
         onClose={() => setOpen(false)}
         title="Nuevo insumo"
-        description="Mantiene al dia el catalogo base para compras y produccion."
+        description="Mantiene al día el catálogo base para compras y producción."
       >
         <SupplyForm
           supply={null}
@@ -172,7 +172,7 @@ function NewPurchaseModal({
         open={open}
         onClose={() => setOpen(false)}
         title="Registrar compra de insumos"
-        description="La compra aumenta stock y crea automaticamente el gasto asociado."
+        description="La compra aumenta stock y crea automáticamente el gasto asociado."
         size="xl"
       >
         <PurchaseForm
@@ -202,7 +202,7 @@ function EditSupplyModal({
       open
       onClose={onClose}
       title="Editar insumo"
-      description="Mantiene al dia el catalogo base para compras y produccion."
+      description="Mantiene al día el catálogo base para compras y producción."
     >
       <SupplyForm
         supply={supply}
@@ -266,8 +266,8 @@ function ReversePurchaseModal({
     >
       <div className="space-y-4">
         <div className="rounded-2xl border border-[var(--line)] bg-[#f7f5ef] px-4 py-3 text-sm text-[var(--muted)]">
-          La anulacion descontara los insumos comprados. Si ya fueron consumidos y el stock quedaria
-          negativo, la base rechazara la operacion.
+          La anulación descontará los insumos comprados. Si ya fueron consumidos y el stock quedaría
+          negativo, la base rechazará la operación.
         </div>
         <label className="space-y-2 text-sm font-semibold">
           Motivo
@@ -276,7 +276,7 @@ function ReversePurchaseModal({
             onChange={(event) => setReason(event.target.value)}
             className="w-full rounded-2xl border border-[var(--line)] bg-white/90 px-4 py-3 text-sm font-normal"
             rows={4}
-            placeholder="Error de carga, devolucion al proveedor o factura anulada."
+            placeholder="Error de carga, devolución al proveedor o factura anulada."
           />
         </label>
         {feedback ? <ActionNotice tone="error" message={feedback} /> : null}
@@ -363,7 +363,7 @@ export function SuppliesShell({
         <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
           <div>
             <p className="text-sm font-semibold uppercase tracking-[0.18em] text-[#55755e]">Insumos</p>
-            <h2 className="mt-2 text-3xl font-semibold">Reposicion y stock de fabrica</h2>
+            <h2 className="mt-2 text-3xl font-semibold">Reposición y stock de fábrica</h2>
             <p className="mt-2 text-sm text-[var(--muted)]">
               Controla existencias, compras ligadas a gastos y ajustes manuales de inventario.
             </p>
@@ -411,10 +411,10 @@ export function SuppliesShell({
       {filteredSupplies.length === 0 ? (
         <Panel>
           <EmptyState
-            title={hasSearchQuery ? "No encontramos insumos" : "Todavia no hay insumos"}
+            title={hasSearchQuery ? "No encontramos insumos" : "Todavía no hay insumos"}
             description={
               hasSearchQuery
-                ? "Prueba otro termino de busqueda o crea un insumo nuevo."
+                ? "Prueba otro término de búsqueda o crea un insumo nuevo."
                 : "Crea insumos base para empezar a registrar compras y movimientos."
             }
             icon={Archive}
@@ -442,9 +442,9 @@ export function SuppliesShell({
                     Stock: {supply.currentStock} {supply.unit}
                   </p>
                   <p>
-                    Minimo: {supply.minStock} {supply.unit}
+                    Mínimo: {supply.minStock} {supply.unit}
                   </p>
-                  <p>Ultima compra: {formatDate(supply.lastPurchaseAt)}</p>
+                  <p>Última compra: {formatDate(supply.lastPurchaseAt)}</p>
                   {isAdmin && supply.avgCost !== null ? (
                     <>
                       <p>Costo promedio: {formatCurrency(supply.avgCost)}</p>
@@ -483,8 +483,8 @@ export function SuppliesShell({
                 <tr>
                   <th className="px-4 py-3 font-medium">Insumo</th>
                   <th className="px-4 py-3 font-medium">Stock actual</th>
-                  <th className="px-4 py-3 font-medium">Minimo</th>
-                  <th className="px-4 py-3 font-medium">Ultima compra</th>
+                  <th className="px-4 py-3 font-medium">Mínimo</th>
+                  <th className="px-4 py-3 font-medium">Última compra</th>
                   {isAdmin ? (
                     <>
                       <th className="px-4 py-3 font-medium">Costo promedio</th>
@@ -551,7 +551,7 @@ export function SuppliesShell({
         />
         <StockHistoryPanel
           title="Historial de stock de insumos"
-          description="Entradas por compra, salidas por produccion y ajustes manuales."
+          description="Entradas por compra, salidas por producción y ajustes manuales."
           movements={movementRecords}
         />
       </div>

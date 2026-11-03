@@ -17,14 +17,47 @@ export function formatCurrency(amount: number) {
   return currencyFormatter.format(Number.isFinite(amount) ? amount : 0);
 }
 
-export function formatDate(value: string | null | undefined, dateFormat = "dd MMM yyyy") {
+const DATE_PREFIX = /^(\d{4})-(\d{2})-(\d{2})(?:$|[T\s])/;
+
+/**
+ * Convierte "yyyy-mm-dd" (o un timestamp ISO que arranca con esa fecha) en un
+ * Date local a medianoche. Se usa el día calendario del texto, sin pasar por
+ * UTC, para que "2026-11-03" nunca se muestre como 2 de noviembre.
+ */
+export function parseCalendarDate(value: string | null | undefined) {
   if (!value) {
-    return "-";
+    return null;
   }
 
-  const parsedDate = parseISO(value);
+  const match = DATE_PREFIX.exec(value.trim());
 
-  if (!isValid(parsedDate)) {
+  if (!match) {
+    return null;
+  }
+
+  const [, year, month, day] = match;
+  const parsed = new Date(Number(year), Number(month) - 1, Number(day));
+
+  if (
+    parsed.getFullYear() !== Number(year) ||
+    parsed.getMonth() !== Number(month) - 1 ||
+    parsed.getDate() !== Number(day)
+  ) {
+    return null;
+  }
+
+  return parsed;
+}
+
+/** Fecha de hoy en zona local como "yyyy-mm-dd" (no usa UTC, así no se corre de noche). */
+export function todayISO(now = new Date()) {
+  return format(now, "yyyy-MM-dd");
+}
+
+export function formatDate(value: string | null | undefined, dateFormat = "dd MMM yyyy") {
+  const parsedDate = parseCalendarDate(value) ?? (value ? parseISO(value) : null);
+
+  if (!parsedDate || !isValid(parsedDate)) {
     return "-";
   }
 

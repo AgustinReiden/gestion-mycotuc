@@ -22,9 +22,9 @@ export default function Error({
         <div className="mb-6 flex h-16 w-16 items-center justify-center rounded-2xl bg-[#faebe8] text-[#a54b3d]">
           <AlertTriangle className="h-8 w-8" />
         </div>
-        <h2 className="text-3xl font-semibold">Algo salio mal</h2>
+        <h2 className="text-3xl font-semibold">Algo salió mal</h2>
         <p className="mt-3 text-[var(--muted)]">
-          Ocurrio un error inesperado. Por favor, intenta de nuevo.
+          Ocurrió un error inesperado. Por favor, intenta de nuevo.
         </p>
         <Button onClick={() => reset()} className="mt-8">
           Intentar de nuevo

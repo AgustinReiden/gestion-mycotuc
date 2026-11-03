@@ -3,7 +3,7 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useEffect, useState, useTransition } from "react";
 import { Controller, useForm } from "react-hook-form";
-import { saveContactAction } from "@/actions/core";
+import { saveContactAction } from "@/actions/contacts";
 import { CONTACT_TYPES } from "@/lib/constants";
 import type { ContactRecord } from "@/lib/domain";
 import { contactFormSchema } from "@/lib/validators";
@@ -101,14 +101,14 @@ export function ContactForm({ contact, onSuccess }: ContactFormProps) {
             control={form.control}
             name="name"
             render={({ field }) => (
-              <TextInput {...field} value={toInputValue(field.value)} placeholder="Maria Gonzalez" />
+              <TextInput {...field} value={toInputValue(field.value)} placeholder="María González" />
             )}
           />
         </Field>
       </div>
 
       <div className="grid gap-4 md:grid-cols-2">
-        <Field label="Telefono" error={form.formState.errors.phone?.message}>
+        <Field label="Teléfono" error={form.formState.errors.phone?.message}>
           <Controller
             control={form.control}
             name="phone"

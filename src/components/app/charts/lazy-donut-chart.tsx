@@ -8,7 +8,7 @@ const DonutChart = dynamic(
     ssr: false,
     loading: () => (
       <div className="flex h-[200px] w-full items-center justify-center rounded-[24px] border border-[var(--line)] bg-white/50 text-sm text-[var(--muted)]">
-        Cargando grafico...
+        Cargando gráfico...
       </div>
     ),
   },

@@ -5,7 +5,7 @@ import { Plus, Trash2 } from "lucide-react";
 import { useState, useTransition } from "react";
 import { Controller, useFieldArray, useForm, useWatch } from "react-hook-form";
 import type { z } from "zod";
-import { savePriceTiersAction } from "@/actions/core";
+import { savePriceTiersAction } from "@/actions/catalog";
 import { ActionNotice } from "@/components/forms/action-notice";
 import { getFirstFormError, toInputValue, toNumberValue } from "@/components/forms/value-helpers";
 import { Button } from "@/components/ui/button";
@@ -82,7 +82,7 @@ export function PriceTiersForm({ product, tiers, onSuccess }: PriceTiersFormProp
             className="grid gap-3 rounded-[24px] border border-[var(--line)] bg-white/90 p-4 md:grid-cols-[1fr_1fr_auto]"
           >
             <Field
-              label="Cantidad minima"
+              label="Cantidad mínima"
               error={form.formState.errors.tiers?.[index]?.minQty?.message}
             >
               <Controller
@@ -148,7 +148,7 @@ export function PriceTiersForm({ product, tiers, onSuccess }: PriceTiersFormProp
 
       {preview.length > 0 ? (
         <div className="rounded-2xl border border-[var(--line)] bg-[#eef4ea] px-4 py-3 text-sm text-[#1e5f44]">
-          <p className="font-semibold">Asi quedan ordenadas</p>
+          <p className="font-semibold">Así quedan ordenadas</p>
           <ul className="mt-1 space-y-1">
             {preview.map((tier, index) => (
               <li key={`${tier.minQty}-${index}`}>

@@ -18,7 +18,7 @@ export function PurchaseHistoryPanel({ purchases, onReversePurchase }: PurchaseH
           <ReceiptText className="h-5 w-5" />
         </div>
         <div>
-          <h3 className="text-2xl font-semibold">Ultimas compras</h3>
+          <h3 className="text-2xl font-semibold">Últimas compras</h3>
           <p className="text-sm text-[var(--muted)]">Historial reciente de reposiciones cargadas en el sistema.</p>
         </div>
       </div>
@@ -26,7 +26,7 @@ export function PurchaseHistoryPanel({ purchases, onReversePurchase }: PurchaseH
       <div className="mt-5 space-y-3">
         {purchases.length === 0 ? (
           <div className="rounded-[24px] border border-[var(--line)] bg-white/80 p-4 text-sm text-[var(--muted)]">
-            Todavia no hay compras registradas.
+            Todavía no hay compras registradas.
           </div>
         ) : (
           purchases.map((purchase) => (

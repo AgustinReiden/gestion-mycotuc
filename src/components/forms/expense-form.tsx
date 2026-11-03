@@ -4,13 +4,14 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useEffect, useState, useTransition } from "react";
 import { Controller, useForm, useWatch } from "react-hook-form";
 import type { z } from "zod";
-import { createExpenseAction } from "@/actions/core";
+import { createExpenseAction } from "@/actions/expenses";
 import { ActionNotice } from "@/components/forms/action-notice";
 import { Button } from "@/components/ui/button";
 import { Field, SelectInput, TextInput, TextareaInput } from "@/components/ui/fields";
 import { getFirstFormError, toInputValue, toNumberValue } from "@/components/forms/value-helpers";
 import type { ExpenseRecord, LookupOption } from "@/lib/domain";
 import { expenseFormSchema } from "@/lib/validators";
+import { todayISO } from "@/lib/utils";
 
 type ExpenseFormValues = z.input<typeof expenseFormSchema>;
 
@@ -22,7 +23,7 @@ type ExpenseFormProps = {
 function getDefaultValues(categories: LookupOption[]): ExpenseFormValues {
   return {
     concept: "",
-    expenseDate: new Date().toISOString().slice(0, 10),
+    expenseDate: todayISO(),
     categoryId: categories[0]?.id ?? "",
     amount: 0,
     notes: "",
@@ -64,7 +65,7 @@ export function ExpenseForm({ categories, onSuccess }: ExpenseFormProps) {
           if (!hasCategories) {
             setFeedback({
               tone: "error",
-              message: "No podemos registrar el gasto todavia: falta al menos una categoria activa.",
+              message: "No podemos registrar el gasto todavía: falta al menos una categoría activa.",
             });
             return;
           }
@@ -89,7 +90,7 @@ export function ExpenseForm({ categories, onSuccess }: ExpenseFormProps) {
       {!hasCategories ? (
         <ActionNotice
           tone="warning"
-          message="Antes de registrar un gasto manual, crea al menos una categoria activa."
+          message="Antes de registrar un gasto manual, crea al menos una categoría activa."
         />
       ) : null}
 
@@ -122,13 +123,13 @@ export function ExpenseForm({ categories, onSuccess }: ExpenseFormProps) {
             )}
           />
         </Field>
-        <Field label="Categoria" error={form.formState.errors.categoryId?.message}>
+        <Field label="Categoría" error={form.formState.errors.categoryId?.message}>
           <Controller
             control={form.control}
             name="categoryId"
             render={({ field }) => (
               <SelectInput {...field} value={toInputValue(field.value)} disabled={!hasCategories}>
-                {!hasCategories ? <option value="">No hay categorias activas disponibles</option> : null}
+                {!hasCategories ? <option value="">No hay categorías activas disponibles</option> : null}
                 {categories.map((category) => (
                   <option key={category.id} value={category.id}>
                     {category.name}

@@ -123,7 +123,7 @@ export function ContactsShell({ contacts }: ContactsShellProps) {
       {filteredContacts.length === 0 ? (
         <Panel>
           <EmptyState
-            title={hasActiveFilters ? "No encontramos contactos" : "Todavia no hay contactos"}
+            title={hasActiveFilters ? "No encontramos contactos" : "Todavía no hay contactos"}
             description={
               hasActiveFilters
                 ? "Prueba otro filtro o crea un contacto nuevo."
@@ -150,7 +150,7 @@ export function ContactsShell({ contacts }: ContactsShellProps) {
               </div>
 
               <div className="rounded-[24px] border border-[var(--line)] bg-[#f7f5ef] p-4 text-sm text-[var(--muted)]">
-                <p>Telefono: {contact.phone ?? "-"}</p>
+                <p>Teléfono: {contact.phone ?? "-"}</p>
                 <p className="mt-2">Notas: {contact.notes ?? "-"}</p>
               </div>
 

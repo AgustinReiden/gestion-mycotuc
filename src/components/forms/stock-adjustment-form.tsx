@@ -4,13 +4,14 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useEffect, useState, useTransition } from "react";
 import { Controller, useForm } from "react-hook-form";
 import type { z } from "zod";
-import { applyStockAdjustmentAction } from "@/actions/core";
+import { applyStockAdjustmentAction } from "@/actions/inventory";
 import { ActionNotice } from "@/components/forms/action-notice";
 import { Button } from "@/components/ui/button";
 import { Field, TextInput, TextareaInput } from "@/components/ui/fields";
 import { getFirstFormError, toInputValue, toNumberValue } from "@/components/forms/value-helpers";
 import type { EntityType, InventoryMovementRecord, ProductRecord, SupplyRecord } from "@/lib/domain";
 import { stockAdjustmentSchema } from "@/lib/validators";
+import { todayISO } from "@/lib/utils";
 
 type AdjustmentValues = z.input<typeof stockAdjustmentSchema>;
 
@@ -40,7 +41,7 @@ export function StockAdjustmentForm({
       entityId,
       quantity: 0,
       notes: "",
-      movementDate: new Date().toISOString().slice(0, 10),
+      movementDate: todayISO(),
     },
   });
 
@@ -50,7 +51,7 @@ export function StockAdjustmentForm({
       entityId,
       quantity: 0,
       notes: "",
-      movementDate: new Date().toISOString().slice(0, 10),
+      movementDate: todayISO(),
     });
   }, [entityId, entityType, form]);
 
@@ -69,7 +70,7 @@ export function StockAdjustmentForm({
                 entityId,
                 quantity: 0,
                 notes: "",
-                movementDate: new Date().toISOString().slice(0, 10),
+                movementDate: todayISO(),
               });
               return;
             }
@@ -88,7 +89,7 @@ export function StockAdjustmentForm({
       </div>
 
       <div className="grid gap-4 md:grid-cols-2">
-        <Field label="Variacion" error={form.formState.errors.quantity?.message}>
+        <Field label="Variación" error={form.formState.errors.quantity?.message}>
           <Controller
             control={form.control}
             name="quantity"

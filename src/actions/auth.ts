@@ -13,8 +13,8 @@ export async function loginAction(input: unknown): Promise<ActionResponse> {
   if (!parsed.success) {
     return {
       success: false,
-      message: "No pudimos iniciar sesion.",
-      error: parsed.error.issues[0]?.message ?? "Credenciales invalidas.",
+      message: "No pudimos iniciar sesión.",
+      error: parsed.error.issues[0]?.message ?? "Credenciales inválidas.",
     };
   }
 
@@ -24,7 +24,7 @@ export async function loginAction(input: unknown): Promise<ActionResponse> {
   if (error) {
     return {
       success: false,
-      message: "No pudimos iniciar sesion.",
+      message: "No pudimos iniciar sesión.",
       error: error.message,
     };
   }
@@ -44,7 +44,7 @@ export async function signOutAction(): Promise<ActionResponse> {
   if (error) {
     return {
       success: false,
-      message: "No pudimos cerrar la sesion.",
+      message: "No pudimos cerrar la sesión.",
       error: error.message,
     };
   }

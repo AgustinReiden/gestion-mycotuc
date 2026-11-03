@@ -5,7 +5,7 @@ import { Plus, Trash2 } from "lucide-react";
 import { useState, useTransition } from "react";
 import { Controller, useFieldArray, useForm, useWatch } from "react-hook-form";
 import type { z } from "zod";
-import { saveBundleAction } from "@/actions/core";
+import { saveBundleAction } from "@/actions/catalog";
 import { ActionNotice } from "@/components/forms/action-notice";
 import { getFirstFormError, toInputValue, toNumberValue } from "@/components/forms/value-helpers";
 import { Button } from "@/components/ui/button";
@@ -199,7 +199,7 @@ export function BundleForm({ bundle, products, onSuccess }: BundleFormProps) {
               {...field}
               value={toInputValue(field.value)}
               rows={3}
-              placeholder="Presentacion, promocion o condiciones del combo."
+              placeholder="Presentación, promoción o condiciones del combo."
             />
           )}
         />

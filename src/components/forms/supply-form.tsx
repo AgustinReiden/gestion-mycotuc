@@ -4,7 +4,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useEffect, useState, useTransition } from "react";
 import { Controller, useForm } from "react-hook-form";
 import type { z } from "zod";
-import { saveSupplyAction } from "@/actions/core";
+import { saveSupplyAction } from "@/actions/supplies";
 import { ActionNotice } from "@/components/forms/action-notice";
 import { Button } from "@/components/ui/button";
 import { Field, TextInput, TextareaInput } from "@/components/ui/fields";
@@ -79,7 +79,7 @@ export function SupplyForm({ supply, onSuccess }: SupplyFormProps) {
             control={form.control}
             name="name"
             render={({ field }) => (
-              <TextInput {...field} value={toInputValue(field.value)} placeholder="Aserrin" />
+              <TextInput {...field} value={toInputValue(field.value)} placeholder="Aserrín" />
             )}
           />
         </Field>
@@ -94,7 +94,7 @@ export function SupplyForm({ supply, onSuccess }: SupplyFormProps) {
         </Field>
       </div>
 
-      <Field label="Stock minimo" error={form.formState.errors.minStock?.message}>
+      <Field label="Stock mínimo" error={form.formState.errors.minStock?.message}>
         <Controller
           control={form.control}
           name="minStock"

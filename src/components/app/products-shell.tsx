@@ -91,7 +91,7 @@ function NewProductModal({
         <Plus className="h-4 w-4" />
         Nuevo producto
       </Button>
-      <Modal open={open} onClose={() => setOpen(false)} title="Nuevo producto" description="Actualiza catalogo, precio y stock minimo.">
+      <Modal open={open} onClose={() => setOpen(false)} title="Nuevo producto" description="Actualiza catálogo, precio y stock mínimo.">
         <ProductForm product={null} categories={categories} onSuccess={(product) => { setOpen(false); onProductSaved(product); }} />
       </Modal>
     </>
@@ -110,7 +110,7 @@ function EditProductModal({
   onProductSaved: (product: ProductRecord) => void;
 }) {
   return (
-    <Modal open onClose={onClose} title="Editar producto" description="Actualiza catalogo, precio y stock minimo.">
+    <Modal open onClose={onClose} title="Editar producto" description="Actualiza catálogo, precio y stock mínimo.">
       <ProductForm product={product} categories={categories} onSuccess={(updatedProduct) => { onProductSaved(updatedProduct); onClose(); }} />
     </Modal>
   );
@@ -154,7 +154,7 @@ function AdjustStockModal({
   }) => void;
 }) {
   return (
-    <Modal open onClose={onClose} title="Ajustar stock" description="Registra una correccion manual para mantener inventario trazable.">
+    <Modal open onClose={onClose} title="Ajustar stock" description="Registra una corrección manual para mantener inventario trazable.">
       <StockAdjustmentForm
         entityType="product"
         entityId={product.id}
@@ -218,9 +218,9 @@ export function ProductsShell({
         <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
           <div>
             <p className="text-sm font-semibold uppercase tracking-[0.18em] text-[#55755e]">Productos</p>
-            <h2 className="mt-2 text-3xl font-semibold">Catalogo de venta</h2>
+            <h2 className="mt-2 text-3xl font-semibold">Catálogo de venta</h2>
             <p className="mt-2 text-sm text-[var(--muted)]">
-              Administra precios, stock minimo y ajustes manuales de producto terminado.
+              Administra precios, stock mínimo y ajustes manuales de producto terminado.
             </p>
           </div>
           <div className="flex flex-col gap-3 sm:flex-row">
@@ -250,8 +250,8 @@ export function ProductsShell({
             title={hasSearchQuery ? "No encontramos productos" : "No hay productos para mostrar"}
             description={
               hasSearchQuery
-                ? "Prueba otro termino de busqueda o crea un producto nuevo."
-                : "Crea tu primer producto o prueba otra busqueda."
+                ? "Prueba otro término de búsqueda o crea un producto nuevo."
+                : "Crea tu primer producto o prueba otra búsqueda."
             }
             icon={Package}
           />
@@ -354,7 +354,7 @@ export function ProductsShell({
 
       <StockHistoryPanel
         title="Historial de stock de productos"
-        description="Ultimos movimientos que afectaron el inventario de producto terminado."
+        description="Últimos movimientos que afectaron el inventario de producto terminado."
         movements={movementRecords}
       />
 

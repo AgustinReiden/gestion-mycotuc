@@ -2,7 +2,7 @@
 
 import { useDeferredValue, useEffect, useState, useTransition } from "react";
 import { Plus, RotateCcw, Sprout, Warehouse } from "lucide-react";
-import { reverseProductionBatchAction } from "@/actions/core";
+import { reverseProductionBatchAction } from "@/actions/production";
 import { ProductionBatchForm } from "@/components/forms/production-batch-form";
 import { ActionNotice } from "@/components/forms/action-notice";
 import { Badge } from "@/components/ui/badge";
@@ -143,12 +143,12 @@ function ReverseBatchModal({
       open
       onClose={onClose}
       title="Anular lote"
-      description="Cancela el lote y revierte inventario si ya habia sido completado."
+      description="Cancela el lote y revierte inventario si ya había sido completado."
     >
       <div className="space-y-4">
         <div className="rounded-2xl border border-[var(--line)] bg-[#f7f5ef] px-4 py-3 text-sm text-[var(--muted)]">
-          Si el lote ya impacto inventario, se devolveran insumos y se descontaran salidas. La base
-          rechazara la anulacion si los productos quedarian con stock negativo.
+          Si el lote ya impactó inventario, se devolverán insumos y se descontarán salidas. La base
+          rechazará la anulación si los productos quedarían con stock negativo.
         </div>
         <label className="space-y-2 text-sm font-semibold">
           Motivo
@@ -225,7 +225,7 @@ export function ProductionShell({ batches, products, supplies, role }: Productio
       <Panel>
         <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
           <div>
-            <p className="text-sm font-semibold uppercase tracking-[0.18em] text-[#55755e]">Produccion</p>
+            <p className="text-sm font-semibold uppercase tracking-[0.18em] text-[#55755e]">Producción</p>
             <h2 className="mt-2 text-3xl font-semibold">Lotes, consumos y rendimiento</h2>
             <p className="mt-2 text-sm text-[var(--muted)]">
               Sigue cada lote simple y registra impacto real sobre insumos y producto terminado.
@@ -238,7 +238,7 @@ export function ProductionShell({ batches, products, supplies, role }: Productio
                 value={search}
                 onChange={(event) => setSearch(event.target.value)}
                 placeholder="Buscar lote o insumo..."
-                aria-label="Buscar lotes de produccion"
+                aria-label="Buscar lotes de producción"
                 className="flex-1 bg-transparent text-sm placeholder:text-[#7e867e]"
               />
             </label>
@@ -256,11 +256,11 @@ export function ProductionShell({ batches, products, supplies, role }: Productio
       {filteredBatches.length === 0 ? (
         <Panel>
           <EmptyState
-            title={hasSearchQuery ? "No encontramos lotes" : "Todavia no hay lotes"}
+            title={hasSearchQuery ? "No encontramos lotes" : "Todavía no hay lotes"}
             description={
               hasSearchQuery
-                ? "Prueba otro termino de busqueda o crea un lote nuevo."
-                : "Crea un lote para empezar a seguir produccion y rendimiento."
+                ? "Prueba otro término de búsqueda o crea un lote nuevo."
+                : "Crea un lote para empezar a seguir producción y rendimiento."
             }
             icon={Sprout}
           />

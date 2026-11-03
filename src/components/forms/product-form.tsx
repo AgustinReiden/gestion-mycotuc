@@ -4,7 +4,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useEffect, useState, useTransition } from "react";
 import { Controller, useForm } from "react-hook-form";
 import type { z } from "zod";
-import { saveProductAction } from "@/actions/core";
+import { saveProductAction } from "@/actions/products";
 import { ActionNotice } from "@/components/forms/action-notice";
 import { Button } from "@/components/ui/button";
 import { Field, SelectInput, TextInput, TextareaInput } from "@/components/ui/fields";
@@ -98,11 +98,11 @@ export function ProductForm({ product, categories, onSuccess }: ProductFormProps
           />
         </Field>
         <Field
-          label="Categoria"
+          label="Categoría"
           error={form.formState.errors.category?.message}
           hint={
             hasInactiveCategory
-              ? "La categoria actual no esta activa. Elegi una categoria activa para guardar."
+              ? "La categoría actual no está activa. Elegí una categoría activa para guardar."
               : undefined
           }
         >
@@ -112,7 +112,7 @@ export function ProductForm({ product, categories, onSuccess }: ProductFormProps
             render={({ field }) => (
               <SelectInput {...field} value={toInputValue(field.value)} disabled={activeCategories.length === 0}>
                 {activeCategories.length === 0 ? (
-                  <option value="">No hay categorias activas</option>
+                  <option value="">No hay categorías activas</option>
                 ) : null}
                 {hasInactiveCategory ? (
                   <option value={currentCategory} disabled>
@@ -158,7 +158,7 @@ export function ProductForm({ product, categories, onSuccess }: ProductFormProps
             )}
           />
         </Field>
-        <Field label="Stock minimo" error={form.formState.errors.minStock?.message}>
+        <Field label="Stock mínimo" error={form.formState.errors.minStock?.message}>
           <Controller
             control={form.control}
             name="minStock"
@@ -187,7 +187,7 @@ export function ProductForm({ product, categories, onSuccess }: ProductFormProps
               {...field}
               value={toInputValue(field.value)}
               rows={4}
-              placeholder="Formato, presentacion o datos utiles."
+              placeholder="Formato, presentación o datos útiles."
             />
           )}
         />

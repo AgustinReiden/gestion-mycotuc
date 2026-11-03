@@ -2,7 +2,7 @@
 
 import { useDeferredValue, useEffect, useState, useTransition } from "react";
 import { CircleDollarSign, Eye, Filter, Plus, RotateCcw, Search } from "lucide-react";
-import { reverseSaleOrderAction } from "@/actions/core";
+import { reverseSaleOrderAction } from "@/actions/sales";
 import { ActionNotice } from "@/components/forms/action-notice";
 import { PaymentStatusForm } from "@/components/forms/payment-status-form";
 import { SaleOrderForm } from "@/components/forms/sale-order-form";
@@ -211,7 +211,7 @@ function NewSaleModal({
         open={open}
         onClose={() => setOpen(false)}
         title="Nueva venta"
-        description="Registra un pedido y descuenta stock automaticamente."
+        description="Registra un pedido y descuenta stock automáticamente."
         size="xl"
       >
         <SaleOrderForm
@@ -247,7 +247,7 @@ function PaymentModal({
       open
       onClose={onClose}
       title="Actualizar estado de cobro"
-      description="Registra un cobro parcial, salda el pedido o ajusta metodo y fecha de cobro."
+      description="Registra un cobro parcial, salda el pedido o ajusta método y fecha de cobro."
     >
       <PaymentStatusForm
         saleOrderId={sale.id}
@@ -353,7 +353,7 @@ function SaleDetailModal({
             </div>
             {margin.missingCostLines > 0 ? (
               <p className="text-xs text-[var(--muted)] sm:col-span-3">
-                {margin.missingCostLines} linea(s) sin costo registrado no entran al margen.
+                {margin.missingCostLines} línea(s) sin costo registrado no entran al margen.
               </p>
             ) : null}
           </div>
@@ -373,13 +373,13 @@ function SaleDetailModal({
         <div className="rounded-[22px] border border-[var(--line)] bg-white/80 p-4 text-sm">
           <p className="font-semibold">Historial de cobros</p>
           {sale.payments.length === 0 ? (
-            <p className="mt-2 text-xs text-[var(--muted)]">Todavia no hay cobros registrados.</p>
+            <p className="mt-2 text-xs text-[var(--muted)]">Todavía no hay cobros registrados.</p>
           ) : (
             <ul className="mt-2 space-y-2">
               {sale.payments.map((payment) => (
                 <li key={payment.id} className="flex items-center justify-between gap-3">
                   <span className="text-[var(--muted)]">
-                    {formatDate(payment.paidAt)} - {payment.paymentMethod ?? "Sin metodo"}
+                    {formatDate(payment.paidAt)} - {payment.paymentMethod ?? "Sin método"}
                   </span>
                   <span className="font-semibold">{formatCurrency(payment.amount)}</span>
                 </li>
@@ -410,11 +410,11 @@ function ReverseSaleModal({
       open
       onClose={onClose}
       title="Anular venta"
-      description="Genera movimientos de reversa y conserva la venta como registro historico."
+      description="Genera movimientos de reversa y conserva la venta como registro histórico."
     >
       <div className="space-y-4">
         <div className="rounded-2xl border border-[var(--line)] bg-[#f7f5ef] px-4 py-3 text-sm text-[var(--muted)]">
-          Se reintegrara stock por {sale.contactName ?? "cliente sin nombre"} y la venta dejara de
+          Se reintegrará stock por {sale.contactName ?? "cliente sin nombre"} y la venta dejará de
           contar en dashboard y reportes.
         </div>
         <label className="space-y-2 text-sm font-semibold">
@@ -424,7 +424,7 @@ function ReverseSaleModal({
             onChange={(event) => setReason(event.target.value)}
             className="w-full rounded-2xl border border-[var(--line)] bg-white/90 px-4 py-3 text-sm font-normal"
             rows={4}
-            placeholder="Error de carga, devolucion o cancelacion."
+            placeholder="Error de carga, devolución o cancelación."
           />
         </label>
         {feedback ? <ActionNotice tone="error" message={feedback} /> : null}
@@ -528,7 +528,7 @@ export function SalesShell({
               <p className="text-sm font-semibold uppercase tracking-[0.18em] text-[#55755e]">Ventas</p>
               <h2 className="mt-2 text-3xl font-semibold">Pedidos y cobros</h2>
               <p className="mt-2 text-sm text-[var(--muted)]">
-                Gestiona ventas multi-item, control de stock y seguimiento de cobro en un solo flujo.
+                Gestiona ventas multi-ítem, control de stock y seguimiento de cobro en un solo flujo.
               </p>
             </div>
 
@@ -549,7 +549,7 @@ export function SalesShell({
 
         <Panel className="grid gap-4 md:grid-cols-2 xl:grid-cols-1">
           <div>
-            <p className="text-sm text-[var(--muted)]">Facturacion acumulada</p>
+            <p className="text-sm text-[var(--muted)]">Facturación acumulada</p>
             <p className="mt-2 text-3xl font-semibold">
               {formatCurrency(sumBy(activeSales, (sale) => sale.totalAmount))}
             </p>
@@ -606,11 +606,11 @@ export function SalesShell({
                 title={
                   hasSearchQuery || hasStatusFilter
                     ? "No encontramos ventas"
-                    : "Todavia no hay ventas"
+                    : "Todavía no hay ventas"
                 }
                 description={
                   hasSearchQuery || hasStatusFilter
-                    ? "Prueba otro termino de busqueda, cambia el filtro o registra un nuevo pedido."
+                    ? "Prueba otro término de búsqueda, cambia el filtro o registra un nuevo pedido."
                     : "Registra tu primera venta para empezar a seguir pedidos y cobros."
                 }
                 icon={CircleDollarSign}
@@ -698,7 +698,7 @@ export function SalesShell({
                       <th className="px-4 py-3 font-medium">Canal</th>
                       <th className="px-4 py-3 font-medium">Cobro</th>
                       <th className="px-4 py-3 font-medium">Total</th>
-                      <th className="px-4 py-3 font-medium text-right">Accion</th>
+                      <th className="px-4 py-3 font-medium text-right">Acción</th>
                     </tr>
                   </thead>
                   <tbody>

@@ -45,9 +45,9 @@ function getMovementLabel(movement: InventoryMovementRecord) {
     case "sale_out":
       return "Venta";
     case "production_in":
-      return "Produccion +";
+      return "Producción +";
     case "production_out":
-      return "Produccion -";
+      return "Producción -";
     default:
       return "Ajuste";
   }
@@ -69,7 +69,7 @@ export function StockHistoryPanel({ title, description, movements }: StockHistor
       <div className="mt-5 space-y-3">
         {movements.length === 0 ? (
           <div className="rounded-[24px] border border-[var(--line)] bg-white/80 p-4 text-sm text-[var(--muted)]">
-            Todavia no hay movimientos registrados.
+            Todavía no hay movimientos registrados.
           </div>
         ) : (
           movements.map((movement) => (
@@ -86,7 +86,7 @@ export function StockHistoryPanel({ title, description, movements }: StockHistor
                   <div>
                     <p className="font-semibold">{movement.entityName}</p>
                     <p className="text-sm text-[var(--muted)]">
-                      {formatDate(movement.movementDate, "dd MMM yyyy HH:mm")} / {movement.createdByName ?? "Sistema"}
+                      {formatDate(movement.movementDate)} / {movement.createdByName ?? "Sistema"}
                     </p>
                     {movement.notes ? (
                       <p className="mt-1 text-sm text-[var(--muted)]">{movement.notes}</p>
