@@ -10,16 +10,22 @@ import { Button } from "@/components/ui/button";
 import { Field, TextInput, TextareaInput } from "@/components/ui/fields";
 import { getFirstFormError, toInputValue, toNumberValue } from "@/components/forms/value-helpers";
 import type { SupplyRecord } from "@/lib/domain";
+import { cn } from "@/lib/utils";
 import { supplyFormSchema } from "@/lib/validators";
 
 type SupplyFormValues = z.input<typeof supplyFormSchema>;
 
 type SupplyFormProps = {
   supply?: SupplyRecord | null;
+  isAdmin: boolean;
   onSuccess: (supply: SupplyRecord) => void;
 };
 
-export function SupplyForm({ supply, onSuccess }: SupplyFormProps) {
+const ADMIN_ONLY_HINT = "Solo un administrador puede cambiarlo";
+
+export function SupplyForm({ supply, isAdmin, onSuccess }: SupplyFormProps) {
+  // Al editar, unidad y activo los cambia solo un admin (la base también lo exige).
+  const lockMasterFields = Boolean(supply) && !isAdmin;
   const [pending, startTransition] = useTransition();
   const [feedback, setFeedback] = useState<{ tone: "success" | "error"; message: string } | null>(null);
   const form = useForm<SupplyFormValues>({
@@ -83,12 +89,21 @@ export function SupplyForm({ supply, onSuccess }: SupplyFormProps) {
             )}
           />
         </Field>
-        <Field label="Unidad" error={form.formState.errors.unit?.message}>
+        <Field
+          label="Unidad"
+          error={form.formState.errors.unit?.message}
+          hint={lockMasterFields ? ADMIN_ONLY_HINT : undefined}
+        >
           <Controller
             control={form.control}
             name="unit"
             render={({ field }) => (
-              <TextInput {...field} value={toInputValue(field.value)} placeholder="kg" />
+              <TextInput
+                {...field}
+                value={toInputValue(field.value)}
+                placeholder="kg"
+                disabled={lockMasterFields}
+              />
             )}
           />
         </Field>
@@ -129,7 +144,12 @@ export function SupplyForm({ supply, onSuccess }: SupplyFormProps) {
         />
       </Field>
 
-      <label className="flex items-center gap-3 min-h-12 rounded-[var(--radius-control)] border border-[var(--line)] bg-[var(--surface)] px-3.5 py-3 text-[15px]">
+      <label
+        className={cn(
+          "flex items-center gap-3 min-h-12 rounded-[var(--radius-control)] border border-[var(--line)] px-3.5 py-3 text-[15px]",
+          lockMasterFields ? "bg-[var(--surface-2)] text-[var(--muted)]" : "bg-[var(--surface)]",
+        )}
+      >
         <Controller
           control={form.control}
           name="isActive"
@@ -141,11 +161,15 @@ export function SupplyForm({ supply, onSuccess }: SupplyFormProps) {
               checked={Boolean(field.value)}
               onBlur={field.onBlur}
               onChange={(event) => field.onChange(event.target.checked)}
+              disabled={lockMasterFields}
               className="h-5 w-5 accent-[var(--accent)]"
             />
           )}
         />
-        Insumo activo
+        <span>
+          Insumo activo
+          {lockMasterFields ? <span className="block text-[13px]">{ADMIN_ONLY_HINT}</span> : null}
+        </span>
       </label>
 
       {feedback ? <ActionNotice tone={feedback.tone} message={feedback.message} /> : null}

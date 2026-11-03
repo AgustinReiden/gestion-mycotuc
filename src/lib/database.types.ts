@@ -688,6 +688,9 @@ export type Database = {
           paid_at: string;
           created_by: string | null;
           created_at: string;
+          voided_at: string | null;
+          voided_by: string | null;
+          void_reason: string | null;
         };
         Insert: {
           id?: string;
@@ -697,6 +700,9 @@ export type Database = {
           paid_at: string;
           created_by?: string | null;
           created_at?: string;
+          voided_at?: string | null;
+          voided_by?: string | null;
+          void_reason?: string | null;
         };
         Update: {
           id?: string;
@@ -706,6 +712,9 @@ export type Database = {
           paid_at?: string;
           created_by?: string | null;
           created_at?: string;
+          voided_at?: string | null;
+          voided_by?: string | null;
+          void_reason?: string | null;
         };
         Relationships: [
           {

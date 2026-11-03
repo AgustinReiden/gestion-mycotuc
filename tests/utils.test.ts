@@ -1,6 +1,15 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { escapeLikePattern } from "../src/lib/search";
-import { formatDate, parseCalendarDate, todayISO } from "../src/lib/utils";
+import {
+  addCalendarDays,
+  formatDate,
+  formatInstantDate,
+  formatMonthLabel,
+  getBusinessMonth,
+  parseCalendarDate,
+  toBusinessDateISO,
+  todayISO,
+} from "../src/lib/utils";
 
 const originalTimeZone = process.env.TZ;
 
@@ -55,6 +64,52 @@ describe("todayISO", () => {
 
     // 21:30 en Buenos Aires del 3/11 ya es el 4/11 en UTC.
     expect(todayISO(new Date(2026, 10, 3, 21, 30))).toBe("2026-11-03");
+  });
+});
+
+describe("fechas en hora argentina", () => {
+  it.each(["UTC", "America/Argentina/Buenos_Aires", "Pacific/Auckland", "America/Los_Angeles"])(
+    "el último día del mes a las 23:30 sigue siendo ese mes con TZ=%s",
+    (timeZone) => {
+      process.env.TZ = timeZone;
+      const instant = new Date("2026-11-30T23:30:00-03:00");
+
+      expect(todayISO(instant)).toBe("2026-11-30");
+      expect(toBusinessDateISO(instant)).toBe("2026-11-30");
+      expect(getBusinessMonth(instant)).toEqual({
+        month: "2026-11",
+        today: "2026-11-30",
+        start: "2026-11-01",
+        end: "2026-11-30",
+      });
+      expect(formatMonthLabel(instant)).toBe("noviembre 2026");
+    },
+  );
+
+  it("pasa de mes a la medianoche argentina, no a la de UTC", () => {
+    expect(getBusinessMonth(new Date("2026-12-01T02:59:00Z")).month).toBe("2026-11");
+    expect(getBusinessMonth(new Date("2026-12-01T03:00:00Z")).month).toBe("2026-12");
+    expect(getBusinessMonth(new Date("2026-12-01T03:00:00Z")).start).toBe("2026-12-01");
+  });
+
+  it("calcula el último día del mes, incluso en años bisiestos", () => {
+    expect(getBusinessMonth(new Date("2028-02-10T12:00:00Z")).end).toBe("2028-02-29");
+    expect(getBusinessMonth(new Date("2026-02-10T12:00:00Z")).end).toBe("2026-02-28");
+    expect(getBusinessMonth(new Date("2026-12-10T12:00:00Z")).end).toBe("2026-12-31");
+  });
+
+  it("suma y resta días calendario sin correrse", () => {
+    expect(addCalendarDays("2026-11-30", 1)).toBe("2026-12-01");
+    expect(addCalendarDays("2026-03-01", -30)).toBe("2026-01-30");
+    expect(addCalendarDays("2026-12-31", 0)).toBe("2026-12-31");
+  });
+
+  it("muestra un instante con el día argentino", () => {
+    process.env.TZ = "UTC";
+    expect(formatInstantDate("2026-11-06T02:30:00+00:00")).toBe("05/11/2026");
+    expect(formatInstantDate("2026-11-05T15:00:00Z")).toBe("05/11/2026");
+    expect(formatInstantDate(null)).toBe("-");
+    expect(formatInstantDate("no es una fecha")).toBe("-");
   });
 });
 

@@ -9,6 +9,7 @@ import { ActionNotice } from "@/components/forms/action-notice";
 import { Button } from "@/components/ui/button";
 import { Field, SelectInput, TextInput, TextareaInput } from "@/components/ui/fields";
 import type { ProductCategoryRecord, ProductRecord } from "@/lib/domain";
+import { cn } from "@/lib/utils";
 import { productFormSchema } from "@/lib/validators";
 import { getFirstFormError, toInputValue, toNumberValue } from "@/components/forms/value-helpers";
 
@@ -17,10 +18,15 @@ type ProductFormValues = z.input<typeof productFormSchema>;
 type ProductFormProps = {
   product?: ProductRecord | null;
   categories: ProductCategoryRecord[];
+  isAdmin: boolean;
   onSuccess: (product: ProductRecord) => void;
 };
 
-export function ProductForm({ product, categories, onSuccess }: ProductFormProps) {
+const ADMIN_ONLY_HINT = "Solo un administrador puede cambiarlo";
+
+export function ProductForm({ product, categories, isAdmin, onSuccess }: ProductFormProps) {
+  // Al editar, unidad, categoría y activo los cambia solo un admin (la base también lo exige).
+  const lockMasterFields = Boolean(product) && !isAdmin;
   const activeCategories = categories.filter((category) => category.isActive);
   const defaultCategory = activeCategories[0]?.name ?? "";
   const currentCategory = product?.category ?? "";
@@ -101,16 +107,22 @@ export function ProductForm({ product, categories, onSuccess }: ProductFormProps
           label="Categoría"
           error={form.formState.errors.category?.message}
           hint={
-            hasInactiveCategory
-              ? "La categoría actual no está activa. Elegí una categoría activa para guardar."
-              : undefined
+            lockMasterFields
+              ? ADMIN_ONLY_HINT
+              : hasInactiveCategory
+                ? "La categoría actual no está activa. Elegí una categoría activa para guardar."
+                : undefined
           }
         >
           <Controller
             control={form.control}
             name="category"
             render={({ field }) => (
-              <SelectInput {...field} value={toInputValue(field.value)} disabled={activeCategories.length === 0}>
+              <SelectInput
+                {...field}
+                value={toInputValue(field.value)}
+                disabled={lockMasterFields || activeCategories.length === 0}
+              >
                 {activeCategories.length === 0 ? (
                   <option value="">No hay categorías activas</option>
                 ) : null}
@@ -131,12 +143,21 @@ export function ProductForm({ product, categories, onSuccess }: ProductFormProps
       </div>
 
       <div className="grid gap-3 sm:grid-cols-3">
-        <Field label="Unidad" error={form.formState.errors.unit?.message}>
+        <Field
+          label="Unidad"
+          error={form.formState.errors.unit?.message}
+          hint={lockMasterFields ? ADMIN_ONLY_HINT : undefined}
+        >
           <Controller
             control={form.control}
             name="unit"
             render={({ field }) => (
-              <TextInput {...field} value={toInputValue(field.value)} placeholder="frasco" />
+              <TextInput
+                {...field}
+                value={toInputValue(field.value)}
+                placeholder="frasco"
+                disabled={lockMasterFields}
+              />
             )}
           />
         </Field>
@@ -195,7 +216,12 @@ export function ProductForm({ product, categories, onSuccess }: ProductFormProps
         />
       </Field>
 
-      <label className="flex items-center gap-3 min-h-12 rounded-[var(--radius-control)] border border-[var(--line)] bg-[var(--surface)] px-3.5 py-3 text-[15px]">
+      <label
+        className={cn(
+          "flex items-center gap-3 min-h-12 rounded-[var(--radius-control)] border border-[var(--line)] px-3.5 py-3 text-[15px]",
+          lockMasterFields ? "bg-[var(--surface-2)] text-[var(--muted)]" : "bg-[var(--surface)]",
+        )}
+      >
         <Controller
           control={form.control}
           name="isActive"
@@ -207,11 +233,15 @@ export function ProductForm({ product, categories, onSuccess }: ProductFormProps
               checked={Boolean(field.value)}
               onBlur={field.onBlur}
               onChange={(event) => field.onChange(event.target.checked)}
+              disabled={lockMasterFields}
               className="h-5 w-5 accent-[var(--accent)]"
             />
           )}
         />
-        Producto activo
+        <span>
+          Producto activo
+          {lockMasterFields ? <span className="block text-[13px]">{ADMIN_ONLY_HINT}</span> : null}
+        </span>
       </label>
 
       {feedback ? <ActionNotice tone={feedback.tone} message={feedback.message} /> : null}

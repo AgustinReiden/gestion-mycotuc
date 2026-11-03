@@ -1,5 +1,5 @@
 -- Pruebas de regresion de la base (roles, catalogo, precios, stock, costos, cobros, anulaciones,
--- costos solo para admin y stock inicial con costo).
+-- costos solo para admin, stock inicial con costo, cobros anulados y datos maestros solo admin).
 --
 -- Como correrlo: en el SQL Editor de Supabase (o psql) de una base con TODAS las migraciones
 -- aplicadas. No deja datos: todo ocurre en una sola transaccion que termina con una excepcion
@@ -93,6 +93,10 @@ declare
   v_product public.products;
   v_text text;
   v_col record;
+  v_cnt2 integer;
+  v_order3 public.sales_orders;
+  v_supply public.supplies;
+  v_oper_product uuid;
 begin
   -- ---------------------------------------------------------------- roles
   insert into auth.users (id, email, aud, role) values (v_admin, 'admin-test@example.com', 'authenticated', 'authenticated');
@@ -211,12 +215,44 @@ begin
   perform pg_temp.check_that(pg_temp.fails(format($q$ select public.update_sale_payment_status(jsonb_build_object('saleOrderId',%L,'paymentStatus','partial','paymentMethod','x','paidAt','2026-11-04','amount',100000)) $q$, v_order.id)),
     'un cobro mayor al saldo se rechaza'); n := n + 1;
   v_order := public.update_sale_payment_status(jsonb_build_object('saleOrderId', v_order.id, 'paymentStatus', 'paid', 'paymentMethod', 'transf', 'paidAt', '2026-11-05'));
-  select count(*), sum(amount) into v_cnt, v_val2 from public.sale_payments where sales_order_id = v_order.id;
+  select count(*), sum(amount) into v_cnt, v_val2 from public.sale_payments where sales_order_id = v_order.id and voided_at is null;
   perform pg_temp.check_that(v_order.payment_status = 'paid' and v_order.amount_paid = v_order.total_amount, 'pagar saldo deja la venta saldada'); n := n + 1;
   perform pg_temp.check_that(v_cnt = 2 and v_val2 = v_order.total_amount, 'los cobros suman el total de la venta'); n := n + 1;
   perform pg_temp.as_user(v_oper);
   perform pg_temp.check_that(pg_temp.fails(format($q$ select public.update_sale_payment_status(jsonb_build_object('saleOrderId',%L,'paymentStatus','pending')) $q$, v_order.id)),
     'operador no puede volver una venta a pendiente'); n := n + 1;
+
+  -- ---------------------------------------------------------------- volver a pendiente conserva los cobros (I2)
+  perform pg_temp.as_user(v_admin);
+  v_order := public.update_sale_payment_status(jsonb_build_object('saleOrderId', v_order.id, 'paymentStatus', 'pending'));
+  perform pg_temp.check_that(v_order.payment_status = 'pending' and v_order.amount_paid = 0
+    and v_order.payment_method is null and v_order.paid_at is null,
+    'volver a pendiente deja amount_paid en 0 y sin metodo ni fecha'); n := n + 1;
+  select count(*),
+         count(*) filter (where voided_at is not null and voided_by = v_admin and void_reason = 'Venta vuelta a pendiente')
+  into v_cnt, v_cnt2
+  from public.sale_payments where sales_order_id = v_order.id;
+  perform pg_temp.check_that(v_cnt = 2 and v_cnt2 = 2,
+    'volver a pendiente no borra los cobros: quedan anulados con motivo, fecha y usuario'); n := n + 1;
+  perform pg_temp.check_that(pg_temp.fails(format($q$ insert into public.sale_payments (sales_order_id, amount, paid_at, voided_at) values (%L, 1, '2026-11-05', now()) $q$, v_order.id)),
+    'un cobro anulado sin motivo se rechaza'); n := n + 1;
+
+  -- volver a cobrar: el saldo y amount_paid cuentan solo los cobros nuevos
+  perform pg_temp.as_user(v_oper);
+  v_order := public.update_sale_payment_status(jsonb_build_object('saleOrderId', v_order.id, 'paymentStatus', 'partial',
+    'paymentMethod', 'efectivo', 'paidAt', '2026-11-06', 'amount', 30));
+  perform pg_temp.check_that(v_order.payment_status = 'partial' and v_order.amount_paid = 30,
+    'cobro parcial despues de volver a pendiente: amount_paid = solo el cobro nuevo'); n := n + 1;
+  perform pg_temp.check_that(pg_temp.fails(format($q$ select public.update_sale_payment_status(jsonb_build_object('saleOrderId',%L,'paymentStatus','partial','paymentMethod','x','paidAt','2026-11-06','amount',%s)) $q$, v_order.id, v_order.total_amount - 30)),
+    'el cobro parcial se valida contra el saldo de los cobros activos'); n := n + 1;
+  v_order := public.update_sale_payment_status(jsonb_build_object('saleOrderId', v_order.id, 'paymentStatus', 'paid',
+    'paymentMethod', 'transf', 'paidAt', '2026-11-07'));
+  select count(*), coalesce(sum(amount), 0) into v_cnt, v_val2
+  from public.sale_payments where sales_order_id = v_order.id and voided_at is null;
+  select count(*) into v_cnt2 from public.sale_payments where sales_order_id = v_order.id and voided_at is not null;
+  perform pg_temp.check_that(v_order.payment_status = 'paid' and v_order.amount_paid = v_order.total_amount
+    and v_cnt = 2 and v_val2 = v_order.total_amount and v_cnt2 = 2,
+    'saldar despues de volver a pendiente: los cobros activos suman el total y los anulados siguen en el historial'); n := n + 1;
 
   -- ---------------------------------------------------------------- anulaciones y ajustes (admin)
   perform pg_temp.as_user(v_admin);
@@ -226,6 +262,23 @@ begin
   perform pg_temp.check_that(public.current_inventory_stock('product', v_ext) = 86, 'anular la venta de 50 devuelve el stock'); n := n + 1;
   perform pg_temp.check_that(pg_temp.fails(format($q$ select public.reverse_sale_order(jsonb_build_object('saleOrderId',%L,'reason','otra vez')) $q$, v_order2.id)),
     'no se puede anular dos veces'); n := n + 1;
+
+  -- anular una venta cobrada: los cobros activos quedan como devueltos al cliente (I1)
+  v_val := public.current_inventory_stock('product', v_sal);
+  v_order3 := public.reverse_sale_order(jsonb_build_object('saleOrderId', v_order.id, 'reason', 'cliente devolvio el producto'));
+  perform pg_temp.check_that(public.current_inventory_stock('product', v_sal) = v_val + 1,
+    'anular una venta cobrada devuelve el stock'); n := n + 1;
+  select count(*) filter (where voided_at is null),
+         count(*) filter (where void_reason = 'Devuelto al anular la venta' and voided_at = v_order3.voided_at and voided_by = v_admin)
+  into v_cnt, v_cnt2
+  from public.sale_payments where sales_order_id = v_order.id;
+  perform pg_temp.check_that(v_cnt = 0 and v_cnt2 = 2,
+    'anular una venta anula sus cobros activos como devueltos, con la fecha y el usuario de la anulacion'); n := n + 1;
+  select count(*) into v_cnt from public.sale_payments
+  where sales_order_id = v_order.id and void_reason = 'Venta vuelta a pendiente';
+  perform pg_temp.check_that(v_cnt = 2, 'los cobros ya anulados conservan su motivo original'); n := n + 1;
+  perform pg_temp.check_that(pg_temp.fails(format($q$ select public.update_sale_payment_status(jsonb_build_object('saleOrderId',%L,'paymentStatus','paid','paymentMethod','x','paidAt','2026-11-08')) $q$, v_order.id)),
+    'no se registra un cobro en una venta anulada'); n := n + 1;
   perform pg_temp.check_that(pg_temp.fails(format($q$ select public.apply_stock_adjustment(jsonb_build_object('entityType','product','entityId',%L,'quantity',-100000,'notes','x')) $q$, v_ext)),
     'un ajuste no puede dejar stock negativo'); n := n + 1;
   perform pg_temp.check_that(pg_temp.fails(format($q$ select public.reverse_supply_purchase(jsonb_build_object('purchaseId',%L,'reason','x1')) $q$, v_purchase.id)),
@@ -345,6 +398,41 @@ begin
   perform pg_temp.check_that(v_cnt = 1, 'venta de producto sin costo guarda unit_cost null (no 0)'); n := n + 1;
   select unit_cost into v_val from public.sales_order_items where sales_order_id = v_order.id and product_id = v_fresco;
   perform pg_temp.check_that(v_val = 60, 'venta de producto con costo congela el promedio'); n := n + 1;
+
+  -- ---------------------------------------------------------------- datos maestros solo admin (I14)
+  perform pg_temp.as_user(v_oper);
+  perform pg_temp.check_that(pg_temp.fails(format($q$ select public.upsert_product(jsonb_build_object('id',%L,'name','Sal Test','category','Sales','unit','kg','salePrice',500,'minStock',0)) $q$, v_sal)),
+    'operador no puede cambiar la unidad de un producto'); n := n + 1;
+  perform pg_temp.check_that(pg_temp.fails(format($q$ select public.upsert_product(jsonb_build_object('id',%L,'name','Sal Test','category','Extractos','unit','bolsa','salePrice',500,'minStock',0)) $q$, v_sal)),
+    'operador no puede cambiar la categoria de un producto'); n := n + 1;
+  perform pg_temp.check_that(pg_temp.fails(format($q$ select public.upsert_product(jsonb_build_object('id',%L,'name','Sal Test','category','Sales','unit','bolsa','salePrice',500,'minStock',0,'isActive',false)) $q$, v_sal)),
+    'operador no puede desactivar un producto'); n := n + 1;
+  perform pg_temp.check_that(pg_temp.fails(format($q$ update public.products set unit = 'kg' where id = %L $q$, v_sal)),
+    'operador no puede cambiar la unidad por fuera de upsert_product'); n := n + 1;
+  v_product := public.upsert_product(jsonb_build_object('id', v_sal, 'name', 'Sal Test editada', 'category', 'Sales',
+    'unit', 'bolsa', 'salePrice', 500, 'minStock', 5, 'notes', 'nota del operador'));
+  perform pg_temp.check_that(v_product.name = 'Sal Test editada' and v_product.min_stock = 5 and v_product.unit = 'bolsa'
+    and v_product.is_active, 'operador puede editar nombre, stock minimo y notas de un producto'); n := n + 1;
+  v_product := public.upsert_product(jsonb_build_object('name', 'Producto operador Test', 'category', 'Sales',
+    'unit', 'u', 'salePrice', 0, 'minStock', 0));
+  v_oper_product := v_product.id;
+  perform pg_temp.check_that(v_oper_product is not null and v_product.unit = 'u', 'operador puede crear un producto'); n := n + 1;
+  perform pg_temp.check_that(pg_temp.fails(format($q$ select public.upsert_supply(jsonb_build_object('id',%L,'name','Hongo seco Test','unit','g','minStock',0)) $q$, v_s_hongo)),
+    'operador no puede cambiar la unidad de un insumo'); n := n + 1;
+  perform pg_temp.check_that(pg_temp.fails(format($q$ select public.upsert_supply(jsonb_build_object('id',%L,'name','Hongo seco Test','unit','kg','minStock',0,'isActive',false)) $q$, v_s_hongo)),
+    'operador no puede desactivar un insumo'); n := n + 1;
+  v_supply := public.upsert_supply(jsonb_build_object('id', v_s_hongo, 'name', 'Hongo seco Test editado', 'unit', 'kg', 'minStock', 2));
+  perform pg_temp.check_that(v_supply.name = 'Hongo seco Test editado' and v_supply.min_stock = 2 and v_supply.unit = 'kg',
+    'operador puede editar nombre y stock minimo de un insumo'); n := n + 1;
+
+  perform pg_temp.as_user(v_admin);
+  v_product := public.upsert_product(jsonb_build_object('id', v_oper_product, 'name', 'Producto operador Test', 'category', 'Extractos',
+    'unit', 'frasco', 'salePrice', 0, 'minStock', 0, 'isActive', false));
+  perform pg_temp.check_that(v_product.unit = 'frasco' and v_product.category = 'Extractos' and not v_product.is_active,
+    'admin puede cambiar unidad, categoria y desactivar un producto'); n := n + 1;
+  v_supply := public.upsert_supply(jsonb_build_object('id', v_s_hongo, 'name', 'Hongo seco Test', 'unit', 'g', 'minStock', 0, 'isActive', false));
+  perform pg_temp.check_that(v_supply.unit = 'g' and not v_supply.is_active,
+    'admin puede cambiar la unidad y desactivar un insumo'); n := n + 1;
 
   raise exception 'PASS: % verificaciones OK (transaccion revertida, no queda nada) [intento real: %]', n, v_text;
 end

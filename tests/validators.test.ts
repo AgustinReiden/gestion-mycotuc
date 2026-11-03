@@ -5,8 +5,12 @@ import {
   getMarginByProduct,
   getMarginPercent,
   getPartialAmountError,
+  getRefundedAmount,
   getSaleBalance,
   getStockValue,
+  PAYMENT_VOID_REASON_BACK_TO_PENDING,
+  PAYMENT_VOID_REASON_REFUNDED,
+  sumCollectedInRange,
   summarizeMargin,
   summarizeReceivables,
 } from "../src/lib/finance";
@@ -505,6 +509,43 @@ describe("balances and partial amount limits", () => {
     ]);
 
     expect(summary).toEqual({ billed: 1800, collected: 1200, pending: 600 });
+  });
+});
+
+describe("cash collected in a period", () => {
+  const payment = (amount: number, paidAt: string | null, isVoided = false) => ({ amount, paidAt, isVoided });
+
+  it("sums active payments by payment date, regardless of the sale date", () => {
+    const total = sumCollectedInRange(
+      [
+        // venta de octubre cobrada en noviembre: cuenta
+        { isVoided: false, payments: [payment(300, "2026-10-28"), payment(700, "2026-11-02")] },
+        // cobros en los bordes del mes
+        { isVoided: false, payments: [payment(100, "2026-11-01"), payment(50, "2026-11-30"), payment(10, "2026-12-01")] },
+        // cobro anulado (venta vuelta a pendiente): no cuenta
+        { isVoided: false, payments: [payment(999, "2026-11-10", true), payment(1, "2026-11-11")] },
+        // venta anulada con cobros historicos sin marcar: no cuenta
+        { isVoided: true, payments: [payment(5000, "2026-11-15")] },
+      ],
+      "2026-11-01",
+      "2026-11-30",
+    );
+
+    expect(total).toBe(851);
+  });
+
+  it("ignores payments without date", () => {
+    expect(sumCollectedInRange([{ isVoided: false, payments: [payment(10, null)] }], "2026-11-01", "2026-11-30")).toBe(0);
+  });
+
+  it("reports only what was refunded when voiding the sale", () => {
+    expect(
+      getRefundedAmount([
+        { ...payment(200, "2026-11-01", true), voidReason: PAYMENT_VOID_REASON_REFUNDED },
+        { ...payment(300, "2026-11-01", true), voidReason: PAYMENT_VOID_REASON_BACK_TO_PENDING },
+        { ...payment(400, "2026-11-01"), voidReason: null },
+      ]),
+    ).toBe(200);
   });
 });
 

@@ -79,9 +79,11 @@ function mergeMovements(
 
 function NewProductModal({
   categories,
+  isAdmin,
   onProductSaved,
 }: {
   categories: ProductCategoryRecord[];
+  isAdmin: boolean;
   onProductSaved: (product: ProductRecord) => void;
 }) {
   const [open, setOpen] = useQuickCreate("producto");
@@ -93,7 +95,7 @@ function NewProductModal({
         Nuevo producto
       </Button>
       <Modal open={open} onClose={() => setOpen(false)} title="Nuevo producto" description="Actualizá catálogo, precio y stock mínimo.">
-        <ProductForm product={null} categories={categories} onSuccess={(product) => { setOpen(false); onProductSaved(product); }} />
+        <ProductForm product={null} categories={categories} isAdmin={isAdmin} onSuccess={(product) => { setOpen(false); onProductSaved(product); }} />
       </Modal>
     </>
   );
@@ -102,17 +104,19 @@ function NewProductModal({
 function EditProductModal({
   product,
   categories,
+  isAdmin,
   onClose,
   onProductSaved,
 }: {
   product: ProductRecord;
   categories: ProductCategoryRecord[];
+  isAdmin: boolean;
   onClose: () => void;
   onProductSaved: (product: ProductRecord) => void;
 }) {
   return (
     <Modal open onClose={onClose} title="Editar producto" description="Actualizá catálogo, precio y stock mínimo.">
-      <ProductForm product={product} categories={categories} onSuccess={(updatedProduct) => { onProductSaved(updatedProduct); onClose(); }} />
+      <ProductForm product={product} categories={categories} isAdmin={isAdmin} onSuccess={(updatedProduct) => { onProductSaved(updatedProduct); onClose(); }} />
     </Modal>
   );
 }
@@ -240,6 +244,7 @@ export function ProductsShell({
         </label>
         <NewProductModal
           categories={categories}
+          isAdmin={isAdmin}
           onProductSaved={(product) => {
             setProductRecords((current) => upsertProduct(current, product));
           }}
@@ -366,6 +371,7 @@ export function ProductsShell({
         <EditProductModal
           product={selectedProduct}
           categories={categories}
+          isAdmin={isAdmin}
           onClose={() => setSelectedProduct(null)}
           onProductSaved={(product) => {
             setProductRecords((current) => upsertProduct(current, product));

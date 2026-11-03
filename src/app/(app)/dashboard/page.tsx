@@ -135,7 +135,7 @@ export default async function DashboardPage() {
         <MetricCard
           label="Cobrado"
           value={formatCurrency(data.monthlyCollected)}
-          helper="De las ventas del mes, con cobros parciales"
+          helper="Cobros registrados este mes"
           icon={DollarSign}
         />
         <MetricCard
