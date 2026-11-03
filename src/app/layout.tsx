@@ -17,6 +17,9 @@ export const metadata: Metadata = {
   title: "Mycotuc Gestión",
   description: "Sistema de gestión para el emprendimiento Mycotuc.",
   appleWebApp: { capable: true, title: "Mycotuc", statusBarStyle: "default" },
+  // Next solo emite "mobile-web-app-capable"; las versiones de iOS anteriores al soporte de
+  // manifest necesitan además la etiqueta con prefijo para abrir sin la barra de Safari.
+  other: { "apple-mobile-web-app-capable": "yes" },
 };
 
 export const viewport: Viewport = {
