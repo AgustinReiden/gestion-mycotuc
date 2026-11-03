@@ -33,6 +33,49 @@ type MarginSale = {
   items: (MarginLineInput & { productName: string })[];
 };
 
+/** Motivos con que la base anula cobros (ver migracion 20261105120000). */
+export const PAYMENT_VOID_REASON_REFUNDED = "Devuelto al anular la venta";
+export const PAYMENT_VOID_REASON_BACK_TO_PENDING = "Venta vuelta a pendiente";
+
+type PaymentLike = {
+  amount: number;
+  paidAt: string | null;
+  isVoided: boolean;
+};
+
+type CollectedSale = {
+  isVoided: boolean;
+  payments: PaymentLike[];
+};
+
+/**
+ * Caja del período: cobros activos cuya fecha de cobro cae entre from y to (inclusive,
+ * "yyyy-mm-dd"), sin importar la fecha de la venta. No cuenta cobros anulados ni cobros de
+ * ventas anuladas (los históricos pueden no estar marcados como anulados).
+ */
+export function sumCollectedInRange(sales: CollectedSale[], from: string, to: string) {
+  return roundMoney(
+    sales
+      .filter((sale) => !sale.isVoided)
+      .flatMap((sale) => sale.payments)
+      .filter((payment) => !payment.isVoided && payment.paidAt !== null)
+      .filter((payment) => {
+        const paidOn = payment.paidAt!.slice(0, 10);
+        return paidOn >= from && paidOn <= to;
+      })
+      .reduce((sum, payment) => sum + payment.amount, 0),
+  );
+}
+
+/** Lo devuelto al cliente al anular la venta (cobros anulados con ese motivo). */
+export function getRefundedAmount(payments: (PaymentLike & { voidReason: string | null })[]) {
+  return roundMoney(
+    payments
+      .filter((payment) => payment.isVoided && payment.voidReason === PAYMENT_VOID_REASON_REFUNDED)
+      .reduce((sum, payment) => sum + payment.amount, 0),
+  );
+}
+
 /** Saldo pendiente de una venta: total menos lo cobrado, nunca negativo. */
 export function getSaleBalance(totalAmount: number, amountPaid: number) {
   return Math.max(roundMoney(totalAmount - amountPaid), 0);

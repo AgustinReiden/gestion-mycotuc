@@ -18,7 +18,7 @@ import type { SupabaseServerClient } from "./shared";
 
 // Sin costos: las acciones devuelven datos a cualquier rol; los costos llegan con el refresco del servidor.
 const SALE_ORDER_SELECT =
-  "id, sale_date, total_amount, amount_paid, payment_status, payment_method, paid_at, notes, voided_at, void_reason, created_at, contacts(name), sales_channels(name), sales_order_items(id, product_id, bundle_id, quantity, unit_price, list_price, line_total, products(name), product_bundles(name)), sale_payments(id, amount, payment_method, paid_at, created_at)";
+  "id, sale_date, total_amount, amount_paid, payment_status, payment_method, paid_at, notes, voided_at, void_reason, created_at, contacts(name), sales_channels(name), sales_order_items(id, product_id, bundle_id, quantity, unit_price, list_price, line_total, products(name), product_bundles(name)), sale_payments(id, amount, payment_method, paid_at, created_at, voided_at, void_reason)";
 const BUNDLE_SELECT =
   "id, name, sale_price, notes, is_active, created_at, product_bundle_items(id, product_id, quantity, products(name))";
 const EXPENSE_SELECT =

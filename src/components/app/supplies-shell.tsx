@@ -120,7 +120,13 @@ function mergeMovements(
   ]).slice(0, limit);
 }
 
-function NewSupplyModal({ onSupplySaved }: { onSupplySaved: (supply: SupplyRecord) => void }) {
+function NewSupplyModal({
+  isAdmin,
+  onSupplySaved,
+}: {
+  isAdmin: boolean;
+  onSupplySaved: (supply: SupplyRecord) => void;
+}) {
   const [open, setOpen] = useState(false);
 
   return (
@@ -137,6 +143,7 @@ function NewSupplyModal({ onSupplySaved }: { onSupplySaved: (supply: SupplyRecor
       >
         <SupplyForm
           supply={null}
+          isAdmin={isAdmin}
           onSuccess={(supply) => {
             setOpen(false);
             onSupplySaved(supply);
@@ -191,10 +198,12 @@ function NewPurchaseModal({
 
 function EditSupplyModal({
   supply,
+  isAdmin,
   onClose,
   onSupplySaved,
 }: {
   supply: SupplyRecord;
+  isAdmin: boolean;
   onClose: () => void;
   onSupplySaved: (supply: SupplyRecord) => void;
 }) {
@@ -207,6 +216,7 @@ function EditSupplyModal({
     >
       <SupplyForm
         supply={supply}
+        isAdmin={isAdmin}
         onSuccess={(updatedSupply) => {
           onSupplySaved(updatedSupply);
           onClose();
@@ -393,6 +403,7 @@ export function SuppliesShell({
             }}
           />
           <NewSupplyModal
+            isAdmin={isAdmin}
             onSupplySaved={(supply) => {
               setSupplyRecords((current) => upsertSupply(current, supply));
             }}
@@ -561,6 +572,7 @@ export function SuppliesShell({
       {selectedSupply ? (
         <EditSupplyModal
           supply={selectedSupply}
+          isAdmin={isAdmin}
           onClose={() => setSelectedSupplyId(null)}
           onSupplySaved={(updatedSupply) => {
             setSupplyRecords((current) => upsertSupply(current, updatedSupply));

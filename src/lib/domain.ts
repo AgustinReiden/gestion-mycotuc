@@ -114,6 +114,10 @@ export type SalePaymentRecord = {
   paymentMethod: string | null;
   paidAt: string | null;
   createdAt: string;
+  /** Cobro anulado (venta vuelta a pendiente o dinero devuelto al anular la venta): no suma. */
+  isVoided: boolean;
+  voidedAt: string | null;
+  voidReason: string | null;
 };
 
 export type SaleOrderRecord = {
@@ -228,9 +232,12 @@ export type StockAlertRecord = {
 
 export type DashboardData = {
   monthlyBilled: number;
+  /** Caja del mes: cobros activos con fecha de cobro en el mes (hora argentina), de ventas no anuladas. */
   monthlyCollected: number;
   monthlyExpenses: number;
+  /** Facturado del mes menos gastos del mes (lo que muestra "Resultado"). */
   accrualProfit: number;
+  /** Cobrado del mes (caja) menos gastos del mes. */
   cashProfit: number;
   pendingReceivables: number;
   /** Margen bruto de las ventas del mes (solo admin; null para operador). */

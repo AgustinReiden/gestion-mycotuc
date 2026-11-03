@@ -21,16 +21,19 @@ import type {
   ProductRecord,
   SaleOrderItemRecord,
   SaleOrderRecord,
+  SalePaymentRecord,
 } from "@/lib/domain";
 import {
   formatPercent,
   getLineCost,
   getMarginPercent,
+  getRefundedAmount,
   getSaleBalance,
+  PAYMENT_VOID_REASON_REFUNDED,
   summarizeMargin,
 } from "@/lib/finance";
 import { formatQuantity, roundMoney } from "@/lib/pricing";
-import { cn, formatCurrency, formatDate, sumBy } from "@/lib/utils";
+import { cn, formatCurrency, formatDate, formatInstantDate, sumBy } from "@/lib/utils";
 
 type SalesShellProps = {
   sales: SaleOrderRecord[];
@@ -162,6 +165,21 @@ function upsertSale(list: SaleOrderRecord[], sale: SaleOrderRecord) {
     : sale;
 
   return sortSales([merged, ...list.filter((entry) => entry.id !== sale.id)]);
+}
+
+/** Lo cobrado que sigue vigente (los cobros anulados no suman). */
+function sumActivePayments(payments: SalePaymentRecord[]) {
+  return roundMoney(sumBy(payments.filter((payment) => !payment.isVoided), (payment) => payment.amount));
+}
+
+function getVoidedPaymentLabel(payment: SalePaymentRecord) {
+  const date = formatInstantDate(payment.voidedAt);
+
+  if (payment.voidReason === PAYMENT_VOID_REASON_REFUNDED) {
+    return `Devuelto el ${date}`;
+  }
+
+  return `Anulado el ${date}: ${payment.voidReason ?? "sin motivo"}`;
 }
 
 function PaymentSummary({ sale }: { sale: SaleOrderRecord }) {
@@ -364,32 +382,57 @@ function SaleDetailModal({
             ) : null}
           </div>
         ) : null}
-        <div className="grid grid-cols-2 gap-3 rounded-[14px] border border-[var(--line)] px-3.5 py-3 text-[15px]">
-          <div>
-            <p className="text-[13px] font-medium text-[var(--muted)]">Cobrado</p>
-            <p className="mt-1 font-semibold text-[var(--moss)]">{formatCurrency(sale.amountPaid)}</p>
+        {sale.isVoided ? (
+          <div className="grid grid-cols-2 gap-3 rounded-[14px] border border-[var(--line)] px-3.5 py-3 text-[15px]">
+            <div>
+              <p className="text-[13px] font-medium text-[var(--muted)]">Cobrado</p>
+              <p className="mt-1 font-semibold">{formatCurrency(sumActivePayments(sale.payments))}</p>
+            </div>
+            <div>
+              <p className="text-[13px] font-medium text-[var(--muted)]">Devuelto al cliente</p>
+              <p className="mt-1 font-semibold">{formatCurrency(getRefundedAmount(sale.payments))}</p>
+            </div>
           </div>
-          <div>
-            <p className="text-[13px] font-medium text-[var(--muted)]">Saldo pendiente</p>
-            <p className="mt-1 font-semibold text-[var(--amber-ink)]">
-              {formatCurrency(getSaleBalance(sale.totalAmount, sale.amountPaid))}
-            </p>
+        ) : (
+          <div className="grid grid-cols-2 gap-3 rounded-[14px] border border-[var(--line)] px-3.5 py-3 text-[15px]">
+            <div>
+              <p className="text-[13px] font-medium text-[var(--muted)]">Cobrado</p>
+              <p className="mt-1 font-semibold text-[var(--moss)]">{formatCurrency(sale.amountPaid)}</p>
+            </div>
+            <div>
+              <p className="text-[13px] font-medium text-[var(--muted)]">Saldo pendiente</p>
+              <p className="mt-1 font-semibold text-[var(--amber-ink)]">
+                {formatCurrency(getSaleBalance(sale.totalAmount, sale.amountPaid))}
+              </p>
+            </div>
           </div>
-        </div>
+        )}
         <div className="rounded-[14px] border border-[var(--line)] p-3.5 text-[15px]">
           <p className="font-semibold">Historial de cobros</p>
           {sale.payments.length === 0 ? (
             <p className="mt-2 text-xs text-[var(--muted)]">Todavía no hay cobros.</p>
           ) : (
             <ul className="mt-2 space-y-2">
-              {sale.payments.map((payment) => (
-                <li key={payment.id} className="flex items-center justify-between gap-3">
-                  <span className="text-[var(--muted)]">
-                    {formatDate(payment.paidAt)} - {payment.paymentMethod ?? "Sin método"}
-                  </span>
-                  <span className="font-semibold">{formatCurrency(payment.amount)}</span>
-                </li>
-              ))}
+              {sale.payments.map((payment) =>
+                payment.isVoided ? (
+                  <li key={payment.id} className="flex items-start justify-between gap-3 text-[var(--muted)]">
+                    <span className="min-w-0">
+                      <span className="block line-through">
+                        {formatDate(payment.paidAt)} - {payment.paymentMethod ?? "Sin método"}
+                      </span>
+                      <span className="block text-xs">{getVoidedPaymentLabel(payment)}</span>
+                    </span>
+                    <span className="shrink-0 font-semibold line-through">{formatCurrency(payment.amount)}</span>
+                  </li>
+                ) : (
+                  <li key={payment.id} className="flex items-center justify-between gap-3">
+                    <span className="text-[var(--muted)]">
+                      {formatDate(payment.paidAt)} - {payment.paymentMethod ?? "Sin método"}
+                    </span>
+                    <span className="font-semibold">{formatCurrency(payment.amount)}</span>
+                  </li>
+                ),
+              )}
             </ul>
           )}
         </div>
@@ -425,6 +468,7 @@ function ReverseSaleModal({
   const [reason, setReason] = useState("");
   const [feedback, setFeedback] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
+  const collected = sumActivePayments(sale.payments);
 
   return (
     <Modal
@@ -438,6 +482,12 @@ function ReverseSaleModal({
           Vuelve el stock de la venta a {sale.contactName ?? "cliente sin nombre"} y deja de contar en el tablero y
           los reportes.
         </div>
+        {collected > 0 ? (
+          <ActionNotice
+            tone="warning"
+            message={`Esta venta tiene ${formatCurrency(collected)} cobrados. Al anularla se registra que le devolviste ese dinero al cliente.`}
+          />
+        ) : null}
         <label className="grid gap-1.5 text-sm font-semibold text-[var(--ink-2)]">
           Motivo
           <textarea

@@ -49,7 +49,7 @@ export type SaleOrderItemRow = Pick<
 
 export type SalePaymentRow = Pick<
   Tables["sale_payments"]["Row"],
-  "id" | "amount" | "payment_method" | "paid_at" | "created_at"
+  "id" | "amount" | "payment_method" | "paid_at" | "created_at" | "voided_at" | "void_reason"
 >;
 
 export type SaleOrderRow = Pick<
@@ -217,6 +217,9 @@ export function mapSalePayment(record: SalePaymentRow): SalePaymentRecord {
     paymentMethod: record.payment_method ?? null,
     paidAt: record.paid_at ?? null,
     createdAt: String(record.created_at ?? ""),
+    isVoided: Boolean(record.voided_at),
+    voidedAt: record.voided_at ?? null,
+    voidReason: record.void_reason ?? null,
   };
 }
 

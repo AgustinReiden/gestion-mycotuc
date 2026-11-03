@@ -19,7 +19,7 @@ import {
   summarizeReceivables,
 } from "@/lib/finance";
 import { formatQuantity } from "@/lib/pricing";
-import { formatCurrency, sumBy, todayISO } from "@/lib/utils";
+import { addCalendarDays, formatCurrency, sumBy, todayISO } from "@/lib/utils";
 
 type ReportsShellProps = {
   sales: SaleOrderRecord[];
@@ -59,9 +59,9 @@ export function ReportsShell({
   role,
 }: ReportsShellProps) {
   const isAdmin = role === "admin";
-  const [range, setRange] = useState<RangeFilter>({
-    from: todayISO(new Date(new Date().setDate(new Date().getDate() - 30))),
-    to: todayISO(),
+  const [range, setRange] = useState<RangeFilter>(() => {
+    const today = todayISO();
+    return { from: addCalendarDays(today, -30), to: today };
   });
   const hasInvalidRange = range.from > range.to;
   const effectiveRange = normalizeRange(range);

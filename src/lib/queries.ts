@@ -1,4 +1,3 @@
-import { endOfMonth, startOfMonth } from "date-fns";
 import { unstable_cache } from "next/cache";
 import { cache } from "react";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
@@ -15,7 +14,7 @@ import type {
   SupplyRecord,
 } from "@/lib/domain";
 import { getSupabaseEnv } from "@/lib/env";
-import { getSaleBalance, summarizeMargin } from "@/lib/finance";
+import { getSaleBalance, sumCollectedInRange, summarizeMargin } from "@/lib/finance";
 import {
   mapBatch,
   mapBundle,
@@ -32,7 +31,7 @@ import {
 } from "@/lib/mappers";
 import { ensureProfileForUser } from "@/lib/profile-sync";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
-import { sumBy, toNumber } from "@/lib/utils";
+import { getBusinessMonth, sumBy, toNumber } from "@/lib/utils";
 
 type QueryClient = SupabaseClient<Database>;
 type AuthContext = {
@@ -175,7 +174,7 @@ const getSalesOrdersData = cache(async () =>
       const { data, error } = await supabase
         .from("sales_orders")
         .select(
-          "id, sale_date, total_amount, amount_paid, payment_status, payment_method, paid_at, notes, voided_at, void_reason, created_at, contacts(name), sales_channels(name), sales_order_items(id, product_id, bundle_id, quantity, unit_price, list_price, line_total, products(name), product_bundles(name)), sale_payments(id, amount, payment_method, paid_at, created_at)",
+          "id, sale_date, total_amount, amount_paid, payment_status, payment_method, paid_at, notes, voided_at, void_reason, created_at, contacts(name), sales_channels(name), sales_order_items(id, product_id, bundle_id, quantity, unit_price, list_price, line_total, products(name), product_bundles(name)), sale_payments(id, amount, payment_method, paid_at, created_at, voided_at, void_reason)",
         )
         .order("sale_date", { ascending: false })
         .order("created_at", { ascending: false });
@@ -662,8 +661,8 @@ export async function getDashboardData(): Promise<DashboardData> {
   ]);
   const isAdmin = role === "admin";
 
-  const monthStart = startOfMonth(new Date()).toISOString().slice(0, 10);
-  const monthEnd = endOfMonth(new Date()).toISOString().slice(0, 10);
+  // El mes es el de Argentina: el servidor corre en UTC y a las 21:00 del ultimo dia ya seria el mes siguiente.
+  const { start: monthStart, end: monthEnd } = getBusinessMonth();
 
   const activeSales = sales.filter((sale) => !sale.isVoided);
   const activeExpenses = expenses.filter((expense) => !expense.isVoided);
@@ -688,8 +687,8 @@ export async function getDashboardData(): Promise<DashboardData> {
   });
 
   const totalSalesAmount = sumBy(monthlySales, (sale) => sale.totalAmount);
-  // Lo cobrado incluye los cobros parciales; el saldo es total menos lo cobrado.
-  const collectedSalesAmount = sumBy(monthlySales, (sale) => sale.amountPaid);
+  // Caja del mes: cobros activos con fecha de cobro en el mes, sea cual sea la fecha de la venta.
+  const collectedSalesAmount = sumCollectedInRange(sales, monthStart, monthEnd);
   const totalExpensesAmount = sumBy(monthlyExpenses, (expense) => expense.amount);
   const pendingReceivables = sumBy(activeSales, (sale) =>
     getSaleBalance(sale.totalAmount, sale.amountPaid),

@@ -191,7 +191,7 @@ export function PaymentStatusForm({
       {currentPaymentStatus === "pending" && amountPaid > 0 ? (
         <ActionNotice
           tone="warning"
-          message="Volver a pendiente borra todos los cobros registrados de esta venta."
+          message="Volver a pendiente anula todos los cobros registrados de esta venta. Quedan en el historial como anulados."
         />
       ) : null}
 
