@@ -65,6 +65,16 @@ function getErrorMessage(error: unknown) {
     return error.message;
   }
 
+  // supabase-js devuelve los errores de rpc()/from() como objetos planos ({ message, code, ... }),
+  // no como instancias de Error: sin esto, cualquier error de la base se veía como "inesperado".
+  if (error && typeof error === "object") {
+    const { message } = error as { message?: unknown };
+
+    if (typeof message === "string" && message.trim().length > 0) {
+      return message;
+    }
+  }
+
   return "Ocurrió un error inesperado.";
 }
 
