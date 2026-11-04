@@ -161,7 +161,11 @@ export function ProductForm({ product, categories, isAdmin, onSuccess }: Product
             )}
           />
         </Field>
-        <Field label="Precio de venta" error={form.formState.errors.salePrice?.message}>
+        <Field
+          label="Precio de venta"
+          error={form.formState.errors.salePrice?.message}
+          hint={!isAdmin ? ADMIN_ONLY_HINT : undefined}
+        >
           <Controller
             control={form.control}
             name="salePrice"
@@ -176,6 +180,7 @@ export function ProductForm({ product, categories, isAdmin, onSuccess }: Product
                 inputMode="decimal"
                 min="0"
                 step="0.01"
+                disabled={!isAdmin}
               />
             )}
           />
