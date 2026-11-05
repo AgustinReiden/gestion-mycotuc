@@ -2,7 +2,6 @@
 
 import { useDeferredValue, useState } from "react";
 import { Edit3, Layers, Package, Plus, Search, Settings2 } from "lucide-react";
-import { BundlesPanel } from "@/components/app/bundles-panel";
 import { StockHistoryPanel } from "@/components/app/stock-history-panel";
 import { PriceTiersForm } from "@/components/forms/price-tiers-form";
 import { ProductForm } from "@/components/forms/product-form";
@@ -14,7 +13,6 @@ import { Modal } from "@/components/ui/modal";
 import { Panel } from "@/components/ui/panel";
 import type {
   AppRole,
-  BundleRecord,
   InventoryMovementRecord,
   PriceTierRecord,
   ProductCategoryRecord,
@@ -30,17 +28,8 @@ type ProductsShellProps = {
   movements: InventoryMovementRecord[];
   categories: ProductCategoryRecord[];
   priceTiers: PriceTierRecord[];
-  bundles: BundleRecord[];
   role: AppRole;
 };
-
-function sortBundles(list: BundleRecord[]) {
-  return [...list].sort((left, right) => left.name.localeCompare(right.name, "es", { sensitivity: "base" }));
-}
-
-function upsertBundle(list: BundleRecord[], bundle: BundleRecord) {
-  return sortBundles([bundle, ...list.filter((entry) => entry.id !== bundle.id)]);
-}
 
 function sortProducts(list: ProductRecord[]) {
   return [...list].sort((left, right) => left.name.localeCompare(right.name, "es", { sensitivity: "base" }));
@@ -178,7 +167,6 @@ export function ProductsShell({
   movements,
   categories,
   priceTiers,
-  bundles,
   role,
 }: ProductsShellProps) {
   const isAdmin = role === "admin";
@@ -186,7 +174,6 @@ export function ProductsShell({
   const [productRecords, setProductRecords] = useState(() => sortProducts(products));
   const [movementRecords, setMovementRecords] = useState(() => sortMovements(movements));
   const [tierRecords, setTierRecords] = useState(priceTiers);
-  const [bundleRecords, setBundleRecords] = useState(() => sortBundles(bundles));
   const [tiersProduct, setTiersProduct] = useState<ProductRecord | null>(null);
   const [selectedProduct, setSelectedProduct] = useState<ProductRecord | null>(null);
   const [adjustmentProduct, setAdjustmentProduct] = useState<ProductRecord | null>(null);
@@ -213,13 +200,6 @@ export function ProductsShell({
   if (syncedPriceTiers !== priceTiers) {
     setSyncedPriceTiers(priceTiers);
     setTierRecords(priceTiers);
-  }
-
-  // Cuando el servidor manda datos nuevos (router.refresh), reemplazan a los locales.
-  const [syncedBundles, setSyncedBundles] = useState(bundles);
-  if (syncedBundles !== bundles) {
-    setSyncedBundles(bundles);
-    setBundleRecords(sortBundles(bundles));
   }
 
   const tiersByProduct = groupTiersByProduct(tierRecords);
@@ -351,15 +331,6 @@ export function ProductsShell({
           ))}
         </div>
       )}
-
-      <BundlesPanel
-        bundles={bundleRecords}
-        products={productRecords}
-        isAdmin={isAdmin}
-        onBundleSaved={(bundle) => {
-          setBundleRecords((current) => upsertBundle(current, bundle));
-        }}
-      />
 
       <StockHistoryPanel
         title="Historial de stock de productos"

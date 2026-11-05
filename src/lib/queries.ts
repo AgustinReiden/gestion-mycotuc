@@ -615,12 +615,11 @@ export async function getSuppliesPageData() {
 }
 
 export async function getProductsPageData() {
-  const [products, movements, categories, priceTiers, bundles, role] = await Promise.all([
+  const [products, movements, categories, priceTiers, role] = await Promise.all([
     getProductsData(),
     getInventoryMovementsData("product"),
     getProductCategoriesData(),
     getPriceTiersData(),
-    getBundlesData(),
     getCurrentRole(),
   ]);
 
@@ -631,7 +630,6 @@ export async function getProductsPageData() {
     movements,
     categories,
     priceTiers,
-    bundles,
     role,
   };
 }

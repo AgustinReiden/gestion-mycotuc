@@ -88,7 +88,7 @@ export async function saveBundleAction(input: unknown): Promise<ActionResponse<B
     }
 
     refreshTags(CACHE_TAGS.bundles);
-    revalidatePaths("/productos", "/ventas");
+    revalidatePaths("/productos", "/ventas", "/promociones");
     return success("Combo guardado.", bundle);
   } catch (error) {
     return failure("No pudimos guardar el combo.", error);
@@ -135,7 +135,7 @@ export async function setBundleStatusAction(
     }
 
     refreshTags(CACHE_TAGS.bundles);
-    revalidatePaths("/productos", "/ventas");
+    revalidatePaths("/productos", "/ventas", "/promociones");
     return success(parsed.data.isActive ? "Combo activado." : "Combo desactivado.", bundle);
   } catch (error) {
     return failure("No pudimos actualizar el combo.", error);
