@@ -21,6 +21,11 @@ function toQuantity(value: unknown) {
   return Number.isFinite(parsed) && parsed > 0 ? parsed : 0;
 }
 
+/** Cantidades con 2 decimales como en la base (numeric): evita que 0.6 + 0.3 + 0.1 sea 0.9999999999999999. */
+function roundQuantity(value: number) {
+  return Math.round(value * 100) / 100;
+}
+
 /**
  * Misma regla que `public.price_category_scales` en la base. Devuelve, por indice de renglon,
  * el total que fija una escala por categoria; los renglones sin escala no aparecen.
@@ -61,7 +66,7 @@ export function priceCategoryScales(
       eligible.push({ index, productId: product.id, quantity, salePrice: product.salePrice });
     });
 
-    const totalQuantity = eligible.reduce((total, line) => total + line.quantity, 0);
+    const totalQuantity = roundQuantity(eligible.reduce((total, line) => total + line.quantity, 0));
     const tier = [...scale.tiers]
       .filter((entry) => entry.minQty <= totalQuantity)
       .sort((left, right) => right.minQty - left.minQty)[0];
@@ -90,8 +95,8 @@ export function priceCategoryScales(
 
     let before = 0;
     const split = ordered.map((line) => {
-      const packQuantity = Math.max(Math.min(line.quantity, tier.minQty - before), 0);
-      before += line.quantity;
+      const packQuantity = roundQuantity(Math.max(Math.min(line.quantity, tier.minQty - before), 0));
+      before = roundQuantity(before + line.quantity);
       return { line, packQuantity };
     });
 

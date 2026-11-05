@@ -20,6 +20,7 @@ declare
   v_id uuid := nullif(payload ->> 'id', '')::uuid;
   v_name text := nullif(trim(payload ->> 'name'), '');
   v_old_name text;
+  v_old_active boolean;
 begin
   perform public.require_admin();
 
@@ -39,21 +40,24 @@ begin
     values (v_name, coalesce((payload ->> 'isActive')::boolean, true))
     returning * into v_category;
   else
-    select name into v_old_name from public.product_categories where id = v_id for update;
+    select name, is_active into v_old_name, v_old_active from public.product_categories where id = v_id for update;
 
     if v_old_name is null then
       raise exception 'Categoria inexistente';
     end if;
 
-    update public.product_categories
-    set name = v_name,
-        is_active = coalesce((payload ->> 'isActive')::boolean, is_active)
-    where id = v_id
-    returning * into v_category;
-
     if v_old_name <> v_name then
+      -- El trigger de productos exige una categoria activa: se renombra activa, se mueven los
+      -- productos y recien despues se fija el estado final.
+      update public.product_categories set name = v_name, is_active = true where id = v_id;
       update public.products set category = v_name where category = v_old_name;
     end if;
+
+    update public.product_categories
+    set name = v_name,
+        is_active = coalesce((payload ->> 'isActive')::boolean, v_old_active)
+    where id = v_id
+    returning * into v_category;
   end if;
 
   return v_category;

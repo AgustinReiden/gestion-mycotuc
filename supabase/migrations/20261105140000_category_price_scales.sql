@@ -33,6 +33,9 @@ alter table public.sales_order_items
   add column if not exists price_scale_id uuid references public.category_price_scales (id),
   add column if not exists price_scale_min_qty numeric(14, 2);
 
+-- Lectura por columna para authenticated (misma regla que las demas columnas de sales_order_items).
+grant select (price_scale_id, price_scale_min_qty) on public.sales_order_items to authenticated;
+
 alter table public.category_price_scales enable row level security;
 alter table public.category_price_scale_tiers enable row level security;
 alter table public.category_price_scale_excluded_products enable row level security;
@@ -61,7 +64,6 @@ declare
   v_category_name text;
   v_active boolean := coalesce((payload ->> 'isActive')::boolean, true);
   v_tier jsonb;
-  v_excluded jsonb;
   v_min numeric;
   v_price numeric;
   v_mode text;
@@ -110,16 +112,6 @@ begin
     raise exception 'Hay escalones con la misma cantidad';
   end if;
 
-  for v_excluded in select * from jsonb_array_elements(coalesce(payload -> 'excludedProductIds', '[]'::jsonb))
-  loop
-    if not exists (
-      select 1 from public.products
-      where id = (v_excluded #>> '{}')::uuid and category = v_category_name
-    ) then
-      raise exception 'Solo se pueden excluir productos de la categoria de la escala';
-    end if;
-  end loop;
-
   insert into public.category_price_scales (category_id, is_active)
   values (v_category_id, v_active)
   on conflict (category_id) do update set is_active = excluded.is_active
@@ -132,9 +124,12 @@ begin
   select v_scale.id, (t ->> 'minQty')::numeric, (t ->> 'price')::numeric, t ->> 'mode'
   from jsonb_array_elements(payload -> 'tiers') t;
 
+  -- Solo se guardan exclusiones de productos que siguen siendo de la categoria; las demas
+  -- (por ejemplo un producto que cambio de categoria) se descartan sin error.
   insert into public.category_price_scale_excluded_products (scale_id, product_id)
-  select distinct v_scale.id, (e #>> '{}')::uuid
-  from jsonb_array_elements(coalesce(payload -> 'excludedProductIds', '[]'::jsonb)) e;
+  select distinct v_scale.id, p.id
+  from jsonb_array_elements(coalesce(payload -> 'excludedProductIds', '[]'::jsonb)) e
+  join public.products p on p.id = (e #>> '{}')::uuid and p.category = v_category_name;
 
   return v_scale;
 end;

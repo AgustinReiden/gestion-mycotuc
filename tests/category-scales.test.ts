@@ -120,6 +120,14 @@ describe("priceCategoryScales", () => {
     expect(priceCategoryScales(lines, products, [makeScale({ categoryIsActive: false })]).size).toBe(0);
   });
 
+  it("suma las cantidades decimales sin errores de punto flotante", () => {
+    // 0.6 + 0.3 + 0.1 da 0.9999999999999999 en punto flotante: debe contar como 1
+    const scale = makeScale({ tiers: [{ id: "t1", minQty: 1, price: 40000, mode: "unit" }] });
+    const result = priceCategoryScales([line("a", 0.6), line("a", 0.3), line("a", 0.1)], products, [scale]);
+    expect(result.size).toBe(3);
+    expect(Math.round(sum(result) * 100)).toBe(4000000);
+  });
+
   it("el reparto del pack es exacto al centavo", () => {
     const scale = makeScale({ tiers: [{ id: "t3", minQty: 3, price: 100, mode: "pack" }] });
     const result = priceCategoryScales([line("a", 1), line("b", 1), line("c", 1)], products, [scale]);
