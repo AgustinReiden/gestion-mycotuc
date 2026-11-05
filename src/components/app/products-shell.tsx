@@ -1,7 +1,8 @@
 "use client";
 
 import { useDeferredValue, useState } from "react";
-import { Edit3, Layers, Package, Plus, Search, Settings2 } from "lucide-react";
+import { Edit3, Layers, Package, Plus, Search, Settings2, Tags } from "lucide-react";
+import { ProductCategoriesModal } from "@/components/app/product-categories-modal";
 import { StockHistoryPanel } from "@/components/app/stock-history-panel";
 import { PriceTiersForm } from "@/components/forms/price-tiers-form";
 import { ProductForm } from "@/components/forms/product-form";
@@ -30,6 +31,14 @@ type ProductsShellProps = {
   priceTiers: PriceTierRecord[];
   role: AppRole;
 };
+
+function sortCategories(list: ProductCategoryRecord[]) {
+  return [...list].sort((left, right) => left.name.localeCompare(right.name, "es", { sensitivity: "base" }));
+}
+
+function upsertCategory(list: ProductCategoryRecord[], category: ProductCategoryRecord) {
+  return sortCategories([category, ...list.filter((entry) => entry.id !== category.id)]);
+}
 
 function sortProducts(list: ProductRecord[]) {
   return [...list].sort((left, right) => left.name.localeCompare(right.name, "es", { sensitivity: "base" }));
@@ -174,6 +183,8 @@ export function ProductsShell({
   const [productRecords, setProductRecords] = useState(() => sortProducts(products));
   const [movementRecords, setMovementRecords] = useState(() => sortMovements(movements));
   const [tierRecords, setTierRecords] = useState(priceTiers);
+  const [categoryRecords, setCategoryRecords] = useState(() => sortCategories(categories));
+  const [categoriesOpen, setCategoriesOpen] = useState(false);
   const [tiersProduct, setTiersProduct] = useState<ProductRecord | null>(null);
   const [selectedProduct, setSelectedProduct] = useState<ProductRecord | null>(null);
   const [adjustmentProduct, setAdjustmentProduct] = useState<ProductRecord | null>(null);
@@ -202,6 +213,13 @@ export function ProductsShell({
     setTierRecords(priceTiers);
   }
 
+  // Cuando el servidor manda datos nuevos (router.refresh), reemplazan a los locales.
+  const [syncedCategories, setSyncedCategories] = useState(categories);
+  if (syncedCategories !== categories) {
+    setSyncedCategories(categories);
+    setCategoryRecords(sortCategories(categories));
+  }
+
   const tiersByProduct = groupTiersByProduct(tierRecords);
 
   const filteredProducts = productRecords.filter((product) => {
@@ -211,7 +229,7 @@ export function ProductsShell({
 
   return (
     <div className="page-grid">
-      <div className="grid gap-3 md:grid-cols-[1fr_auto] md:items-center">
+      <div className="grid gap-3 md:grid-cols-[1fr_auto_auto] md:items-center">
         <label className="flex min-h-12 items-center gap-2 rounded-[var(--radius-control)] border border-[var(--line-strong)] bg-[var(--surface)] px-3.5 focus-within:border-[var(--foreground)]">
           <Search className="h-4 w-4 shrink-0 text-[var(--muted)]" aria-hidden />
           <input
@@ -222,8 +240,12 @@ export function ProductsShell({
             className="min-w-0 flex-1 bg-transparent text-base placeholder:text-[#958d84]"
           />
         </label>
+        <Button type="button" variant="secondary" size="lg" className="w-full sm:w-auto" onClick={() => setCategoriesOpen(true)}>
+          <Tags className="h-5 w-5" />
+          Categorías
+        </Button>
         <NewProductModal
-          categories={categories}
+          categories={categoryRecords}
           isAdmin={isAdmin}
           onProductSaved={(product) => {
             setProductRecords((current) => upsertProduct(current, product));
@@ -341,11 +363,22 @@ export function ProductsShell({
       {selectedProduct ? (
         <EditProductModal
           product={selectedProduct}
-          categories={categories}
+          categories={categoryRecords}
           isAdmin={isAdmin}
           onClose={() => setSelectedProduct(null)}
           onProductSaved={(product) => {
             setProductRecords((current) => upsertProduct(current, product));
+          }}
+        />
+      ) : null}
+      {categoriesOpen ? (
+        <ProductCategoriesModal
+          categories={categoryRecords}
+          products={productRecords}
+          isAdmin={isAdmin}
+          onClose={() => setCategoriesOpen(false)}
+          onCategorySaved={(category) => {
+            setCategoryRecords((current) => upsertCategory(current, category));
           }}
         />
       ) : null}
