@@ -63,6 +63,24 @@ export type PriceTierRecord = {
   unitPrice: number;
 };
 
+export type CategoryScaleTierRecord = {
+  id: string;
+  minQty: number;
+  price: number;
+  /** "unit": precio por unidad; "pack": precio total de las primeras minQty unidades. */
+  mode: "unit" | "pack";
+};
+
+export type CategoryScaleRecord = {
+  id: string;
+  categoryId: string;
+  categoryName: string;
+  categoryIsActive: boolean;
+  isActive: boolean;
+  excludedProductIds: string[];
+  tiers: CategoryScaleTierRecord[];
+};
+
 export type BundleItemRecord = {
   id: string;
   productId: string;
