@@ -1,10 +1,23 @@
 "use server";
 
 import { CACHE_TAGS } from "@/lib/cache";
-import type { ActionResponse, BundleRecord, PriceTierRecord } from "@/lib/domain";
-import { mapPriceTier } from "@/lib/mappers";
-import { bundleFormSchema, bundleStatusSchema, priceTiersFormSchema } from "@/lib/validators";
-import { getBundleRecord } from "./records";
+import type {
+  ActionResponse,
+  BundleRecord,
+  CategoryScaleRecord,
+  PriceTierRecord,
+  ProductCategoryRecord,
+} from "@/lib/domain";
+import { mapPriceTier, mapProductCategory } from "@/lib/mappers";
+import {
+  bundleFormSchema,
+  bundleStatusSchema,
+  categoryScaleFormSchema,
+  categoryScaleStatusSchema,
+  priceTiersFormSchema,
+  productCategoryFormSchema,
+} from "@/lib/validators";
+import { getBundleRecord, getCategoryScaleRecord } from "./records";
 import { failure, getAuthenticatedClient, getReturnedId, refreshTags, revalidatePaths, success } from "./shared";
 
 export async function savePriceTiersAction(
@@ -126,5 +139,123 @@ export async function setBundleStatusAction(
     return success(parsed.data.isActive ? "Combo activado." : "Combo desactivado.", bundle);
   } catch (error) {
     return failure("No pudimos actualizar el combo.", error);
+  }
+}
+
+export async function saveCategoryScaleAction(
+  input: unknown,
+): Promise<ActionResponse<CategoryScaleRecord>> {
+  const parsed = categoryScaleFormSchema.safeParse(input);
+
+  if (!parsed.success) {
+    return failure("No pudimos guardar la escala.", parsed.error);
+  }
+
+  try {
+    const { supabase } = await getAuthenticatedClient();
+    const { data, error } = await supabase.rpc("save_category_price_scale", {
+      payload: {
+        id: parsed.data.id,
+        categoryId: parsed.data.categoryId,
+        isActive: parsed.data.isActive,
+        excludedProductIds: parsed.data.excludedProductIds,
+        tiers: parsed.data.tiers.map((tier) => ({
+          minQty: tier.minQty,
+          price: tier.price,
+          mode: tier.mode,
+        })),
+      },
+    });
+
+    if (error) throw error;
+
+    const scaleId = getReturnedId(data) ?? parsed.data.id ?? null;
+    const scale = scaleId ? await getCategoryScaleRecord(supabase, scaleId) : null;
+
+    if (!scale) {
+      throw new Error("No pudimos recuperar la escala guardada.");
+    }
+
+    refreshTags(CACHE_TAGS.categoryScales);
+    revalidatePaths("/promociones", "/ventas");
+    return success("Escala guardada.", scale);
+  } catch (error) {
+    return failure("No pudimos guardar la escala.", error);
+  }
+}
+
+export async function setCategoryScaleStatusAction(
+  input: unknown,
+): Promise<ActionResponse<CategoryScaleRecord>> {
+  const parsed = categoryScaleStatusSchema.safeParse(input);
+
+  if (!parsed.success) {
+    return failure("No pudimos actualizar la escala.", parsed.error);
+  }
+
+  try {
+    const { supabase } = await getAuthenticatedClient();
+    const current = await getCategoryScaleRecord(supabase, parsed.data.id);
+
+    if (!current) {
+      throw new Error("No encontramos la escala seleccionada.");
+    }
+
+    const { error } = await supabase.rpc("save_category_price_scale", {
+      payload: {
+        id: current.id,
+        categoryId: current.categoryId,
+        isActive: parsed.data.isActive,
+        excludedProductIds: current.excludedProductIds,
+        tiers: current.tiers.map((tier) => ({
+          minQty: tier.minQty,
+          price: tier.price,
+          mode: tier.mode,
+        })),
+      },
+    });
+
+    if (error) throw error;
+
+    const scale = await getCategoryScaleRecord(supabase, current.id);
+
+    if (!scale) {
+      throw new Error("No pudimos recuperar la escala actualizada.");
+    }
+
+    refreshTags(CACHE_TAGS.categoryScales);
+    revalidatePaths("/promociones", "/ventas");
+    return success(parsed.data.isActive ? "Escala activada." : "Escala desactivada.", scale);
+  } catch (error) {
+    return failure("No pudimos actualizar la escala.", error);
+  }
+}
+
+export async function saveProductCategoryAction(
+  input: unknown,
+): Promise<ActionResponse<ProductCategoryRecord>> {
+  const parsed = productCategoryFormSchema.safeParse(input);
+
+  if (!parsed.success) {
+    return failure("No pudimos guardar la categoría.", parsed.error);
+  }
+
+  try {
+    const { supabase } = await getAuthenticatedClient();
+    const { data, error } = await supabase.rpc("save_product_category", {
+      payload: {
+        id: parsed.data.id,
+        name: parsed.data.name,
+        isActive: parsed.data.isActive,
+      },
+    });
+
+    if (error) throw error;
+
+    refreshTags(CACHE_TAGS.categories, CACHE_TAGS.products, CACHE_TAGS.categoryScales);
+    revalidatePaths("/productos", "/ventas", "/promociones");
+    return success("Categoría guardada.", mapProductCategory(data));
+  } catch (error) {
+    return failure("No pudimos guardar la categoría.", error);
   }
 }

@@ -218,6 +218,51 @@ export const bundleStatusSchema = z.object({
   isActive: z.boolean(),
 });
 
+export const categoryScaleTierSchema = z.object({
+  minQty: z.coerce.number().positive("La cantidad debe ser mayor a cero."),
+  price: z.coerce.number().positive("El precio debe ser mayor a cero."),
+  mode: z.enum(["unit", "pack"], { error: "Elegí si el precio es por unidad o total del pack." }),
+});
+
+export const categoryScaleFormSchema = z
+  .object({
+    id: z.string().uuid().optional(),
+    categoryId: z.string().uuid("Seleccioná una categoría."),
+    isActive: z.boolean().default(true),
+    excludedProductIds: z.array(z.string().uuid()).default([]),
+    tiers: z.array(categoryScaleTierSchema).min(1, "Agregá al menos un escalón."),
+  })
+  .superRefine((data, ctx) => {
+    const seen = new Set<number>();
+
+    data.tiers.forEach((tier, index) => {
+      if (seen.has(tier.minQty)) {
+        ctx.addIssue({
+          code: "custom",
+          path: ["tiers", index, "minQty"],
+          message: "No puede haber dos escalones con la misma cantidad.",
+        });
+      }
+
+      seen.add(tier.minQty);
+    });
+  })
+  .transform((data) => ({
+    ...data,
+    tiers: [...data.tiers].sort((left, right) => left.minQty - right.minQty),
+  }));
+
+export const categoryScaleStatusSchema = z.object({
+  id: z.string().uuid(),
+  isActive: z.boolean(),
+});
+
+export const productCategoryFormSchema = z.object({
+  id: z.string().uuid().optional(),
+  name: z.string().trim().min(2, "El nombre de la categoría es obligatorio."),
+  isActive: z.boolean().default(true),
+});
+
 export const saleOrderFormSchema = z
   .object({
     customerMode: z.enum(["existing", "inline", "anonymous"]).default("inline"),

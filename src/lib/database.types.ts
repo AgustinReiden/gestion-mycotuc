@@ -76,6 +76,100 @@ export type Database = {
           },
         ];
       };
+      category_price_scale_excluded_products: {
+        Row: {
+          scale_id: string;
+          product_id: string;
+        };
+        Insert: {
+          scale_id: string;
+          product_id: string;
+        };
+        Update: {
+          scale_id?: string;
+          product_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "category_price_scale_excluded_products_scale_id_fkey";
+            columns: ["scale_id"];
+            isOneToOne: false;
+            referencedRelation: "category_price_scales";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "category_price_scale_excluded_products_product_id_fkey";
+            columns: ["product_id"];
+            isOneToOne: false;
+            referencedRelation: "products";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      category_price_scale_tiers: {
+        Row: {
+          id: string;
+          scale_id: string;
+          min_qty: number;
+          price: number;
+          mode: string;
+        };
+        Insert: {
+          id?: string;
+          scale_id: string;
+          min_qty: number;
+          price: number;
+          mode: string;
+        };
+        Update: {
+          id?: string;
+          scale_id?: string;
+          min_qty?: number;
+          price?: number;
+          mode?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "category_price_scale_tiers_scale_id_fkey";
+            columns: ["scale_id"];
+            isOneToOne: false;
+            referencedRelation: "category_price_scales";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      category_price_scales: {
+        Row: {
+          id: string;
+          category_id: string;
+          is_active: boolean;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          category_id: string;
+          is_active?: boolean;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          category_id?: string;
+          is_active?: boolean;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "category_price_scales_category_id_fkey";
+            columns: ["category_id"];
+            isOneToOne: true;
+            referencedRelation: "product_categories";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       contacts: {
         Row: {
           id: string;
@@ -762,6 +856,8 @@ export type Database = {
           bundle_id: string | null;
           list_price: number | null;
           unit_cost: number | null;
+          price_scale_id: string | null;
+          price_scale_min_qty: number | null;
         };
         Insert: {
           id?: string;
@@ -774,6 +870,8 @@ export type Database = {
           bundle_id?: string | null;
           list_price?: number | null;
           unit_cost?: number | null;
+          price_scale_id?: string | null;
+          price_scale_min_qty?: number | null;
         };
         Update: {
           id?: string;
@@ -786,6 +884,8 @@ export type Database = {
           bundle_id?: string | null;
           list_price?: number | null;
           unit_cost?: number | null;
+          price_scale_id?: string | null;
+          price_scale_min_qty?: number | null;
         };
         Relationships: [
           {
@@ -1115,6 +1215,18 @@ export type Database = {
       run_sql: {
         Args: { query: string };
         Returns: Json;
+      };
+      save_category_price_scale: {
+        Args: { payload: Json };
+        Returns: Database["public"]["Tables"]["category_price_scales"]["Row"];
+      };
+      save_product_category: {
+        Args: { payload: Json };
+        Returns: Database["public"]["Tables"]["product_categories"]["Row"];
+      };
+      price_category_scales: {
+        Args: { p_items: Json };
+        Returns: { item_index: number; line_total: number; scale_id: string; tier_min_qty: number }[];
       };
       save_price_tiers: {
         Args: { payload: Json };

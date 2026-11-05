@@ -22,8 +22,10 @@ import {
 import {
   averageCostCorrectionSchema,
   bundleFormSchema,
+  categoryScaleFormSchema,
   paymentStatusUpdateSchema,
   priceTiersFormSchema,
+  productCategoryFormSchema,
   productionBatchFormSchema,
   purchaseFormSchema,
   reversalSchema,
@@ -40,6 +42,7 @@ const ids = {
   supplier: "00000000-0000-4000-8000-000000000006",
   supply: "00000000-0000-4000-8000-000000000007",
   bundle: "00000000-0000-4000-8000-000000000008",
+  category: "00000000-0000-4000-8000-000000000009",
 };
 
 const baseSale = {
@@ -639,5 +642,79 @@ describe("costs and margins", () => {
     expect(formatPercent(null)).toBe("-");
     expect(formatPercent(70)).toBe("70%");
     expect(formatPercent(33.333)).toMatch(/^33[,.]3%$/);
+  });
+});
+
+describe("category scale validation", () => {
+  const baseScale = {
+    categoryId: ids.category,
+    isActive: true,
+    excludedProductIds: [] as string[],
+    tiers: [
+      { minQty: 3, price: 65000, mode: "pack" },
+      { minQty: 4, price: 80000, mode: "pack" },
+      { minQty: 5, price: 15000, mode: "unit" },
+    ],
+  };
+
+  it("accepts the 3 / 4 / 5-or-more example and sorts the tiers", () => {
+    const result = categoryScaleFormSchema.safeParse({
+      ...baseScale,
+      tiers: [...baseScale.tiers].reverse(),
+    });
+
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.tiers.map((tier) => tier.minQty)).toEqual([3, 4, 5]);
+    }
+  });
+
+  it("rejects an empty list of tiers", () => {
+    expect(categoryScaleFormSchema.safeParse({ ...baseScale, tiers: [] }).success).toBe(false);
+  });
+
+  it("rejects repeated minimum quantities", () => {
+    const result = categoryScaleFormSchema.safeParse({
+      ...baseScale,
+      tiers: [
+        { minQty: 3, price: 65000, mode: "pack" },
+        { minQty: 3, price: 60000, mode: "unit" },
+      ],
+    });
+
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error.issues.map((issue) => issue.path.join("."))).toContain("tiers.1.minQty");
+    }
+  });
+
+  it("rejects non positive quantities and prices and unknown modes", () => {
+    const withTier = (tier: Record<string, unknown>) =>
+      categoryScaleFormSchema.safeParse({ ...baseScale, tiers: [tier] }).success;
+
+    expect(withTier({ minQty: 0, price: 100, mode: "pack" })).toBe(false);
+    expect(withTier({ minQty: 3, price: 0, mode: "pack" })).toBe(false);
+    expect(withTier({ minQty: 3, price: 100, mode: "otro" })).toBe(false);
+  });
+
+  it("rejects an invalid category and invalid excluded product ids", () => {
+    expect(categoryScaleFormSchema.safeParse({ ...baseScale, categoryId: "x" }).success).toBe(false);
+    expect(categoryScaleFormSchema.safeParse({ ...baseScale, excludedProductIds: ["x"] }).success).toBe(false);
+  });
+});
+
+describe("product category validation", () => {
+  it("accepts a valid name and defaults to active", () => {
+    const result = productCategoryFormSchema.safeParse({ name: "  Hongos Secos  " });
+
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.name).toBe("Hongos Secos");
+      expect(result.data.isActive).toBe(true);
+    }
+  });
+
+  it("rejects names shorter than two characters", () => {
+    expect(productCategoryFormSchema.safeParse({ name: " a " }).success).toBe(false);
   });
 });
