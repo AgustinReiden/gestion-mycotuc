@@ -97,6 +97,8 @@ declare
   v_order3 public.sales_orders;
   v_supply public.supplies;
   v_oper_product uuid;
+  v_cat public.product_categories;
+  v_cat_prod uuid;
 begin
   -- ---------------------------------------------------------------- roles
   insert into auth.users (id, email, aud, role) values (v_admin, 'admin-test@example.com', 'authenticated', 'authenticated');
@@ -433,6 +435,34 @@ begin
   v_supply := public.upsert_supply(jsonb_build_object('id', v_s_hongo, 'name', 'Hongo seco Test', 'unit', 'g', 'minStock', 0, 'isActive', false));
   perform pg_temp.check_that(v_supply.unit = 'g' and not v_supply.is_active,
     'admin puede cambiar la unidad y desactivar un insumo'); n := n + 1;
+
+  -- ---------------------------------------------------------------- categorias editables
+  perform pg_temp.as_user(v_oper);
+  perform pg_temp.check_that(pg_temp.fails($q$ select public.save_product_category(jsonb_build_object('name','Categoria Test')) $q$),
+    'operador no puede crear categorias'); n := n + 1;
+
+  perform pg_temp.as_user(v_admin);
+  perform pg_temp.check_that(exists (select 1 from public.product_categories where name = 'Hongos Secos' and is_active),
+    'existe la categoria Hongos Secos activa'); n := n + 1;
+  v_cat := public.save_product_category(jsonb_build_object('name', 'Categoria Test'));
+  perform pg_temp.check_that(v_cat.id is not null and v_cat.is_active, 'admin crea una categoria'); n := n + 1;
+  perform pg_temp.check_that(pg_temp.fails($q$ select public.save_product_category(jsonb_build_object('name','categoria test')) $q$),
+    'un nombre de categoria repetido (sin distinguir mayusculas) se rechaza'); n := n + 1;
+  perform pg_temp.check_that(pg_temp.fails($q$ select public.save_product_category(jsonb_build_object('name',' x ')) $q$),
+    'un nombre de categoria demasiado corto se rechaza'); n := n + 1;
+
+  insert into public.products (name, category, unit, sale_price) values ('Producto Categoria Test', 'Categoria Test', 'u', 100) returning id into v_cat_prod;
+  v_cat := public.save_product_category(jsonb_build_object('id', v_cat.id, 'name', 'Categoria Renombrada'));
+  perform pg_temp.check_that((select category from public.products where id = v_cat_prod) = 'Categoria Renombrada',
+    'renombrar una categoria actualiza sus productos'); n := n + 1;
+  perform pg_temp.check_that(not exists (select 1 from public.products where category = 'Categoria Test'),
+    'al renombrar no quedan productos con el nombre viejo'); n := n + 1;
+  v_cat := public.save_product_category(jsonb_build_object('id', v_cat.id, 'name', 'Categoria Renombrada', 'isActive', false));
+  perform pg_temp.check_that(not v_cat.is_active
+    and (select category from public.products where id = v_cat_prod) = 'Categoria Renombrada',
+    'desactivar una categoria no toca sus productos'); n := n + 1;
+  perform pg_temp.check_that(pg_temp.fails($q$ insert into public.products (name, category, unit) values ('Y', 'Categoria Renombrada', 'u') $q$),
+    'no se pueden crear productos en una categoria desactivada'); n := n + 1;
 
   raise exception 'PASS: % verificaciones OK (transaccion revertida, no queda nada) [intento real: %]', n, v_text;
 end
