@@ -46,6 +46,8 @@ Archivos SQL del proyecto:
 - `supabase/migrations/20260318152000_auth_profile_sync.sql`
 - `supabase/migrations/20260318164000_profile_self_heal_and_policy.sql`
 - `supabase/migrations/20260318180000_inventory_history_and_batch_guards.sql`
+- `supabase/migrations/20261105130000_category_management.sql` (categorias editables y Hongos Secos)
+- `supabase/migrations/20261105140000_category_price_scales.sql` (escalas por categoria en la venta)
 - `supabase/seed/seed.sql`
 
 ## Desarrollo local
@@ -73,7 +75,7 @@ npm.cmd run build
 
 ## Notas del modelo
 
-- Hay dos roles: `admin` y `operator`. El primer perfil creado queda admin. Solo el admin anula ventas/compras/lotes, ajusta stock, cambia precios base, define escalas y combos, y ve costos y margenes. El operador vende a precio de lista.
+- Hay dos roles: `admin` y `operator`. El primer perfil creado queda admin. Solo el admin anula ventas/compras/lotes, ajusta stock, cambia precios base, define escalas, combos, promociones por categoria (seccion Promociones) y categorias de producto, y ve costos y margenes. El operador vende a precio de lista.
 - Desactivar el registro publico en Supabase Auth (Allow new users to sign up).
 - Las migraciones `20260318152000_auth_profile_sync.sql` y `20260318164000_profile_self_heal_and_policy.sql` corrigen usuarios ya existentes en `auth.users`, dejan triggers para altas/updates futuros y endurecen la policy de `profiles`.
 - La migracion `20260318180000_inventory_history_and_batch_guards.sql` agrega historial legible de movimientos y evita completar lotes con insumos insuficientes o sin salidas cargadas.

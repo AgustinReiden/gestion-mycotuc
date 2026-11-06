@@ -68,6 +68,27 @@ as $$
   select set_config('request.jwt.claims', json_build_object('sub', p_user, 'role', 'authenticated')::text, true);
 $$;
 
+create or replace function pg_temp.item(p_product uuid, p_qty numeric)
+returns jsonb
+language sql
+as $$
+  select jsonb_build_object('productId', p_product, 'quantity', p_qty);
+$$;
+
+create or replace function pg_temp.scale_sum(p_items jsonb)
+returns numeric
+language sql
+as $$
+  select coalesce(sum(line_total), 0) from public.price_category_scales(p_items);
+$$;
+
+create or replace function pg_temp.scale_rows(p_items jsonb)
+returns integer
+language sql
+as $$
+  select count(*)::integer from public.price_category_scales(p_items);
+$$;
+
 do $$
 declare
   n integer := 0;
@@ -97,6 +118,15 @@ declare
   v_order3 public.sales_orders;
   v_supply public.supplies;
   v_oper_product uuid;
+  v_cat public.product_categories;
+  v_cat_prod uuid;
+  v_scat public.product_categories;
+  v_pa uuid;
+  v_pb uuid;
+  v_pc uuid;
+  v_pd uuid;
+  v_scale public.category_price_scales;
+  v_tmp jsonb;
 begin
   -- ---------------------------------------------------------------- roles
   insert into auth.users (id, email, aud, role) values (v_admin, 'admin-test@example.com', 'authenticated', 'authenticated');
@@ -433,6 +463,168 @@ begin
   v_supply := public.upsert_supply(jsonb_build_object('id', v_s_hongo, 'name', 'Hongo seco Test', 'unit', 'g', 'minStock', 0, 'isActive', false));
   perform pg_temp.check_that(v_supply.unit = 'g' and not v_supply.is_active,
     'admin puede cambiar la unidad y desactivar un insumo'); n := n + 1;
+
+  -- ---------------------------------------------------------------- categorias editables
+  perform pg_temp.as_user(v_oper);
+  perform pg_temp.check_that(pg_temp.fails($q$ select public.save_product_category(jsonb_build_object('name','Categoria Test')) $q$),
+    'operador no puede crear categorias'); n := n + 1;
+
+  perform pg_temp.as_user(v_admin);
+  perform pg_temp.check_that(exists (select 1 from public.product_categories where name = 'Hongos Secos' and is_active),
+    'existe la categoria Hongos Secos activa'); n := n + 1;
+  v_cat := public.save_product_category(jsonb_build_object('name', 'Categoria Test'));
+  perform pg_temp.check_that(v_cat.id is not null and v_cat.is_active, 'admin crea una categoria'); n := n + 1;
+  perform pg_temp.check_that(pg_temp.fails($q$ select public.save_product_category(jsonb_build_object('name','categoria test')) $q$),
+    'un nombre de categoria repetido (sin distinguir mayusculas) se rechaza'); n := n + 1;
+  perform pg_temp.check_that(pg_temp.fails($q$ select public.save_product_category(jsonb_build_object('name',' x ')) $q$),
+    'un nombre de categoria demasiado corto se rechaza'); n := n + 1;
+
+  insert into public.products (name, category, unit, sale_price) values ('Producto Categoria Test', 'Categoria Test', 'u', 100) returning id into v_cat_prod;
+  v_cat := public.save_product_category(jsonb_build_object('id', v_cat.id, 'name', 'Categoria Renombrada'));
+  perform pg_temp.check_that((select category from public.products where id = v_cat_prod) = 'Categoria Renombrada',
+    'renombrar una categoria actualiza sus productos'); n := n + 1;
+  perform pg_temp.check_that(not exists (select 1 from public.products where category = 'Categoria Test'),
+    'al renombrar no quedan productos con el nombre viejo'); n := n + 1;
+  v_cat := public.save_product_category(jsonb_build_object('id', v_cat.id, 'name', 'Categoria Renombrada', 'isActive', false));
+  perform pg_temp.check_that(not v_cat.is_active
+    and (select category from public.products where id = v_cat_prod) = 'Categoria Renombrada',
+    'desactivar una categoria no toca sus productos'); n := n + 1;
+  perform pg_temp.check_that(pg_temp.fails($q$ insert into public.products (name, category, unit) values ('Y', 'Categoria Renombrada', 'u') $q$),
+    'no se pueden crear productos en una categoria desactivada'); n := n + 1;
+  v_cat := public.save_product_category(jsonb_build_object('id', v_cat.id, 'name', 'Categoria Inactiva Renombrada', 'isActive', false));
+  perform pg_temp.check_that(not v_cat.is_active
+    and (select category from public.products where id = v_cat_prod) = 'Categoria Inactiva Renombrada',
+    'se puede renombrar una categoria inactiva con productos y sigue inactiva'); n := n + 1;
+
+  -- ---------------------------------------------------------------- escalas por categoria
+  perform pg_temp.as_user(v_admin);
+  v_scat := public.save_product_category(jsonb_build_object('name', 'Escala Test'));
+  insert into public.products (name, category, unit, sale_price) values ('Esc A', 'Escala Test', 'u', 25000) returning id into v_pa;
+  insert into public.products (name, category, unit, sale_price) values ('Esc B', 'Escala Test', 'u', 22000) returning id into v_pb;
+  insert into public.products (name, category, unit, sale_price) values ('Esc C', 'Escala Test', 'u', 20000) returning id into v_pc;
+  insert into public.products (name, category, unit, sale_price) values ('Esc D', 'Escala Test', 'u', 20000) returning id into v_pd;
+  insert into public.inventory_movements (entity_type, entity_id, movement_type, quantity, reference_type)
+  select 'product', id, 'adjustment', 100, 'test' from public.products where category = 'Escala Test';
+
+  perform pg_temp.as_user(v_oper);
+  perform pg_temp.check_that(pg_temp.fails(format($q$ select public.save_category_price_scale(jsonb_build_object('categoryId',%L,'excludedProductIds','[]'::jsonb,'tiers',jsonb_build_array(jsonb_build_object('minQty',3,'price',65000,'mode','pack')))) $q$, v_scat.id)),
+    'operador no puede crear escalas por categoria'); n := n + 1;
+
+  perform pg_temp.as_user(v_admin);
+  perform pg_temp.check_that(pg_temp.fails(format($q$ select public.save_category_price_scale(jsonb_build_object('categoryId',%L,'excludedProductIds','[]'::jsonb,'tiers','[]'::jsonb)) $q$, v_scat.id)),
+    'una escala sin escalones se rechaza'); n := n + 1;
+  perform pg_temp.check_that(pg_temp.fails(format($q$ select public.save_category_price_scale(jsonb_build_object('categoryId',%L,'excludedProductIds','[]'::jsonb,'tiers',jsonb_build_array(jsonb_build_object('minQty',3,'price',100,'mode','pack'),jsonb_build_object('minQty',3,'price',90,'mode','unit')))) $q$, v_scat.id)),
+    'escalones con la misma cantidad se rechazan'); n := n + 1;
+  perform pg_temp.check_that(pg_temp.fails(format($q$ select public.save_category_price_scale(jsonb_build_object('categoryId',%L,'excludedProductIds','[]'::jsonb,'tiers',jsonb_build_array(jsonb_build_object('minQty',3,'price',0,'mode','pack')))) $q$, v_scat.id)),
+    'un escalon con precio cero se rechaza'); n := n + 1;
+
+  v_scale := public.save_category_price_scale(jsonb_build_object('categoryId', v_scat.id, 'excludedProductIds', '[]'::jsonb,
+    'tiers', jsonb_build_array(
+      jsonb_build_object('minQty', 3, 'price', 65000, 'mode', 'pack'),
+      jsonb_build_object('minQty', 4, 'price', 80000, 'mode', 'pack'),
+      jsonb_build_object('minQty', 5, 'price', 15000, 'mode', 'unit'))));
+  perform pg_temp.check_that(v_scale.id is not null and v_scale.is_active, 'admin crea una escala por categoria'); n := n + 1;
+
+  perform pg_temp.check_that(pg_temp.scale_rows(jsonb_build_array(pg_temp.item(v_pa, 1), pg_temp.item(v_pb, 1))) = 0,
+    'bajo el primer escalon no hay escala'); n := n + 1;
+  perform pg_temp.check_that(pg_temp.scale_sum(jsonb_build_array(pg_temp.item(v_pa, 1), pg_temp.item(v_pb, 1), pg_temp.item(v_pc, 1))) = 65000,
+    '3 productos distintos suman el total del pack de 3'); n := n + 1;
+  perform pg_temp.check_that(pg_temp.scale_sum(jsonb_build_array(pg_temp.item(v_pa, 1), pg_temp.item(v_pb, 1), pg_temp.item(v_pc, 1), pg_temp.item(v_pd, 1))) = 80000,
+    '4 productos distintos suman el total del pack de 4'); n := n + 1;
+  perform pg_temp.check_that(pg_temp.scale_sum(jsonb_build_array(pg_temp.item(v_pa, 2), pg_temp.item(v_pb, 2), pg_temp.item(v_pc, 2))) = 90000,
+    '6 unidades cobran el precio por unidad del escalon de 5 o mas'); n := n + 1;
+  perform pg_temp.check_that(pg_temp.scale_sum(jsonb_build_array(pg_temp.item(v_pa, 12))) = 180000,
+    'mas unidades que el ultimo escalon siguen en el ultimo escalon'); n := n + 1;
+  perform pg_temp.check_that(pg_temp.scale_sum(jsonb_build_array(pg_temp.item(v_pa, 0.5), pg_temp.item(v_pa, 2.5))) = 65000
+    and pg_temp.scale_rows(jsonb_build_array(pg_temp.item(v_pa, 0.5), pg_temp.item(v_pa, 2.5))) = 2,
+    'el mismo producto en dos renglones con decimales suma como 3 unidades'); n := n + 1;
+  perform pg_temp.check_that(pg_temp.scale_rows(jsonb_build_array(pg_temp.item(v_pa, 1), pg_temp.item(v_pb, 1),
+      jsonb_build_object('bundleId', v_bundle.id, 'quantity', 1))) = 0,
+    'las unidades de un combo no cuentan para la escala'); n := n + 1;
+  perform pg_temp.check_that(pg_temp.scale_sum(jsonb_build_array(pg_temp.item(v_pa, 1), pg_temp.item(v_pb, 1), pg_temp.item(v_pc, 1), pg_temp.item(v_ext, 1))) = 65000
+    and pg_temp.scale_rows(jsonb_build_array(pg_temp.item(v_pa, 1), pg_temp.item(v_pb, 1), pg_temp.item(v_pc, 1), pg_temp.item(v_ext, 1))) = 3,
+    'un producto de otra categoria no cuenta ni se toca'); n := n + 1;
+
+  -- un solo escalon de pack: las unidades sobrantes van al precio normal
+  v_scale := public.save_category_price_scale(jsonb_build_object('categoryId', v_scat.id, 'excludedProductIds', '[]'::jsonb,
+    'tiers', jsonb_build_array(jsonb_build_object('minQty', 3, 'price', 65000, 'mode', 'pack'))));
+  perform pg_temp.check_that((select count(*) from public.category_price_scales where category_id = v_scat.id) = 1,
+    'guardar de nuevo la escala de una categoria la edita, no la duplica'); n := n + 1;
+  perform pg_temp.check_that(pg_temp.scale_sum(jsonb_build_array(pg_temp.item(v_pa, 2), pg_temp.item(v_pb, 1), pg_temp.item(v_pc, 1))) = 85000,
+    'el pack toma las unidades mas caras y las sobrantes van al precio normal'); n := n + 1;
+
+  -- exclusiones
+  v_scale := public.save_category_price_scale(jsonb_build_object('categoryId', v_scat.id, 'excludedProductIds', jsonb_build_array(v_pd),
+    'tiers', jsonb_build_array(jsonb_build_object('minQty', 3, 'price', 65000, 'mode', 'pack'))));
+  perform pg_temp.check_that(pg_temp.scale_sum(jsonb_build_array(pg_temp.item(v_pa, 1), pg_temp.item(v_pb, 1), pg_temp.item(v_pc, 1), pg_temp.item(v_pd, 1))) = 65000
+    and pg_temp.scale_rows(jsonb_build_array(pg_temp.item(v_pa, 1), pg_temp.item(v_pb, 1), pg_temp.item(v_pc, 1), pg_temp.item(v_pd, 1))) = 3,
+    'un producto excluido no cuenta para la escala'); n := n + 1;
+  perform pg_temp.check_that(pg_temp.scale_rows(jsonb_build_array(pg_temp.item(v_pa, 1), pg_temp.item(v_pb, 1), pg_temp.item(v_pd, 1))) = 0,
+    'con un excluido no se llega al primer escalon'); n := n + 1;
+  v_scale := public.save_category_price_scale(jsonb_build_object('categoryId', v_scat.id, 'excludedProductIds', jsonb_build_array(v_ext),
+    'tiers', jsonb_build_array(jsonb_build_object('minQty', 3, 'price', 65000, 'mode', 'pack'))));
+  perform pg_temp.check_that(not exists (select 1 from public.category_price_scale_excluded_products where scale_id = v_scale.id),
+    'un producto de otra categoria no se guarda como excluido'); n := n + 1;
+  -- un excluido que cambio de categoria no impide guardar ni desactivar la escala
+  v_scale := public.save_category_price_scale(jsonb_build_object('categoryId', v_scat.id, 'excludedProductIds', jsonb_build_array(v_pd),
+    'tiers', jsonb_build_array(jsonb_build_object('minQty', 3, 'price', 65000, 'mode', 'pack'))));
+  update public.products set category = 'Sales' where id = v_pd;
+  v_scale := public.save_category_price_scale(jsonb_build_object('categoryId', v_scat.id, 'isActive', false, 'excludedProductIds', jsonb_build_array(v_pd),
+    'tiers', jsonb_build_array(jsonb_build_object('minQty', 3, 'price', 65000, 'mode', 'pack'))));
+  perform pg_temp.check_that(not v_scale.is_active, 'se puede desactivar una escala aunque un excluido haya cambiado de categoria'); n := n + 1;
+  update public.products set category = 'Escala Test' where id = v_pd;
+
+  perform pg_temp.check_that(has_column_privilege('authenticated', 'public.sales_order_items', 'price_scale_id', 'select')
+    and has_column_privilege('authenticated', 'public.sales_order_items', 'price_scale_min_qty', 'select'),
+    'authenticated puede leer las columnas de escala de los renglones de venta'); n := n + 1;
+
+  -- venta completa con escala (operador paga el precio calculado)
+  v_scale := public.save_category_price_scale(jsonb_build_object('categoryId', v_scat.id, 'excludedProductIds', '[]'::jsonb,
+    'tiers', jsonb_build_array(
+      jsonb_build_object('minQty', 3, 'price', 65000, 'mode', 'pack'),
+      jsonb_build_object('minQty', 5, 'price', 15000, 'mode', 'unit'))));
+  perform pg_temp.as_user(v_oper);
+  v_order := public.create_sale_order(jsonb_build_object('contactId', v_client, 'channelId', v_channel, 'items', jsonb_build_array(
+    pg_temp.item(v_pa, 1), pg_temp.item(v_pb, 1), pg_temp.item(v_pc, 1))));
+  perform pg_temp.check_that(v_order.total_amount = 65000, 'venta de 3 productos de la categoria = total del pack'); n := n + 1;
+  select count(*), sum(line_total) into v_cnt, v_val from public.sales_order_items where sales_order_id = v_order.id;
+  perform pg_temp.check_that(v_cnt = 3 and v_val = 65000, 'los renglones de la venta suman el total del pack'); n := n + 1;
+  perform pg_temp.check_that((select count(*) from public.sales_order_items where sales_order_id = v_order.id and price_scale_id = v_scale.id and price_scale_min_qty = 3) = 3,
+    'cada renglon guarda la escala y el escalon aplicados'); n := n + 1;
+  perform pg_temp.check_that(public.current_inventory_stock('product', v_pa) = 99 and public.current_inventory_stock('product', v_pb) = 99
+    and public.current_inventory_stock('product', v_pc) = 99 and public.current_inventory_stock('product', v_pd) = 100,
+    'el stock baja de cada producto realmente elegido'); n := n + 1;
+
+  -- el cliente manda el precio unitario redondeado por renglon (decimales y renglones repetidos)
+  v_tmp := jsonb_build_array(
+    jsonb_build_object('productId', v_pa, 'quantity', 0.5, 'unitPrice', round(65000 / 3.0, 2)),
+    jsonb_build_object('productId', v_pa, 'quantity', 2.5, 'unitPrice', round(65000 / 3.0, 2)));
+  v_order := public.create_sale_order(jsonb_build_object('contactId', v_client, 'channelId', v_channel, 'items', v_tmp));
+  perform pg_temp.check_that(v_order.total_amount = 65000, 'el precio unitario redondeado por renglon se acepta dentro de la tolerancia'); n := n + 1;
+
+  perform pg_temp.check_that(pg_temp.fails(format($q$ select public.create_sale_order(jsonb_build_object('contactId',%L,'channelId',%L,'items',jsonb_build_array(
+      jsonb_build_object('productId',%L,'quantity',1,'unitPrice',1), %L::jsonb, %L::jsonb))) $q$, v_client, v_channel, v_pa, pg_temp.item(v_pb, 1), pg_temp.item(v_pc, 1))),
+    'operador no puede cambiar el precio de un renglon con escala'); n := n + 1;
+
+  perform pg_temp.as_user(v_admin);
+  v_order := public.create_sale_order(jsonb_build_object('contactId', v_client, 'channelId', v_channel, 'items', jsonb_build_array(
+    jsonb_build_object('productId', v_pa, 'quantity', 1, 'unitPrice', 1000), pg_temp.item(v_pb, 1), pg_temp.item(v_pc, 1))));
+  perform pg_temp.check_that((select line_total from public.sales_order_items where sales_order_id = v_order.id and product_id = v_pa) = 1000,
+    'un admin puede cambiar el precio de un renglon con escala'); n := n + 1;
+
+  -- desactivar la escala o la categoria devuelve el precio normal, sin error
+  v_scale := public.save_category_price_scale(jsonb_build_object('categoryId', v_scat.id, 'isActive', false, 'excludedProductIds', '[]'::jsonb,
+    'tiers', jsonb_build_array(jsonb_build_object('minQty', 3, 'price', 65000, 'mode', 'pack'))));
+  perform pg_temp.check_that(pg_temp.scale_rows(jsonb_build_array(pg_temp.item(v_pa, 1), pg_temp.item(v_pb, 1), pg_temp.item(v_pc, 1))) = 0,
+    'una escala desactivada no se aplica'); n := n + 1;
+  v_order := public.create_sale_order(jsonb_build_object('contactId', v_client, 'channelId', v_channel, 'items', jsonb_build_array(
+    pg_temp.item(v_pa, 1), pg_temp.item(v_pb, 1), pg_temp.item(v_pc, 1))));
+  perform pg_temp.check_that(v_order.total_amount = 67000, 'con la escala desactivada se cobra a precio normal'); n := n + 1;
+  v_scale := public.save_category_price_scale(jsonb_build_object('categoryId', v_scat.id, 'isActive', true, 'excludedProductIds', '[]'::jsonb,
+    'tiers', jsonb_build_array(jsonb_build_object('minQty', 3, 'price', 65000, 'mode', 'pack'))));
+  v_scat := public.save_product_category(jsonb_build_object('id', v_scat.id, 'name', 'Escala Test', 'isActive', false));
+  perform pg_temp.check_that(pg_temp.scale_rows(jsonb_build_array(pg_temp.item(v_pa, 1), pg_temp.item(v_pb, 1), pg_temp.item(v_pc, 1))) = 0,
+    'una categoria desactivada deja sin efecto su escala'); n := n + 1;
 
   raise exception 'PASS: % verificaciones OK (transaccion revertida, no queda nada) [intento real: %]', n, v_text;
 end

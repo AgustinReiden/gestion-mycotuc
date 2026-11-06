@@ -1,5 +1,6 @@
 export const CACHE_TAGS = {
   bundles: "bundles",
+  categoryScales: "category-scales",
   categories: "product-categories",
   contacts: "contacts",
   expenses: "expenses",

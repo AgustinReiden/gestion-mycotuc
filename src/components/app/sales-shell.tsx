@@ -15,6 +15,7 @@ import { useQuickCreate } from "@/lib/hooks/use-quick-create";
 import type {
   AppRole,
   BundleRecord,
+  CategoryScaleRecord,
   ContactRecord,
   LookupOption,
   PriceTierRecord,
@@ -42,6 +43,7 @@ type SalesShellProps = {
   channels: LookupOption[];
   priceTiers: PriceTierRecord[];
   bundles: BundleRecord[];
+  categoryScales: CategoryScaleRecord[];
   role: AppRole;
 };
 
@@ -207,6 +209,7 @@ function NewSaleModal({
   channels,
   priceTiers,
   bundles,
+  categoryScales,
   role,
   onSaleCreated,
 }: {
@@ -215,6 +218,7 @@ function NewSaleModal({
   channels: LookupOption[];
   priceTiers: PriceTierRecord[];
   bundles: BundleRecord[];
+  categoryScales: CategoryScaleRecord[];
   role: AppRole;
   onSaleCreated: (result: CreateSaleOrderResult) => void;
 }) {
@@ -239,6 +243,7 @@ function NewSaleModal({
           channels={channels}
           priceTiers={priceTiers}
           bundles={bundles}
+          categoryScales={categoryScales}
           role={role}
           onSuccess={(result) => {
             setOpen(false);
@@ -537,6 +542,7 @@ export function SalesShell({
   channels,
   priceTiers,
   bundles,
+  categoryScales,
   role,
 }: SalesShellProps) {
   const isAdmin = role === "admin";
@@ -627,6 +633,7 @@ export function SalesShell({
           channels={channels}
           priceTiers={priceTiers}
           bundles={bundles}
+          categoryScales={categoryScales}
           role={role}
           onSaleCreated={(result) => {
             setSaleRecords((current) => upsertSale(current, result.sale));

@@ -1,6 +1,7 @@
 import type { Database } from "@/lib/database.types";
 import type {
   BundleRecord,
+  CategoryScaleRecord,
   ContactRecord,
   ExpenseRecord,
   InventoryMovementRecord,
@@ -37,6 +38,11 @@ export type PriceTierRow = Pick<
   "id" | "product_id" | "min_qty" | "unit_price"
 >;
 export type ProductCategoryRow = Pick<Tables["product_categories"]["Row"], "id" | "name" | "is_active">;
+export type CategoryScaleRow = Pick<Tables["category_price_scales"]["Row"], "id" | "category_id" | "is_active"> & {
+  product_categories: { name: string; is_active: boolean } | null;
+  category_price_scale_tiers: Array<Pick<Tables["category_price_scale_tiers"]["Row"], "id" | "min_qty" | "price" | "mode">>;
+  category_price_scale_excluded_products: Array<{ product_id: string }>;
+};
 export type LookupRow = { id: string; name: string };
 
 export type SaleOrderItemRow = Pick<
@@ -284,6 +290,25 @@ export function mapBundle(record: BundleRow): BundleRecord {
         quantity: toNumber(item.quantity),
       }))
       .sort((left, right) => left.productName.localeCompare(right.productName, "es")),
+  };
+}
+
+export function mapCategoryScale(record: CategoryScaleRow): CategoryScaleRecord {
+  return {
+    id: String(record.id ?? ""),
+    categoryId: String(record.category_id ?? ""),
+    categoryName: String(record.product_categories?.name ?? ""),
+    categoryIsActive: Boolean(record.product_categories?.is_active),
+    isActive: Boolean(record.is_active),
+    excludedProductIds: record.category_price_scale_excluded_products.map((entry) => String(entry.product_id)),
+    tiers: record.category_price_scale_tiers
+      .map((tier) => ({
+        id: String(tier.id ?? ""),
+        minQty: toNumber(tier.min_qty),
+        price: toNumber(tier.price),
+        mode: tier.mode === "pack" ? ("pack" as const) : ("unit" as const),
+      }))
+      .sort((left, right) => left.minQty - right.minQty),
   };
 }
 

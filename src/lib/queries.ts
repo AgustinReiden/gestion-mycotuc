@@ -24,7 +24,9 @@ import {
   mapLookup,
   mapPriceTier,
   mapProduct,
+  mapCategoryScale,
   mapProductCategory,
+  type CategoryScaleRow,
   mapPurchase,
   mapSale,
   mapSupply,
@@ -382,6 +384,23 @@ export const getBundlesData = cache(async () =>
   }),
 );
 
+export const getCategoryScalesData = cache(async () =>
+  runUserCachedQuery({
+    key: ["category-scales-data"],
+    query: async (supabase) => {
+      const { data, error } = await supabase
+        .from("category_price_scales")
+        .select(
+          "id, category_id, is_active, product_categories(name, is_active), category_price_scale_tiers(id, min_qty, price, mode), category_price_scale_excluded_products(product_id)",
+        );
+      if (error) throw error;
+      return (data ?? []).map((record) => mapCategoryScale(record as unknown as CategoryScaleRow));
+    },
+    revalidate: 300,
+    tags: [CACHE_TAGS.categoryScales, CACHE_TAGS.categories, CACHE_TAGS.products],
+  }),
+);
+
 export const getSuppliesData = cache(async () =>
   runUserCachedQuery({
     key: ["supplies-data"],
@@ -538,13 +557,14 @@ export const getPurchasesData = cache(async (limit = 8) =>
 
 export async function getSalesData() {
   const role = await getCurrentRole();
-  const [sales, contacts, products, lookup, priceTiers, bundles] = await Promise.all([
+  const [sales, contacts, products, lookup, priceTiers, bundles, categoryScales] = await Promise.all([
     getSalesForRole(role),
     getContactsData(),
     getProductsData(),
     getLookupData(),
     getPriceTiersData(),
     getBundlesData(),
+    getCategoryScalesData(),
   ]);
   const activeProducts = products.filter((product) => product.isActive);
   const activeProductIds = new Set(activeProducts.map((product) => product.id));
@@ -561,6 +581,7 @@ export async function getSalesData() {
         bundle.items.length > 0 &&
         bundle.items.every((item) => activeProductIds.has(item.productId)),
     ),
+    categoryScales: categoryScales.filter((scale) => scale.isActive && scale.categoryIsActive),
     role,
   };
 }
@@ -594,12 +615,11 @@ export async function getSuppliesPageData() {
 }
 
 export async function getProductsPageData() {
-  const [products, movements, categories, priceTiers, bundles, role] = await Promise.all([
+  const [products, movements, categories, priceTiers, role] = await Promise.all([
     getProductsData(),
     getInventoryMovementsData("product"),
     getProductCategoriesData(),
     getPriceTiersData(),
-    getBundlesData(),
     getCurrentRole(),
   ]);
 
@@ -610,9 +630,20 @@ export async function getProductsPageData() {
     movements,
     categories,
     priceTiers,
-    bundles,
     role,
   };
+}
+
+export async function getPromotionsPageData() {
+  const [products, categories, bundles, scales, role] = await Promise.all([
+    getProductsData(),
+    getProductCategoriesData(),
+    getBundlesData(),
+    getCategoryScalesData(),
+    getCurrentRole(),
+  ]);
+
+  return { products, categories, bundles, scales, role };
 }
 
 export async function getProductionData() {

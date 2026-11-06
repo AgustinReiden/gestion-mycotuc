@@ -10,6 +10,7 @@ import { ANONYMOUS_CUSTOMER_NAME, PAYMENT_STATUSES } from "@/lib/constants";
 import type {
   AppRole,
   BundleRecord,
+  CategoryScaleRecord,
   ContactRecord,
   LookupOption,
   PriceTierRecord,
@@ -17,6 +18,7 @@ import type {
   SaleCustomerMode,
   SaleOrderRecord,
 } from "@/lib/domain";
+import { priceCategoryScales } from "@/lib/category-scales";
 import { getPartialAmountError, getSaleBalance } from "@/lib/finance";
 import {
   formatQuantity,
@@ -52,6 +54,7 @@ type SaleOrderFormProps = {
   channels: LookupOption[];
   priceTiers: PriceTierRecord[];
   bundles: BundleRecord[];
+  categoryScales: CategoryScaleRecord[];
   role: AppRole;
   onSuccess: (result: CreateSaleOrderResult) => void;
 };
@@ -62,6 +65,7 @@ type LinePricing = {
   quantity: number;
   listPrice: number;
   tierMinQty: number | null;
+  scaleMinQty: number | null;
   isManual: boolean;
   unitPrice: number;
   subtotal: number;
@@ -75,15 +79,18 @@ function getLinePricing({
   manualFlags,
   products,
   bundles,
+  categoryScales,
   tiersByProduct,
 }: {
   items: SaleLineValues[];
   manualFlags: boolean[];
   products: ProductRecord[];
   bundles: BundleRecord[];
+  categoryScales: CategoryScaleRecord[];
   tiersByProduct: Map<string, PriceTierRecord[]>;
 }): LinePricing[] {
   const directQuantities = getDirectProductQuantities(items);
+  const scaledLines = priceCategoryScales(items, products, categoryScales);
 
   return items.map((item, index) => {
     const quantity = Number(item.quantity) > 0 ? Number(item.quantity) : 0;
@@ -92,9 +99,16 @@ function getLinePricing({
       !bundle && item.productId ? products.find((entry) => entry.id === item.productId) ?? null : null;
     let listPrice = 0;
     let tierMinQty: number | null = null;
+    let scaleMinQty: number | null = null;
+    let scaledTotal: number | null = null;
+    const scaled = scaledLines.get(index);
 
     if (bundle) {
       listPrice = bundle.salePrice;
+    } else if (product && scaled && quantity > 0) {
+      listPrice = roundMoney(scaled.lineTotal / quantity);
+      scaleMinQty = scaled.tierMinQty;
+      scaledTotal = scaled.lineTotal;
     } else if (product) {
       const resolved = resolveProductListPrice(
         product.salePrice,
@@ -114,9 +128,10 @@ function getLinePricing({
       quantity,
       listPrice,
       tierMinQty,
+      scaleMinQty,
       isManual,
       unitPrice,
-      subtotal: roundMoney(unitPrice * quantity),
+      subtotal: !isManual && scaledTotal !== null ? scaledTotal : roundMoney(unitPrice * quantity),
     };
   });
 }
@@ -219,6 +234,7 @@ export function SaleOrderForm({
   channels,
   priceTiers,
   bundles,
+  categoryScales,
   role,
   onSuccess,
 }: SaleOrderFormProps) {
@@ -291,6 +307,7 @@ export function SaleOrderForm({
     manualFlags,
     products,
     bundles,
+    categoryScales,
     tiersByProduct,
   });
   const total = roundMoney(linePricing.reduce((sum, line) => sum + line.subtotal, 0));
@@ -458,6 +475,7 @@ export function SaleOrderForm({
             manualFlags,
             products,
             bundles,
+            categoryScales,
             tiersByProduct,
           });
           const invalidLine = submitPricing.findIndex((line) => !(line.unitPrice > 0));
@@ -674,6 +692,9 @@ export function SaleOrderForm({
                     <div className="min-w-0">
                       <p className="text-[15px] font-semibold leading-snug">
                         {line?.bundle ? <span className="text-[var(--amber-ink)]">Combo · </span> : null}
+                        {line?.scaleMinQty !== null && line?.scaleMinQty !== undefined ? (
+                          <span className="text-[var(--amber-ink)]">Promo · </span>
+                        ) : null}
                         {name}
                       </p>
                       <p className="text-[13px] text-[var(--muted)] tabular-nums">
@@ -681,6 +702,9 @@ export function SaleOrderForm({
                         {line?.isManual ? " · precio manual" : null}
                         {!line?.isManual && line?.tierMinQty !== null && line?.tierMinQty !== undefined
                           ? ` · precio por cantidad desde ${formatQuantity(line.tierMinQty)}`
+                          : null}
+                        {!line?.isManual && line?.scaleMinQty !== null && line?.scaleMinQty !== undefined
+                          ? ` · promo desde ${formatQuantity(line.scaleMinQty)}`
                           : null}
                       </p>
                     </div>

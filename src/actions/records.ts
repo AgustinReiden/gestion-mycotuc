@@ -1,6 +1,7 @@
 import {
   mapBatch,
   mapBundle,
+  mapCategoryScale,
   mapContact,
   mapExpense,
   mapInventoryMovement,
@@ -8,6 +9,7 @@ import {
   mapPurchase,
   mapSale,
   mapSupply,
+  type CategoryScaleRow,
 } from "@/lib/mappers";
 import type { SupabaseServerClient } from "./shared";
 
@@ -21,6 +23,8 @@ const SALE_ORDER_SELECT =
   "id, sale_date, total_amount, amount_paid, payment_status, payment_method, paid_at, notes, voided_at, void_reason, created_at, contacts(name), sales_channels(name), sales_order_items(id, product_id, bundle_id, quantity, unit_price, list_price, line_total, products(name), product_bundles(name)), sale_payments(id, amount, payment_method, paid_at, created_at, voided_at, void_reason)";
 const BUNDLE_SELECT =
   "id, name, sale_price, notes, is_active, created_at, product_bundle_items(id, product_id, quantity, products(name))";
+const CATEGORY_SCALE_SELECT =
+  "id, category_id, is_active, product_categories(name, is_active), category_price_scale_tiers(id, min_qty, price, mode), category_price_scale_excluded_products(product_id)";
 const EXPENSE_SELECT =
   "id, expense_date, concept, amount, source, notes, linked_purchase_id, voided_at, void_reason, created_at, expense_categories(name), purchases(contacts(name))";
 const PURCHASE_SELECT =
@@ -78,6 +82,20 @@ export async function getBundleRecord(supabase: SupabaseServerClient, bundleId: 
   }
 
   return data ? mapBundle(data) : null;
+}
+
+export async function getCategoryScaleRecord(supabase: SupabaseServerClient, scaleId: string) {
+  const { data, error } = await supabase
+    .from("category_price_scales")
+    .select(CATEGORY_SCALE_SELECT)
+    .eq("id", scaleId)
+    .maybeSingle();
+
+  if (error) {
+    throw error;
+  }
+
+  return data ? mapCategoryScale(data as unknown as CategoryScaleRow) : null;
 }
 
 export async function getProductionBatchRecord(supabase: SupabaseServerClient, batchId: string) {

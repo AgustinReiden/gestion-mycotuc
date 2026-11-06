@@ -6,6 +6,7 @@ import {
   Package,
   ShoppingCart,
   Sprout,
+  Tag,
   Wallet,
   type LucideIcon,
 } from "lucide-react";
@@ -68,6 +69,7 @@ export const APP_NAVIGATION: NavItem[] = [
   { href: "/ventas", label: "Ventas", title: "Ventas y cobros", icon: ShoppingCart },
   { href: "/gastos", label: "Gastos", title: "Gastos", icon: Wallet },
   { href: "/productos", label: "Productos", title: "Productos y stock", icon: Package },
+  { href: "/promociones", label: "Promociones", title: "Promociones y combos", icon: Tag },
   { href: "/insumos", label: "Insumos", title: "Insumos y compras", icon: Archive },
   { href: "/produccion", label: "Producción", title: "Lotes de producción", icon: Sprout },
   { href: "/contactos", label: "Contactos", title: "Clientes y proveedores", icon: ClipboardList },
